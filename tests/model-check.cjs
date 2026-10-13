@@ -146,4 +146,46 @@ assert.equal(keyGeometry.find(key => key.physical === 'z').matrix_index, 102);
 assert.equal(keyGeometry.find(key => key.physical === 'slash').matrix_index, 111);
 assert.equal(keyGeometry.find(key => key.physical === 'rshift').matrix_index, 112);
 
-console.log('PASS: actual 3 designs, immutable palette variants and RGB intensity, reserved black, LED-only configuration import, isolated single-slot merge with live key-layer preservation and text-mode clearing, invalid input rejection and physical key geometry.');
+// Exported external-AI instructions describe the actual Studio import contract,
+// independently of the app's bounded recipe compiler and optional style reference.
+const brief = '做一只5像素高的黑猫眨眼；彩虹背景，36帧、90ms，不需要纵向滚动。';
+const reference = { name: '旧作品名不应继承', description: '旧六段剧情不应强制', palette: ['#AABBCC', '#00ff41', 'bad', '#FFF'] };
+const referenceBefore = digest(reference);
+const prompt = model.prompt(brief, reference);
+assert.ok(prompt.includes(brief), 'the user visual target and explicit valid timing must survive export');
+assert.ok(!prompt.includes(reference.name) && !prompt.includes(reference.description), 'existing style is opt-in');
+assert.ok(prompt.includes('#AABBCC') && prompt.includes('#00ff41'));
+assert.ok(!prompt.includes('bad'));assert.doesNotMatch(prompt, /#FFF(?:[^0-9A-Fa-f]|$)/);
+for (const subject of ['像素角色', '渐变与波浪', '自然元素', '呼吸氛围', '文字信息', '静态纯色',
+  '游戏街机', '键帽主题', '彩虹光谱', '数字雨', '运动光效', '节日与电竞']) assert.ok(prompt.includes(subject));
+for (const motion of ['像素姿态', '平移滚动', '相位波', '呼吸', '拖尾', '下落', '伪随机', '静态']) assert.ok(prompt.includes(motion));
+assert.match(prompt, /顶部为40列×5行，每帧恰好200个颜色/);
+assert.match(prompt, /轴灯每帧恰好90个颜色/);
+assert.match(prompt, /保留索引57、61、74、78、82、83、84必须全部为#000000/);
+assert.match(prompt, /空格三灯为79、80、81/);
+assert.match(prompt, /禁止把200灯顶部数据直接复制成轴灯帧/);
+assert.match(prompt, /frames和keyframes各含1–255帧/);
+assert.match(prompt, /speed_ms是1–32767的整数/);
+assert.match(prompt, /内置AI编排支持10–100 ms\/帧/);
+assert.match(prompt, /不要固定生成192帧/);
+assert.match(prompt, /3–8秒循环/);
+assert.match(prompt, /并不保证更丝滑/);
+assert.match(prompt, /3×5 ASCII/);
+assert.match(prompt, /字符间距1列/);
+assert.match(prompt, /4n-1列/);
+assert.match(prompt, /超过40列应滚动展示完整内容/);
+assert.match(prompt, /并非所有角色都必须纵向滚动/);
+assert.match(prompt, /用户要求保留完整高图/);
+assert.match(prompt, /只输出一个完整JSON对象/);
+assert.match(prompt, /不要输出官网page_data配置、frames\.frame_data对象、scenes配方/);
+assert.match(prompt, /不输出8个抽样帧、不用省略号/);
+assert.match(prompt, /不询问是否补全/);
+assert.match(prompt, /彩虹是有效方向/);
+assert.doesNotMatch(prompt, /781|72%|均赞|人气王|318|30\.7|JSON代码块|示意帧/);
+assert.ok(!prompt.includes('```'), 'instructions must not embed a fenced output example that contradicts raw JSON');
+const optedIn = model.prompt(brief, reference, { useReference: true });
+assert.ok(optedIn.includes(reference.name) && optedIn.includes(reference.description));
+assert.equal(digest(reference), referenceBefore, 'prompt export never mutates the reference design');
+assert.doesNotThrow(() => model.prompt('', null));
+
+console.log('PASS: actual 3 designs, immutable palette variants and RGB intensity, reserved black, LED-only configuration import, isolated single-slot merge with live key-layer preservation and text-mode clearing, invalid input rejection, physical geometry and complete Studio-format external AI prompt with opt-in references, 12 styles, 8 motions and corrected hardware/font/timing limits.');

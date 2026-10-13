@@ -103,7 +103,7 @@ class StrictProtocolChecks(unittest.TestCase):
         opener = fixture.Opener(fixture.completion())
         result = ai.generate(self.payload(), opener=opener)
         request = opener.calls[0][0]
-        self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/0.2.0")
+        self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/0.2.1")
         self.assertNotIn(fixture.SECRET, request.full_url)
         self.assertNotIn(fixture.SECRET, request.data.decode())
         self.assertNotIn(fixture.SECRET, json.dumps(result))

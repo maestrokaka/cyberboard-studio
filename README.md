@@ -38,12 +38,12 @@ Cyberboard 的 macOS / Windows 灯效工作台：用 Kimi 和参考图制作顶�
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.2.0-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
-| `Cyberboard-Studio-0.2.0-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
+| `Cyberboard-Studio-0.2.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
+| `Cyberboard-Studio-0.2.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
 
 两个发布包均带 CLI 和运行环境，无需自己安装 Python。Windows 缺少 WebView2 时，运行包内 `Dependencies/MicrosoftEdgeWebview2Setup.exe`，联网安装后重新打开应用。
 
-当前是 `v0.2.0` 内测版；[v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
+当前是 `v0.2.1` 内测版；[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
 
@@ -63,11 +63,13 @@ Cyberboard 的 macOS / Windows 灯效工作台：用 Kimi 和参考图制作顶�
 
 v0.2.0 已接入 Kimi，同时保留本地模板变体、外部 AI 创作规格导出与作品 JSON 导入。当前 CLI 不支持固件升级。
 
+v0.2.1 将创作提示词扩展为 12 类设计方向与 8 种运动语言，按主题选择角色微动作、渐变、自然、文字、游戏或光轨等组合，不套用固定场景模板。内部 Kimi 输出有界配方，由本地编译完整帧；外部提示词要求完整 Studio 作品 JSON。顶部每帧 200 色、轴灯每帧 90 色，不能把顶部数组复制成轴灯。App 当前仍请求 192 帧和当前 `10–100 ms / 帧`，3–8 秒只是设计目标。[提示词与格式说明](docs/USER_GUIDE.md#creative)
+
 在左侧「模型配置」选择服务、区域和模型，输入自己的 API Key 并保存；回到工作台填写描述或添加参考图，点击「用 Kimi 制作灯效」。默认优先遵循描述和图片，当前作品只提供配色建议；需要参考当前作品的主题和风格时，再勾选「使用当前作品风格」。图片只保留在当前会话，不发送设备配置、键位或整份草稿。生成不会自动放入槽位或写入 USB。完整步骤见[AI 创作说明](docs/USER_GUIDE.md#creative)。
 
 默认 Code 模型为 `k3`，下拉可选择 `k3`、`k3-256k`、`kimi-for-coding` 或 `kimi-for-coding-highspeed`；开放平台默认 `kimi-k3`。两种服务都可选择「自定义模型…」填写有权限使用的官方模型 ID，使用不同密钥和额度；当前实际支持这两种 Kimi 服务，独立配置页面为后续服务扩展保留空间。[Kimi 模型配置](https://www.kimi.com/code/docs/kimi-code/models.html)
 
-AI 根据素材设计图案和时间轴；角色、IP 和复杂标志可用有限像素图配方保持轮廓，通过上下滚动显示超出五行的部分。不会把整张高图强制压扁成五行，也不会执行模型返回的代码。
+AI 根据素材设计图案和时间轴：五行能辨认的角色适合少而精的眨眼、摆动等微动作；需要完整高造型时，可用最多 40×32 的像素图按需滚动。不会把整张高图强制压扁成五行、要求所有角色滚动，或执行模型返回的代码。
 
 macOS 已实际验证 Code 密钥保存、连接检查及 `kimi-for-coding` 在线生成；新默认 `k3` 尚未单独完成真实生成验证。协议、图片处理、动画编译和交互另有离线检查。新版同步流程的读取与计划准备不代表实际写入成功，真实写入及完成后读回仍待验收；Windows 原生启动、DPAPI 和真实 USB 也待实机验证。Kimi 官方将 Code 会员接口用于编程工具，产品集成推荐开放平台；本 App 保持真实客户端身份，实际权限与可用性以平台为准。[Kimi 官方接入说明](https://www.kimi.com/code/docs/)
 

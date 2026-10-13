@@ -10,7 +10,7 @@ import zipfile
 
 APP = Path(__file__).resolve().parents[2]
 PACKAGE = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.2.0-Windows-x64.zip"
+ARCHIVE = APP / "build/Cyberboard-Studio-0.2.1-Windows-x64.zip"
 
 
 def digest(path):

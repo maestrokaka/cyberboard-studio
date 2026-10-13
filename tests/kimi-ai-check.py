@@ -145,6 +145,55 @@ class KimiChecks(unittest.TestCase):
         for secret in ("private-keymap", "private-frames", "private-reference-key", "private-identity", "private-baseline", SECRET):
             self.assertNotIn(secret, text)
 
+    def test_reference_aesthetics_keep_the_requested_output_contract(self):
+        payload = {**self.payload(), "frameCount": 50, "speedMs": 100,
+                   "brief": "黑底紫色小角色眨眼，轴灯轻微呼吸"}
+        messages = ai.creative_messages(payload)
+        system, request = messages[0]["content"], json.loads(messages[1]["content"])
+        self.assertEqual(request["固定播放参数"], {"frame_count": 50, "speed_ms": 100, "loop_seconds": 5.0})
+        self.assertIn("frame_count=50，speed_ms=100", system)
+        self.assertIn("有效帧索引0..49", system)
+        self.assertIn("不能把200颗顶部像素复制成轴灯", system)
+        self.assertIn("示意帧", system)
+        self.assertIn("能在5行里辨识的图案可完整静置", system)
+        self.assertIn("不强制上下滚动", system)
+        self.assertNotIn("781", system)
+        # The final schema remains the actual executable contract rather than
+        # a copied DIY page shape, invented shader, or raw pixel-array format.
+        schema = json.loads(system.split("配方JSON Schema：\n", 1)[1])
+        self.assertEqual(schema["properties"]["frame_count"]["maximum"], 255)
+        self.assertIn("scenes", schema["required"])
+        self.assertNotIn("frames", schema["properties"])
+        self.assertNotIn("hsv", schema["$defs"])
+
+    def test_small_character_and_breathing_keep_complete_independent_outputs(self):
+        r = {"version": 1, "name": "紫影眨眼", "description": "紫色像素角色轻眨眼，轴灯低亮呼吸。",
+             "frame_count": 50, "speed_ms": 100, "palette": ["#7B2FBE", "#FFFFFF"], "scenes": []}
+        for name, start, end, rows in [("睁眼", 0, 45, ["01110", "12221", "12121", "11111", "01010"]),
+                                       ("眨眼", 45, 50, ["01110", "11111", "12221", "11111", "01010"])]:
+            r["scenes"].append({"name": name, "start": start, "end": end,
+                                "top": [{"kind": "bitmap", "rows": rows, "x": 0.5, "y": 0.5}],
+                                "keys": [{"kind": "solid", "color": "#7B2FBE", "opacity": {"from": 0.1, "to": 0.4, "ease": "sine"}}]})
+        payload = {**self.payload(), "frameCount": 50, "speedMs": 100, "brief": "小角色只眨一次眼"}
+        result = ai.generate(payload, opener=Opener(completion(json.dumps(r))))
+        d = result["design"]
+        self.assertEqual((len(d["frames"]), len(d["keyframes"]), d["speed_ms"]), (50, 50, 100))
+        self.assertEqual({len(f) for f in d["frames"]}, {200})
+        self.assertEqual({len(f) for f in d["keyframes"]}, {90})
+        self.assertNotEqual(d["frames"][0], d["frames"][-1])
+        self.assertNotEqual(d["keyframes"][0], d["keyframes"][22])
+        self.assertTrue(all(f[i] == "#000000" for f in d["keyframes"] for i in bridge.RESERVED_LEDS))
+        self.assertEqual({(layer.get("x"), layer.get("y")) for scene in r["scenes"] for layer in scene["top"]}, {(0.5, 0.5)})
+
+    def test_reference_document_partial_and_200_lamp_keyboard_output_is_not_accepted(self):
+        incomplete = recipe()
+        incomplete["frame_count"] = 8
+        for text in (json.dumps(incomplete), "设计思路：先看八帧示意。\n```json\n"+json.dumps(recipe())+"\n```",
+                     json.dumps({"frames": {"frame_num": 8, "valid": 1, "frame_data": []}, "keyframes": {"frame_num": 8}, "speed_ms": 150})):
+            opener = Opener(completion(text), completion(text))
+            self.error("ai_recipe_invalid", lambda: ai.generate(self.payload(), opener=opener))
+            self.assertEqual(len(opener.calls), 2)
+
     def test_k3_choice_and_bitmap_brief_compile_through_the_same_pipeline(self):
         drawing = recipe()
         drawing.update(name="猫影纵卷", description="橙色像素轮廓上下穿过顶部视窗。")

@@ -1,4 +1,4 @@
-Cyberboard Studio 0.2.0 · Windows x64 桌面版
+Cyberboard Studio 0.2.1 · Windows x64 桌面版
 
 完整使用说明（适用当前版本，含图示、JSON 格式和故障处理）：
 https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/USER_GUIDE.md
