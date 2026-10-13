@@ -4,6 +4,28 @@ Cyberboard 的 macOS / Windows 灯效工作台：设计顶部与轴灯动画，�
 
 [下载软件与查看版本记录](https://github.com/maestrokaka/cyberboard-studio/releases)
 
+## 应用截图
+
+以下为 macOS 版实际运行截图，Windows 版共用同一套工作台界面。
+
+### 灯效工作台
+
+在去背景的真实键盘特写上预览顶部与轴灯动画，调整亮度、节奏与槽位草稿。
+
+![裂隙超载灯效工作台](docs/screenshots/workbench-neon-rift.jpg)
+
+### 桌面整机预览
+
+切换实体照片视角，查看灯效与键盘外观的整体搭配。
+
+![桌面视角下的整机灯效预览](docs/screenshots/keyboard-desk-preview.jpg)
+
+### 灯效作品库
+
+浏览三套作品的像素缩略图、配色、动画帧数与循环时长，再进入工作台预览。
+
+![灯效作品库](docs/screenshots/lighting-library.jpg)
+
 ## 下载与运行
 
 | 文件 | 适用电脑 | 打开方式 |
