@@ -2,7 +2,9 @@
 
 Cyberboard 的 macOS / Windows 灯效工作台：设计顶部与轴灯动画，在真实键盘照片上预览，再通过本机 CLI 同步到键盘。
 
-[下载软件与查看版本记录](https://github.com/maestrokaka/cyberboard-studio/releases)
+[下载软件与查看版本记录](https://github.com/maestrokaka/cyberboard-studio/releases) · **[完整使用说明](docs/USER_GUIDE.md)** · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
+
+第一次使用可先阅读[五分钟上手](docs/USER_GUIDE.md#quick-start)，查看安装、预览、JSON、原配置迁移、同步、键位、时间和故障处理的完整步骤。
 
 ## 应用截图
 
@@ -58,10 +60,12 @@ AI 服务尚未连接。可导出创作规格供外部 AI 使用、导入生成�
 
 - 在原 Mac 上，记录通常位于 `~/.local/share/cyberboard-cli/devices/AM01R6/`；R4 使用自己的产品 ID。保留 `current.json` 和 `meta.json`，不要改写身份。
 - 在同一台 Mac 上，发布版沿用原 CLI 设备记录，可以直接检查连接并准备同步。
-- 移到 Windows 时，关闭 App，双击包内「迁移原配置.cmd」，粘贴原设备目录或 `current.json` 的完整路径。工具校验结构与 CRC，拒绝覆盖已有记录，不操作 USB。详细步骤见 [Windows 使用说明](windows/release-readme.txt)。
+- 移到 Windows 时，关闭 App，双击包内「迁移原配置.cmd」，粘贴原设备目录或 `current.json` 的完整路径。工具校验结构与 CRC，拒绝覆盖已有记录，不操作 USB。详细步骤见[完整使用说明：首次同步](docs/USER_GUIDE.md#baseline)与 [Windows 包内说明](windows/release-readme.txt)。
 - 在另一台 Mac 上，将可信记录复制至对应 CLI 设备目录，关闭 App 后复制，随后重新打开。
 
 连接后先检查设备身份与键位，再查看同步计划；确认写入后保持 USB 连接，等待提交和验证完成。
+
+没有可信原记录的新用户可先预览、导出作品、读取键位和同步时间；当前 GUI 不能从键盘读回灯效并初始化完整记录。具体限制与首次建立记录的区别见[使用说明](docs/USER_GUIDE.md#baseline)。
 
 ## 本机数据
 

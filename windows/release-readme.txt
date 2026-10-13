@@ -1,5 +1,8 @@
 Cyberboard Studio 0.1.0 · Windows x64 桌面版
 
+完整使用说明（适用当前版本，含图示、JSON 格式和故障处理）：
+https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/USER_GUIDE.md
+
 开始使用
 1. 把整个 ZIP 解压到一个普通文件夹，例如 D:\Apps\Cyberboard Studio。
 2. 双击 Cyberboard Studio.exe。请保留同目录所有 DLL 与 resources 文件夹。
@@ -17,7 +20,8 @@ Enterprise 版本；普通 Windows 10、ARM64 原生版和 32 位版尚未验证
 • 实体键盘顶部与轴灯动画、整机与键盘特写、亮度、节奏和配色变体。
 • JSON 原生导入导出、作品库、草稿保存。
 • 检查 USB 连接后读取设备身份、固件与 81 个实体键的 7 层键位。
-• 连接后同步系统时间。固件升级功能不在当前 CLI 中。
+• 连接后按电脑当前时刻同步北京时间（Asia/Shanghai，固定 UTC+8）。
+  当前没有时区选择；固件升级功能不在当前 CLI 中。
 启动和打开预览不会自动连接或写入键盘。写入灯效仍需先查看同步计划，
 再明确点击“同步到键盘”。底层继续使用完整配置备份、协议确认及键位读回。
 
@@ -26,11 +30,12 @@ Windows 包不预置任何人的设备配置或历史。键盘不能读回灯效
 需要迁移这把键盘此前通过 CLI 成功写入后保存的完整记录，才能安全保留
 其他槽位和键位。普通“导入灯效”只添加作品，不建立原配置记录。
 
-1. 在 Mac 关闭 App 和 CLI，运行：
-   .tools/cyberboard-cli/bin/cyberboard store path --device AM01R6
-   复制返回的设备目录内 current.json 与 meta.json，保持它们放在同一文件夹。
-   原目录通常为 ~/.local/share/cyberboard-cli/devices/AM01R6。
-   R4 请把 AM01R6 替换成这把键盘实际的产品 ID，不要改写 meta.json。
+1. 在 Mac 关闭 App 和 CLI，在 Finder 按 Command+Shift+G，输入：
+   ~/.local/share/cyberboard-cli/devices/
+   打开这把键盘实际产品 ID 的目录。R6 通常为 AM01R6；R4 以实际 ID 为准。
+   复制目录内 current.json 与 meta.json，保持它们放在原产品目录中。
+   如以前显式设置过 CYBERBOARD_DATA_DIR，使用当时指定的记录目录。
+   不要改写 meta.json。Mac App 已带后台，无需另找开发目录里的 CLI。
 2. 把这个文件夹带到 Windows（例如用 U 盘），关闭 App。
 3. 双击“迁移原配置.cmd”，粘贴设备文件夹或 current.json 的完整路径。
    工具校验完整结构与编码 CRC，拒绝覆盖已存在的当前库；只复制本机记录，
