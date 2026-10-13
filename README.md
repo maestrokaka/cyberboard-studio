@@ -37,7 +37,7 @@ Cyberboard 的 macOS / Windows 灯效工作台：设计顶部与轴灯动画，�
 
 当前是 `v0.1.0` 内测版。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动和真实 USB 通信尚待 Windows 实机验证。
 
-仓库和版本下载当前均为私有，登录拥有访问权限的 GitHub 账号后可见。
+仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
 
 ## 当前功能
 
@@ -89,7 +89,7 @@ native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 
 这会先冻结独立后台，再生成 `build/Cyberboard Studio.app`。Mac 构建会检查发布素材不含个人基线，并验证签名。
 
-Windows 私有运行环境准备与校验见 [运行环境构建说明](windows/runtime-readme.txt)。准备 `windows/runtime/python` 后：
+Windows 独立运行环境准备与校验见 [运行环境构建说明](windows/runtime-readme.txt)。准备 `windows/runtime/python` 后：
 
 ```sh
 python windows/build.py --dotnet /path/to/dotnet --nuget /path/to/nuget-cache --bootstrapper /path/to/MicrosoftEdgeWebview2Setup.exe
