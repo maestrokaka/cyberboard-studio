@@ -1,0 +1,33 @@
+# Local application builds and downloaded runtimes
+/build/
+/.tools/
+/.venv/
+**/bin/
+**/obj/
+**/__pycache__/
+*.py[cod]
+.DS_Store
+/windows/runtime/python/
+/windows/runtime/downloads/*.whl
+/windows/runtime/downloads/*.zip
+/windows/installer/*.exe
+/screenshots/
+*.zip
+*.zip.sha256
+
+# Device records belong to the user's computer
+**/current.json
+**/meta.json
+**/workspace.json
+**/*.raw
+**/plans/
+**/backups/
+**/history/
+.env
+.env.*
+!.env.example
+
+# Windows/IDE local state
+.vs/
+*.user
+*.suo

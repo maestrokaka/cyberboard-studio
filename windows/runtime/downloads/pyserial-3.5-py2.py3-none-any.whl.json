@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/pyserial/3.5/json",
+  "urls": [
+    {
+      "filename": "pyserial-3.5-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "07bc587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558",
+        "md5": "b6b182ebaf20199e9788214cae349df4",
+        "sha256": "c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0"
+      }
+    },
+    {
+      "filename": "pyserial-3.5.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/1e/7d/ae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082/pyserial-3.5.tar.gz",
+      "digests": {
+        "blake2b_256": "1e7dae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082",
+        "md5": "1cf25a76da59b530dbfc2cf99392dc83",
+        "sha256": "3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb"
+      }
+    }
+  ]
+}

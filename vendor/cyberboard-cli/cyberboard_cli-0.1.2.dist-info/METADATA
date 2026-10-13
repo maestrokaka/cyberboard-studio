@@ -1,0 +1,330 @@
+Metadata-Version: 2.5
+Name: cyberboard-cli
+Version: 0.1.2
+Summary: Configure the AngryMiao CyberBoard R4 (keymap + LED) over USB without AM Master
+Project-URL: Homepage, https://github.com/GeneralD/cyberboard-cli
+Project-URL: Repository, https://github.com/GeneralD/cyberboard-cli
+Project-URL: Issues, https://github.com/GeneralD/cyberboard-cli/issues
+Author: GeneralD
+License-Expression: MIT
+License-File: LICENSE
+Keywords: angrymiao,cli,cyberboard,keyboard,keymap,led
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: MacOS
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: System :: Hardware
+Classifier: Topic :: Utilities
+Requires-Python: >=3.11
+Requires-Dist: pyserial>=3.5
+Provides-Extra: all
+Requires-Dist: jsonschema>=4.0; extra == 'all'
+Requires-Dist: mcp<2,>=1.2; extra == 'all'
+Requires-Dist: pillow>=10.0; extra == 'all'
+Requires-Dist: textual>=2.0; extra == 'all'
+Provides-Extra: led
+Requires-Dist: pillow>=10.0; extra == 'led'
+Provides-Extra: mcp
+Requires-Dist: mcp<2,>=1.2; extra == 'mcp'
+Provides-Extra: tui
+Requires-Dist: textual>=2.0; extra == 'tui'
+Provides-Extra: verify
+Requires-Dist: jsonschema>=4.0; extra == 'verify'
+Description-Content-Type: text/markdown
+
+# cyberboard-cli
+
+<p align="center">
+  <img src="assets/hero.jpg" alt="cyberboard-cli — write CyberBoard R4 config from the terminal" width="420">
+</p>
+
+![status](https://img.shields.io/badge/status-CLI%20usable%20·%20WIP-success) ![platform](https://img.shields.io/badge/platform-macOS-blue) ![target](https://img.shields.io/badge/target-CyberBoard%20R4-blue) ![python](https://img.shields.io/badge/python-%3E%3D3.11-blue) ![PyPI](https://img.shields.io/pypi/v/cyberboard-cli) ![install](https://img.shields.io/badge/install-brew%20%7C%20pip%20%7C%20uv-blue) ![protocol](https://img.shields.io/badge/protocol-reverse--engineered-purple) ![transport](https://img.shields.io/badge/transport-USB%20CDC%20serial-success) ![license](https://img.shields.io/badge/license-MIT-green)
+
+A CLI — and the protocol knowledge base behind it — for writing **AngryMiao
+CyberBoard R4** configuration **without the official AM Master app**.
+
+The goal: manage your keymap and LED display as **separate, version-controllable
+sources**, and write them straight to the board from the command line — robustly,
+without AM Master's flaky connection.
+
+> **Status:** the write protocol is fully reverse-engineered, and the `cyberboard`
+> CLI is implemented and published (see **Install** below). Writing and keymap
+> read-back are **verified on real R4 hardware**; keymap authoring (TOML) and LED
+> display authoring (GIF / declarative recipes) work today, and the MCP server and
+> Claude Code plugin ship alongside the CLI. Still WIP: per-key LED authoring. The
+> self-contained protocol spec lives under [`.claude/rules/`](.claude/rules/) (Japanese).
+
+## Install
+
+**Prerequisite:** Python ≥ 3.11. Every method below installs the same package
+([`cyberboard-cli` on PyPI](https://pypi.org/project/cyberboard-cli/)) — they
+differ only in *how* it lands on your machine.
+
+### Which installer should I pick?
+
+| If you want… | Use | You get |
+|---|---|---|
+| macOS, simplest, shell completion wired for you | **Homebrew** | core + LED + keymap edit (TUI) |
+| One isolated global command, any OS | **uv tool** or **pipx** | core + whatever extras you ask for |
+| It inside a project / existing venv | **pip** | core + extras |
+| To try it once without installing | **uvx** | ephemeral, extras on the fly |
+
+### Pick your extras
+
+The package is a small core plus opt-in extras, so a device-only or keymap-only
+setup stays lean. Add them in brackets, e.g. `'cyberboard-cli[led,verify]'`:
+
+| Extra | Pulls in | Needed for |
+|---|---|---|
+| *(core)* | `pyserial` | device I/O + keymap build — `devices` / `read` / `write` / `doctor` / `build` |
+| `[led]` | `pillow` | LED authoring — `led` / `anim` / `compose` |
+| `[tui]` | `textual` | the interactive keymap editor — `keymap edit` |
+| `[verify]` | `jsonschema` | strict schema checks in `verify` (degrades to basic checks without it) |
+| `[mcp]` | `mcp` | the `cyberboard-mcp` server — see [MCP server](#mcp-server) |
+| `[all]` | all of the above | everything |
+
+### Commands
+
+```sh
+# Homebrew (macOS) — full app (device I/O + LED + keymap edit), completion auto-wired:
+brew install GeneralD/tap/cyberboard-cli
+
+# uv tool — isolated global command (recommended for the full feature set):
+uv tool install cyberboard-cli                 # core only
+uv tool install 'cyberboard-cli[led]'          # + LED authoring
+
+# pipx — isolated global command:
+pipx install 'cyberboard-cli[led]'
+
+# pip — into the currently-active venv:
+pip install 'cyberboard-cli[led]'
+
+# uvx — run once, nothing installed:
+uvx --from 'cyberboard-cli[led]' cyberboard --help
+```
+
+> **Homebrew bundles the full app** — device I/O, LED authoring (`anim` / `led`
+> / `compose`), and the keymap editor (`keymap edit`). `pillow` ships as a
+> prebuilt wheel and `textual` is pure Python, so installs stay quick (~30 s, not
+> a long source build). Only the `[verify]` and `[mcp]` extras aren't bundled
+> (both degrade gracefully). If you want them, install a separate
+> `uv tool install 'cyberboard-cli[all]'` — use `[all]` (not just
+> `[verify,mcp]`) so that environment can also render LED when it runs the MCP
+> server.
+
+**Developing on a clone?** Run it straight from the source tree, no install:
+
+```sh
+uv run --extra led cyberboard --help   # device commands don't need --extra led
+```
+
+## Usage
+
+`cyberboard <command>` — run `cyberboard <command> --help` for each command's options.
+
+| Command | What |
+|---|---|
+| `devices` / `device` | List connected boards / show one device's detail |
+| `doctor` | Non-destructive connectivity health check |
+| `build` | `keymap.toml` → IR config (`--dump` for the reverse) |
+| `verify` | Validate an IR config against the schema |
+| `led` | GIF ⇄ IR display codec + terminal player (`gif2ir` / `ir2gif` / `play` / `recipe`) |
+| `anim` | Render declarative LED animations (`render` / `preview` / `montage`) |
+| `compose` | Compose a `led.toml` manifest (multi-source slots) → IR |
+| `read` | Read config back from the device (`keymap`) |
+| `keymap` | Keyboard-shaped keymap grid, colored by key category with compact ⌘⌥⌃⇧ / arrow symbols — `show` (ASCII, color on a TTY), or `edit` (interactive TUI, click a key to reassign; needs `[tui]`) |
+| `write` | Write an IR config to the device. On a successful `--execute`, saves the written full IR to the state store (`current.json` + a snapshot) so `dump` / `history` / `restore` have a source of truth |
+| `set-time` | Set the device RTC clock |
+| `store` | Where per-device configs are saved (`path` shows the resolved root; `--selftest`) |
+| `get` | Show the current config in the terminal — live keymap grid (per layer) + stored LED frame counts, labelled by provenance (`--layer N` / `--all-layers`) |
+| `dump` | Dump the current config to a file/stdout — hybrid: live keymap + stored LED, each labelled by provenance (`-o FILE`) |
+| `diff` | Diff two configs (snapshot refs or files): per-position keymap + per-slot LED frame counts (`diff <a> <b>`) |
+| `history` | List a device's saved snapshots (newest first) with size + provenance — the refs `diff` / `restore` accept |
+| `restore` | Re-write a past snapshot to the device — undo/rollback (`restore <ref>`, `<ref>` = `latest` or a timestamp; dry-run unless `--execute`) |
+| `set key` | Reassign one key in place — read live keymap, swap one position, keep stored LED, full-write (`set key <layer> <pos> <val>`; dry-run unless `--execute`). Auto-snapshots before & after |
+| `set led` | Replace one display slot's frames from a GIF or recipe — keep the live keymap, full-write (`set led <slot> <gif\|recipe>`; dry-run unless `--execute`). Auto-snapshots before & after |
+| `completion` | Print a shell completion script (`bash` / `zsh` / `fish`) |
+
+```sh
+cyberboard devices                                              # find your board
+cyberboard anim preview -r examples/led/text-scroll.json -o preview.gif   # author an LED animation
+cyberboard led play -i preview.gif                              # play it right in the terminal (Ctrl-C to stop)
+cyberboard compose -m examples/led/compose.toml -b base.json -o config.json   # combine many sources per slot
+cyberboard build -k keymap.toml -b base.json -o config.json     # build a config from a TOML keymap
+cyberboard keymap show config.json --layer 1                    # view the keymap (colored grid; --color auto/always/never)
+cyberboard keymap edit config.json                              # edit it interactively — click a key to reassign (needs [tui])
+cyberboard write config.json --execute                          # write it (omit --execute for a dry run)
+```
+
+### Shell completion
+
+`cyberboard completion <shell>` prints a completion script. Homebrew wires this
+up automatically; for a pip/uv install, install it manually:
+
+```sh
+cyberboard completion zsh  > "${fpath[1]}/_cyberboard"            # zsh (then restart)
+cyberboard completion bash > /usr/local/etc/bash_completion.d/cyberboard   # bash
+cyberboard completion fish > ~/.config/fish/completions/cyberboard.fish    # fish
+```
+
+## MCP server
+
+Every CLI operation is also exposed to MCP clients (Claude Desktop, Claude Code,
+editors, AI agents) through a small **stdio** server that simply wraps the CLI —
+so the MCP tool surface never drifts from the CLI's behaviour.
+
+**1. Install with the `[mcp]` extra** so the `cyberboard-mcp` command is on your
+`PATH` (add `[led]` too if you want the LED tools to render inside the server):
+
+```sh
+uv tool install 'cyberboard-cli[mcp]'        # or: pipx install / pip install
+uv tool install 'cyberboard-cli[mcp,led]'    # + LED tools (render/preview/gif)
+cyberboard-mcp                               # quick check: serves over stdio (Ctrl-C to quit)
+```
+
+**2. Register it with your client** — the command must be on the client's `PATH`:
+
+```json
+{ "mcpServers": { "cyberboard": { "command": "cyberboard-mcp" } } }
+```
+
+Per client:
+
+- **Claude Code** — just use the [plugin](#claude-code-plugin) below; it wires
+  the server for you, no JSON editing.
+- **Claude Desktop / Cursor / editors** — paste the JSON above into the client's
+  MCP config. If it can't find the command, give an absolute path
+  (`which cyberboard-mcp`) or run it through uvx (no separate install needed):
+
+  ```json
+  { "mcpServers": { "cyberboard": {
+      "command": "uvx",
+      "args": ["--from", "cyberboard-cli[mcp]", "--with", "mcp<2", "cyberboard-mcp"] } } }
+  ```
+
+- **[mcpm](https://mcpm.sh) users** — register it once and add it to a profile:
+
+  ```sh
+  mcpm new cyberboard --type stdio --command uvx \
+    --args "--from cyberboard-cli[mcp] --with mcp<2 cyberboard-mcp"
+  mcpm profile edit base --add-server cyberboard
+  ```
+
+**Tools (11):** `list_devices` · `device_info` · `doctor` · `verify` ·
+`build_keymap` · `render_animation` · `preview_animation` · `gif_to_ir` ·
+`ir_to_gif` · `read_keymap` · `write_config`.
+
+> `write_config` is destructive and defaults to a **dry run** — pass
+> `execute=true` to actually write to the board. The LED tools
+> (`render_animation` / `preview_animation` / `gif_to_ir` / `ir_to_gif`) need the
+> `[led]` extra in the same environment.
+
+## Claude Code plugin
+
+For [Claude Code](https://claude.ai/code), the plugin auto-configures the
+`cyberboard` MCP server — no hand-editing of `mcpServers`, and **no separate
+package install needed**.
+
+**Inside Claude Code** (these are slash commands, not shell), add this repo as a
+plugin marketplace and install the plugin:
+
+```text
+/plugin marketplace add GeneralD/cyberboard-cli
+/plugin install cyberboard@cyberboard-cli
+```
+
+Enabling it starts the server automatically. The MCP entry **self-bootstraps**
+via `uvx --from 'cyberboard-cli[mcp,led]' --with 'mcp<2' cyberboard-mcp` — uvx fetches the
+package on first launch (LED tools included, pillow from a wheel — no source
+build) and caches it thereafter.
+
+> **Prerequisite:** [`uv`](https://docs.astral.sh/uv/) (for `uvx`). Nothing else
+> to install — the plugin pulls the server itself. The plugin manifest lives at
+> `plugins/cyberboard/` and the marketplace manifest at
+> `.claude-plugin/marketplace.json` (both in this repo).
+
+## Why
+
+The official setup has three problems this project fixes:
+
+- **Keymap and LED live in one JSON file.** Applying a community LED animation
+  overwrites your keymap. This project keeps them apart and recombines them only
+  at build time, so "swap just the LED" is safe.
+- **AM Master's connection is flaky** — writes succeed or fail at random. The
+  root causes are now identified (see the protocol doc) and are fixable on the
+  CLI side.
+- **It's inflexible** — no partial updates, no scripting, no diffing.
+
+## What we know (headline findings)
+
+All reverse-engineered from AM Master 1.3.7 (decompiled locally; the decompiled
+sources are **not** redistributed here — see *Legal*):
+
+- **Transport is USB CDC serial (pyserial) @ 9600 baud.** HID is detection-only.
+- **No encryption on the config path** — the AES in the app is just PyInstaller
+  bytecode obfuscation.
+- **Frames are a fixed 64 bytes:** `[0]` category, `[1]` subcommand,
+  `[2..62]` payload, `[63]` **CRC-8** (poly `0x07`).
+- **LED model:** `frames` = the 40×5 = 200-px top display; `keyframes` = the
+  90 per-key backlights. Slots 1/2/3 = pages 5/6/7. *(Empirically verified:
+  active pages always pack to exactly 200 px / 90 px — see `verify_encoding.py`
+  in the [research wiki](https://github.com/GeneralD/cyberboard-cli/wiki).)*
+- **Send sequence and full command table** are documented in
+  [`.claude/rules/30-write-protocol.md`](.claude/rules/30-write-protocol.md).
+
+## Repository layout
+
+| Path | What |
+|---|---|
+| [`.claude/rules/`](.claude/rules/) | The protocol & schema knowledge base (Japanese) — start at `00-overview.md` |
+| `.claude/rules/30-write-protocol.md` | The definitive write-protocol spec (transport, frames, CRC, command table, send order) |
+| [Research wiki](https://github.com/GeneralD/cyberboard-cli/wiki) | Raw reverse-engineering scripts (`verify_encoding.py`, `zscan.py`) and protocol experiments, moved out of the repo tree |
+
+> Confidence is marked throughout: 🟢 source-confirmed · 🟡 strong inference ·
+> 🔴 needs live-hardware capture.
+
+## Roadmap
+
+Done:
+
+- **M0 — Protocol analysis** ✅ decompiled; encoding verified; wire bytes
+  confirmed by live serial handshake on a real R4.
+- **M1 — Full write** ✅ a known-good config writes over the reverse-engineered
+  sequence (LED visually confirmed on hardware).
+- **M2 — Read-back + diff** ✅ for the keymap (write → read → 1400/1400 match).
+  LED has no read-back path, so it's authored from source.
+- **M3 — Keymap build** ✅ `keymap.toml` → IR with lossless round-trip.
+- **M5 — LED display authoring** ✅ GIF ⇄ IR codec + declarative animation recipes
+  - an in-terminal player (`led play`, half-block truecolor) and a frame
+    montage (`anim montage`) for judging motion/loop in a still viewer.
+
+Productization ✅ a unified `cyberboard` CLI core, standalone packaging
+(published to PyPI + a Homebrew tap), an MCP server (`cyberboard-mcp`), and a
+Claude Code plugin — all calling the same core. Next: per-key LED authoring and
+a sprite/vision LED design loop.
+
+> Note: partial writes are **not** supported by firmware (`JSON_START` erases the
+> whole config), so "swap just the LED" is done by read → merge → full write, not
+> by a partial write.
+
+## Legal
+
+This is an independent interoperability project. The reverse-engineering was done
+on a locally-owned copy of AM Master for the sole purpose of interoperating with
+hardware the author owns. **The vendor's app, its installer, its extracted
+bytecode, and the decompiled sources are deliberately excluded from this repo**
+(see `.gitignore`); only original analysis and first-party tooling are published.
+All trademarks belong to their respective owners. "AngryMiao" and "CyberBoard"
+are trademarks of AngryMiao.
+
+## Acknowledgements
+
+- [`angrymiao-cyberboard-config-merger`](https://github.com/GeneralD/angrymiao-cyberboard-config-merger)
+  and [`miaomerge`](https://github.com/GeneralD/miaomerge) — sibling tools that
+  merge/composite LED animations into a writable JSON (writing still relies on
+  AM Master; that's the gap this project closes).

@@ -1,0 +1,3 @@
+[console_scripts]
+cyberboard = cyberboard.cli:main
+cyberboard-mcp = cyberboard.mcp_server:main

@@ -1,0 +1,102 @@
+[
+  {
+    "id": "faceted-cs",
+    "number": "01",
+    "name": "切面 CS",
+    "englishName": "Faceted CS",
+    "concept": "把 C 与 S 压进切角金属轮廓，品牌名称与键盘装甲形成同一语言。",
+    "shortConcept": [
+      "切角金属轮廓",
+      "字母直接关联品牌"
+    ],
+    "recommended": false,
+    "description": "把 C 与 S 压进切角金属轮廓，品牌名称与键盘装甲形成同一语言。",
+    "mark": "faceted-cs/mark.svg",
+    "whiteMark": "faceted-cs/mark-white.svg",
+    "blackMark": "faceted-cs/mark-black.svg",
+    "appIcon": "faceted-cs/app-icon.svg",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"切面 CS\"><g fill=\"#828fff\"><path d=\"M28 10 L16 10 L5 21 L5 43 L16 54 L28 54 L28 43 L21 43 L16 38 L16 26 L21 21 L28 21 Z\"/><path d=\"M59 10 L40 10 L32 18 L32 29 L47 37 L48 39 L45 43 L33 43 L33 54 L49 54 L59 44 L59 34 L44 26 L43 24 L46 21 L59 21 Z\"/></g></svg>",
+    "whiteSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"切面 CS\"><g fill=\"#f7f8f8\"><path d=\"M28 10 L16 10 L5 21 L5 43 L16 54 L28 54 L28 43 L21 43 L16 38 L16 26 L21 21 L28 21 Z\"/><path d=\"M59 10 L40 10 L32 18 L32 29 L47 37 L48 39 L45 43 L33 43 L33 54 L49 54 L59 44 L59 34 L44 26 L43 24 L46 21 L59 21 Z\"/></g></svg>",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" role=\"img\" aria-label=\"切面 CS\"><rect x=\"4\" y=\"4\" width=\"120\" height=\"120\" rx=\"28\" fill=\"#141516\"/><g fill=\"#828fff\" transform=\"translate(30 30) scale(1.0625)\"><path d=\"M28 10 L16 10 L5 21 L5 43 L16 54 L28 54 L28 43 L21 43 L16 38 L16 26 L21 21 L28 21 Z\"/><path d=\"M59 10 L40 10 L32 18 L32 29 L47 37 L48 39 L45 43 L33 43 L33 54 L49 54 L59 44 L59 34 L44 26 L43 24 L46 21 L59 21 Z\"/></g></svg>"
+  },
+  {
+    "id": "refraction-gate",
+    "number": "02",
+    "name": "折光门",
+    "englishName": "Refraction Gate",
+    "concept": "两片几何装甲相向折叠，中间留出光道；灯效可以穿过，外壳轮廓保持安静。",
+    "shortConcept": [
+      "相向折叠的装甲",
+      "中央留出一条光道"
+    ],
+    "recommended": true,
+    "description": "两片几何装甲相向折叠，中间留出光道；灯效可以穿过，外壳轮廓保持安静。",
+    "mark": "refraction-gate/mark.svg",
+    "whiteMark": "refraction-gate/mark-white.svg",
+    "blackMark": "refraction-gate/mark-black.svg",
+    "appIcon": "refraction-gate/app-icon.svg",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"折光门\"><g fill=\"#828fff\"><path d=\"M29 5 L7 20 L7 44 L29 59 L29 47 L18 39 L18 25 L29 17 Z\"/><path d=\"M35 5 L57 20 L57 44 L35 59 L35 47 L46 39 L46 25 L35 17 Z\"/></g></svg>",
+    "whiteSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"折光门\"><g fill=\"#f7f8f8\"><path d=\"M29 5 L7 20 L7 44 L29 59 L29 47 L18 39 L18 25 L29 17 Z\"/><path d=\"M35 5 L57 20 L57 44 L35 59 L35 47 L46 39 L46 25 L35 17 Z\"/></g></svg>",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" role=\"img\" aria-label=\"折光门\"><rect x=\"4\" y=\"4\" width=\"120\" height=\"120\" rx=\"28\" fill=\"#141516\"/><g fill=\"#828fff\" transform=\"translate(30 30) scale(1.0625)\"><path d=\"M29 5 L7 20 L7 44 L29 59 L29 47 L18 39 L18 25 L29 17 Z\"/><path d=\"M35 5 L57 20 L57 44 L35 59 L35 47 L46 39 L46 25 L35 17 Z\"/></g></svg>"
+  },
+  {
+    "id": "pixel-tide",
+    "number": "03",
+    "name": "像素潮",
+    "englishName": "Pixel Tide",
+    "concept": "用一条阶梯脉冲代替点阵，波峰与离散光点表达顶屏扫描、节奏和时间。",
+    "shortConcept": [
+      "阶梯脉冲与光点",
+      "顶屏扫描的节奏"
+    ],
+    "recommended": false,
+    "description": "用一条阶梯脉冲代替点阵，波峰与离散光点表达顶屏扫描、节奏和时间。",
+    "mark": "pixel-tide/mark.svg",
+    "whiteMark": "pixel-tide/mark-white.svg",
+    "blackMark": "pixel-tide/mark-black.svg",
+    "appIcon": "pixel-tide/app-icon.svg",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"像素潮\"><g fill=\"#828fff\"><path d=\"M4 38 L14 38 L14 26 L24 26 L24 14 L36 14 L36 26 L46 26 L46 38 L58 38 L58 50 L42 50 L42 38 L32 38 L32 26 L28 26 L28 38 L18 38 L18 50 L4 50 Z\"/><path d=\"M48 14 L58 14 L58 24 L48 24 Z\"/></g></svg>",
+    "whiteSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"像素潮\"><g fill=\"#f7f8f8\"><path d=\"M4 38 L14 38 L14 26 L24 26 L24 14 L36 14 L36 26 L46 26 L46 38 L58 38 L58 50 L42 50 L42 38 L32 38 L32 26 L28 26 L28 38 L18 38 L18 50 L4 50 Z\"/><path d=\"M48 14 L58 14 L58 24 L48 24 Z\"/></g></svg>",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" role=\"img\" aria-label=\"像素潮\"><rect x=\"4\" y=\"4\" width=\"120\" height=\"120\" rx=\"28\" fill=\"#141516\"/><g fill=\"#828fff\" transform=\"translate(30 30) scale(1.0625)\"><path d=\"M4 38 L14 38 L14 26 L24 26 L24 14 L36 14 L36 26 L46 26 L46 38 L58 38 L58 50 L42 50 L42 38 L32 38 L32 26 L28 26 L28 38 L18 38 L18 50 L4 50 Z\"/><path d=\"M48 14 L58 14 L58 24 L48 24 Z\"/></g></svg>"
+  },
+  {
+    "id": "mechanical-iris",
+    "number": "04",
+    "name": "机械光圈",
+    "englishName": "Mechanical Iris",
+    "concept": "六片独立切面围住一颗暗心，组合出转动的光圈；把机械结构与灯光编排放在一起。",
+    "shortConcept": [
+      "六片切面围合",
+      "机械结构与光联动"
+    ],
+    "recommended": false,
+    "description": "六片独立切面围住一颗暗心，组合出转动的光圈；把机械结构与灯光编排放在一起。",
+    "mark": "mechanical-iris/mark.svg",
+    "whiteMark": "mechanical-iris/mark-white.svg",
+    "blackMark": "mechanical-iris/mark-black.svg",
+    "appIcon": "mechanical-iris/app-icon.svg",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"机械光圈\"><g fill=\"#828fff\"><path d=\"M33.595 7.319 L53.237 18.659 L42.835 29.999 L38.215 21.997 Z\"/><path d=\"M54.172 21.041 L54.172 43.721 L39.151 40.383 L43.77 32.381 Z\"/><path d=\"M52.577 45.722 L32.935 57.062 L28.315 42.384 L37.555 42.384 Z\"/><path d=\"M30.405 56.681 L10.763 45.341 L21.165 34.001 L25.785 42.003 Z\"/><path d=\"M9.828 42.959 L9.828 20.279 L24.849 23.617 L20.23 31.619 Z\"/><path d=\"M11.423 18.278 L31.065 6.938 L35.685 21.616 L26.445 21.616 Z\"/></g></svg>",
+    "whiteSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"机械光圈\"><g fill=\"#f7f8f8\"><path d=\"M33.595 7.319 L53.237 18.659 L42.835 29.999 L38.215 21.997 Z\"/><path d=\"M54.172 21.041 L54.172 43.721 L39.151 40.383 L43.77 32.381 Z\"/><path d=\"M52.577 45.722 L32.935 57.062 L28.315 42.384 L37.555 42.384 Z\"/><path d=\"M30.405 56.681 L10.763 45.341 L21.165 34.001 L25.785 42.003 Z\"/><path d=\"M9.828 42.959 L9.828 20.279 L24.849 23.617 L20.23 31.619 Z\"/><path d=\"M11.423 18.278 L31.065 6.938 L35.685 21.616 L26.445 21.616 Z\"/></g></svg>",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" role=\"img\" aria-label=\"机械光圈\"><rect x=\"4\" y=\"4\" width=\"120\" height=\"120\" rx=\"28\" fill=\"#141516\"/><g fill=\"#828fff\" transform=\"translate(30 30) scale(1.0625)\"><path d=\"M33.595 7.319 L53.237 18.659 L42.835 29.999 L38.215 21.997 Z\"/><path d=\"M54.172 21.041 L54.172 43.721 L39.151 40.383 L43.77 32.381 Z\"/><path d=\"M52.577 45.722 L32.935 57.062 L28.315 42.384 L37.555 42.384 Z\"/><path d=\"M30.405 56.681 L10.763 45.341 L21.165 34.001 L25.785 42.003 Z\"/><path d=\"M9.828 42.959 L9.828 20.279 L24.849 23.617 L20.23 31.619 Z\"/><path d=\"M11.423 18.278 L31.065 6.938 L35.685 21.616 L26.445 21.616 Z\"/></g></svg>"
+  },
+  {
+    "id": "circuit-fold",
+    "number": "05",
+    "name": "回路折叠",
+    "englishName": "Circuit Fold",
+    "concept": "两条反向折线错位成回路，借用键盘外壳的斜向纹理，表达设计、预览与同步的循环。",
+    "shortConcept": [
+      "反向折线的回路",
+      "设计 → 预览 → 同步"
+    ],
+    "recommended": false,
+    "description": "两条反向折线错位成回路，借用键盘外壳的斜向纹理，表达设计、预览与同步的循环。",
+    "mark": "circuit-fold/mark.svg",
+    "whiteMark": "circuit-fold/mark-white.svg",
+    "blackMark": "circuit-fold/mark-black.svg",
+    "appIcon": "circuit-fold/app-icon.svg",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"回路折叠\"><g fill=\"#828fff\"><path d=\"M23 10 L56 10 L56 22 L33 22 L21 34 L8 34 L8 25 Z\"/><path d=\"M41 54 L8 54 L8 42 L31 42 L43 30 L56 30 L56 39 Z\"/></g></svg>",
+    "whiteSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" role=\"img\" aria-label=\"回路折叠\"><g fill=\"#f7f8f8\"><path d=\"M23 10 L56 10 L56 22 L33 22 L21 34 L8 34 L8 25 Z\"/><path d=\"M41 54 L8 54 L8 42 L31 42 L43 30 L56 30 L56 39 Z\"/></g></svg>",
+    "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" role=\"img\" aria-label=\"回路折叠\"><rect x=\"4\" y=\"4\" width=\"120\" height=\"120\" rx=\"28\" fill=\"#141516\"/><g fill=\"#828fff\" transform=\"translate(30 30) scale(1.0625)\"><path d=\"M23 10 L56 10 L56 22 L33 22 L21 34 L8 34 L8 25 Z\"/><path d=\"M41 54 L8 54 L8 42 L31 42 L43 30 L56 30 L56 39 Z\"/></g></svg>"
+  }
+]

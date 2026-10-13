@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/jsonschema-specifications/2025.9.1/json",
+  "urls": [
+    {
+      "filename": "jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "41451a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f",
+        "md5": "3bc19f16b4b7bf78e337a39664d3d7ac",
+        "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"
+      }
+    },
+    {
+      "filename": "jsonschema_specifications-2025.9.1.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa6d1095e7cc5569bebf04342ee146178e2d36600708b/jsonschema_specifications-2025.9.1.tar.gz",
+      "digests": {
+        "blake2b_256": "1974a633ee74eb36c44aa6d1095e7cc5569bebf04342ee146178e2d36600708b",
+        "md5": "ef8e5a762c7ef39dcfb775c81336a690",
+        "sha256": "b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d"
+      }
+    }
+  ]
+}

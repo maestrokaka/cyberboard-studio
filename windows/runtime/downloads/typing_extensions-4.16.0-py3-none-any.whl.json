@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/typing_extensions/4.16.0/json",
+  "urls": [
+    {
+      "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "49d3b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80",
+        "md5": "aaa249e7f620bbcecbcbf2b7b11fbd12",
+        "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+      }
+    },
+    {
+      "filename": "typing_extensions-4.16.0.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz",
+      "digests": {
+        "blake2b_256": "f6cc6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6",
+        "md5": "7758284b826ec6ca6b722e7891bbd10d",
+        "sha256": "dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"
+      }
+    }
+  ]
+}

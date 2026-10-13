@@ -1,0 +1,1 @@
+window.STUDIO_MATERIAL_ICON_OPTIONS=[{"id":"product-wedge","number":"01","name":"轮廓 · 猫爪","description":"已确认的橙白产品图标。以低矮楔形机身和灯屏形成整体轮廓，中央橙色猫爪使用确认后的方向。","image":"assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png","formal":true,"recommended":false}];

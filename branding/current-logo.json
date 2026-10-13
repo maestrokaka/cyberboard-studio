@@ -1,0 +1,12 @@
+{
+  "name": "Cyberboard Studio",
+  "status": "formal",
+  "approved_source": "product-icon/cyberboard-studio-photo-contour-v6-paw-180.png",
+  "approved_source_sha256": "6e7bef50c2e57a65d0db9098e29a6a97154e2bb59637c434e7f16718b48932f1",
+  "paw_rotation_degrees": 180,
+  "keyboard_rotation_degrees": 0,
+  "web_asset": "web/assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png",
+  "native_icon": "AppIcon.icns",
+  "native_export": "仅将橙砖外的演示画布设为透明；正式图形 RGB 保持原样。",
+  "bundled_web_logo_matches": true
+}

@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/tzdata/2026.5/json",
+  "urls": [
+    {
+      "filename": "tzdata-2026.5-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "94211e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718",
+        "md5": "81bb8d8df7440eab17d70cbd902b8c51",
+        "sha256": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac"
+      }
+    },
+    {
+      "filename": "tzdata-2026.5.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/d9/68/f1b440335057bfce71b6e50a9d09445aa2ecbd08359a337976627b8409e7/tzdata-2026.5.tar.gz",
+      "digests": {
+        "blake2b_256": "d968f1b440335057bfce71b6e50a9d09445aa2ecbd08359a337976627b8409e7",
+        "md5": "aa1580fbbc17ff5da7b7fe8ef2cb9e10",
+        "sha256": "8cc73c0a0bfca7dbfa59235d60b2eff82231dee33f53d206db1acd9173cfc0a7"
+      }
+    }
+  ]
+}

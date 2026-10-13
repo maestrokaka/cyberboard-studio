@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/jsonschema/4.26.0/json",
+  "urls": [
+    {
+      "filename": "jsonschema-4.26.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/69/90/f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee/jsonschema-4.26.0-py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "6990f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee",
+        "md5": "2b7e04c1ca5e5c280087b9765d9f3970",
+        "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"
+      }
+    },
+    {
+      "filename": "jsonschema-4.26.0.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/b3/fc/e067678238fa451312d4c62bf6e6cf5ec56375422aee02f9cb5f909b3047/jsonschema-4.26.0.tar.gz",
+      "digests": {
+        "blake2b_256": "b3fce067678238fa451312d4c62bf6e6cf5ec56375422aee02f9cb5f909b3047",
+        "md5": "3c1deb667257ae19924dede13332d906",
+        "sha256": "0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326"
+      }
+    }
+  ]
+}

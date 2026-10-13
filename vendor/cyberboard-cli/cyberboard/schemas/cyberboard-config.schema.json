@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/GeneralD/cyberboard-cli/schemas/cyberboard-config.schema.json",
+  "title": "CyberBoard Config (official / IR format)",
+  "description": "The config JSON written by AM Master and produced by the merger — keymap + LED display in one document. This is the IR (intermediate representation) the CLI builds toward and writes. Field confidence is noted per-key via $comment (see .claude/rules/10-config-schema.md, 30-write-protocol.md). 🟢 confirmed / 🟡 inferred / 🔴 unverified.",
+  "type": "object",
+  "required": ["page_num", "page_data"],
+  "additionalProperties": true,
+  "$comment": "additionalProperties is true at the root: community/base configs flatten-preserve fields we don't model yet (merger keeps non-LED props verbatim). Core fields are validated; unknown extras are allowed.",
+  "properties": {
+    "product_info": {
+      "type": "object",
+      "description": "Product identity block. Sample files ship placeholder 'CB_XX'; the real R4 reports 'CB04' via the [1,1] product_id query — not from this field.",
+      "properties": {
+        "product_info_addr": { "type": "string" },
+        "product_id": { "type": "string", "examples": ["CB04", "CB_XX"] }
+      }
+    },
+    "page_num": {
+      "type": "integer",
+      "description": "Number of LED display pages. R4 ships 8.",
+      "minimum": 0,
+      "examples": [8]
+    },
+    "page_data": {
+      "type": "array",
+      "description": "LED display pages. index 0-4 = built-in (battery/mosaic/time/text/streamer), 5/6/7 = Custom LED 1/2/3 = the user-facing 'slots'.",
+      "items": { "$ref": "#/$defs/pageDatum" }
+    },
+
+    "key_layer": { "$ref": "#/$defs/keyLayer" },
+
+    "Fn_key_num": { "type": "integer", "minimum": 0 },
+    "Fn_key": {
+      "type": "array",
+      "description": "Fn-hold key substitutions. Note: not present in the R-series send order (§5) — exact wire behaviour unconfirmed 🔴.",
+      "items": { "$ref": "#/$defs/inOutKey" }
+    },
+
+    "MACRO_key_num": { "type": "integer", "minimum": 0 },
+    "MACRO_key": {
+      "type": "array",
+      "description": "Macros (key sequence + per-step interval). Uppercase MACRO_key; distinct from the lowercase (empty) macro_key.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "MACRO_key_index": { "type": "integer" },
+          "input_key": { "$ref": "#/$defs/keyCode" },
+          "out_key": { "type": "array", "items": { "$ref": "#/$defs/keyCode" } },
+          "intvel_ms": { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+
+    "swap_key_num": { "type": "integer", "minimum": 0 },
+    "swap_key": {
+      "type": "array",
+      "description": "Key swaps (input -> out). Sent via [6,6], 11 per frame. 🟢",
+      "items": { "$ref": "#/$defs/inOutKey" }
+    },
+
+    "exchange_num": { "type": "integer", "minimum": 0 },
+    "exchange_key": {
+      "type": "array",
+      "description": "Key exchanges (array in/out). Sent via [6,1], one frame per entry — note the wire sends every list entry regardless of exchange_num. 🟢",
+      "items": {
+        "type": "object",
+        "properties": {
+          "exchange_index": { "type": "integer" },
+          "input_key": { "type": "array", "items": { "$ref": "#/$defs/keyCode" } },
+          "out_key": { "type": "array", "items": { "$ref": "#/$defs/keyCode" } }
+        }
+      }
+    },
+
+    "tab_key_num": { "type": "integer", "minimum": 0 },
+    "tab_key": { "type": "array", "description": "Usually empty; purpose unconfirmed 🔴." },
+    "macro_key": { "type": "array", "description": "Lowercase, usually empty. Distinct from MACRO_key." },
+
+    "spotlight_frames": {
+      "description": "Car-light / spotlight (CMD_CAR_*). Presence on R4 unconfirmed 🔴 — absent in known merger outputs.",
+      "$ref": "#/$defs/lightFrameSet"
+    },
+    "hatsu": { "type": "object", "description": "HATSU-product page/line data. Not present on R4. 🔴" },
+    "HATSU": { "type": "object", "description": "Same as 'hatsu' (casing varies by source)." }
+  },
+
+  "$defs": {
+    "boolOrInt": {
+      "$comment": "'valid' fields appear as bool, int (0/1/2), OR numeric string across sources; change_dict / serde normalise these (0->False, non-0->True). The 1-vs-2 distinction is unconfirmed 🟡.",
+      "anyOf": [
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "type": "string", "pattern": "^-?[0-9]+$" }
+      ]
+    },
+    "numberish": {
+      "$comment": "Integer that some sources serialise as a quoted string (e.g. frame_index '0' on inactive-page placeholders). serde accepts both.",
+      "anyOf": [
+        { "type": "integer" },
+        { "type": "string", "pattern": "^-?[0-9]+$" }
+      ]
+    },
+    "comment": {
+      "$comment": "'//' keys carry human comments (often Chinese) inside otherwise-strict objects; allow them everywhere.",
+      "type": "string"
+    },
+    "hexColor": {
+      "type": "string",
+      "description": "#RRGGBB (3 bytes via rgb_to_bytes). Strict — used for color blocks.",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "examples": ["#000000", "#00FF00"]
+    },
+    "frameColor": {
+      "type": "string",
+      "description": "Per-pixel frame color. Active pages use #RRGGBB; inactive-page placeholders carry a short malformed value like '#0000' (length-1 frame_RGB), so the pattern is loosened here.",
+      "pattern": "^#[0-9a-fA-F]+$",
+      "examples": ["#00FF00", "#0000"]
+    },
+    "keyCode": {
+      "type": "string",
+      "description": "#MMPPUUUU — MM=modifier bitmask, PP=HID usage page (07=keyboard, 0C=consumer, 92=AM vendor Fn), UUUU=usage id. 4 bytes. #00000000 = unassigned.",
+      "pattern": "^#[0-9a-fA-F]{8}$",
+      "examples": ["#00070029", "#000C00B6", "#00000000"]
+    },
+    "unicodePoint": {
+      "type": "string",
+      "description": "#XXXX — a 2-byte code point for text pages (unicode_to_bytes).",
+      "pattern": "^#[0-9a-fA-F]{4}$",
+      "examples": ["#0041"]
+    },
+    "color": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "//": { "$ref": "#/$defs/comment" },
+        "default": { "$ref": "#/$defs/boolOrInt" },
+        "back_rgb": { "$ref": "#/$defs/hexColor" },
+        "rgb": { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "wordPage": {
+      "type": "object",
+      "description": "Text-page glyph data.",
+      "additionalProperties": false,
+      "properties": {
+        "//": { "$ref": "#/$defs/comment" },
+        "valid": { "$ref": "#/$defs/boolOrInt" },
+        "word_len": { "type": "integer", "minimum": 0 },
+        "unicode": { "type": "array", "items": { "$ref": "#/$defs/unicodePoint" } }
+      }
+    },
+    "rgbFrameSet": {
+      "type": "object",
+      "description": "A set of RGB frames. For display 'frames' each frame_RGB has 200 entries (40x5); for per-key 'keyframes' it has 90 (one per key). 🟢 Active pages (5/6/7) are full-size; inactive pages carry a length-1 placeholder with frame_num 0.",
+      "additionalProperties": false,
+      "properties": {
+        "//": { "$ref": "#/$defs/comment" },
+        "valid": { "$ref": "#/$defs/boolOrInt" },
+        "frame_num": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256,
+          "$comment": "REAL per-slot limit = 256 (2^8), confirmed on hardware 2026-06-22: writing 400 numbered frames ACKs but plays back only 0-255 (firmware's playback index is 8-bit). merger's MAX_FRAMES=300 and AM Master's ~300 both overshoot the true 256; the official 300-frame editor produces 257-300 'dead' frames that never display. The wire field is 2 bytes so the PROTOCOL would allow up to 32767, but the schema enforces the firmware ceiling so cb_verify flags un-playable frame counts before a write. per-slot-vs-total still unconfirmed 🔴."
+        },
+        "frame_data": {
+          "type": "array",
+          "maxItems": 256,
+          "$comment": "Capped at the firmware playback ceiling (256). See frame_num above.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "//": { "$ref": "#/$defs/comment" },
+              "frame_index": { "$ref": "#/$defs/numberish" },
+              "frame_RGB": {
+                "type": "array",
+                "description": "Per-pixel colors. Note the JSON key is upper-case frame_RGB (serde-renamed to frame_rgb internally).",
+                "items": { "$ref": "#/$defs/frameColor" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "lightFrameSet": {
+      "type": "object",
+      "description": "Spotlight/car-light frames (frame_light instead of frame_RGB). 🔴",
+      "properties": {
+        "valid": { "$ref": "#/$defs/boolOrInt" },
+        "frame_num": { "type": "integer", "minimum": 0, "maximum": 256, "$comment": "256 by analogy with the confirmed 8-bit playback cursor on display/per-key frames; spotlight itself is unverified on R4 🔴." },
+        "frame_data": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "properties": {
+              "frame_index": { "$ref": "#/$defs/numberish" },
+              "frame_light": { "type": "array" }
+            }
+          }
+        }
+      }
+    },
+    "pageDatum": {
+      "type": "object",
+      "required": ["page_index"],
+      "additionalProperties": true,
+      "properties": {
+        "valid": { "$ref": "#/$defs/boolOrInt" },
+        "page_index": { "type": "integer", "minimum": 0 },
+        "lightness": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "speed_ms": { "type": "integer", "minimum": 0, "description": "Animation speed (ms/frame)." },
+        "color": { "$ref": "#/$defs/color" },
+        "word_page": { "$ref": "#/$defs/wordPage" },
+        "frames": {
+          "description": "40x5 = 200px display frames.",
+          "$ref": "#/$defs/rgbFrameSet"
+        },
+        "keyframes": {
+          "description": "90 per-key backlight frames (one color per key). NOT interpolation keyframes. This is the 'lighting' subsystem in AM Master, whose UI caps a single animation at 100 frames 🟡 (vs the display editor's 300). That 100 is only a UI authoring cap, NOT a firmware limit: the known-good merger output merged_20250916_161615.json has 123 keyframes on page 7 (via merger 'combine') and writes/ACKs fine. The per-key frame_index is sent as 1 byte ([5,pi] [2]=frame_index) so the structural ceiling is 256; the real firmware per-key PLAYBACK limit is untested 🔴 (could be ≤100 like display's 256<300, but per-key can't be numbered-rendered to count). Schema enforces the structural 256 (via rgbFrameSet), not the 100 UI cap, so it doesn't reject the 123-frame known-good.",
+          "$ref": "#/$defs/rgbFrameSet"
+        },
+        "spotlight_frames": { "$ref": "#/$defs/lightFrameSet" }
+      }
+    },
+    "keyLayer": {
+      "type": "object",
+      "description": "Per-layer remap matrix. Sent via [6,8] (layer count) then [6,7] (60-byte chunks). 🟢",
+      "additionalProperties": false,
+      "properties": {
+        "//": { "$ref": "#/$defs/comment" },
+        "valid": { "$ref": "#/$defs/boolOrInt" },
+        "layer_num": { "type": "integer", "minimum": 1, "examples": [7] },
+        "layer_data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "//": { "$ref": "#/$defs/comment" },
+              "layer": {
+                "type": "array",
+                "description": "Reserved 25x8 = 200 matrix positions of HID keycodes.",
+                "items": { "$ref": "#/$defs/keyCode" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "inOutKey": {
+      "type": "object",
+      "description": "A single input->out key mapping (Fn_key / swap_key share this shape).",
+      "properties": {
+        "Fn_key_index": { "type": "integer" },
+        "swap_key_index": { "type": "integer" },
+        "input_key": { "$ref": "#/$defs/keyCode" },
+        "out_key": { "$ref": "#/$defs/keyCode" }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "source": "https://pypi.org/pypi/cyberboard-cli/0.1.2/json",
+  "urls": [
+    {
+      "filename": "cyberboard_cli-0.1.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/10/12/8e4f28b51df712ae81144815680779d2e02b2dfd782f2966c82a4e7ecaa2/cyberboard_cli-0.1.2-py3-none-any.whl",
+      "digests": {
+        "blake2b_256": "10128e4f28b51df712ae81144815680779d2e02b2dfd782f2966c82a4e7ecaa2",
+        "md5": "b91b776540637ecce508ab82f6c27ce9",
+        "sha256": "4ef29e23bce979dcb15be8776f10411e603ce52beb432373ae87fa4dde4d39c8"
+      }
+    },
+    {
+      "filename": "cyberboard_cli-0.1.2.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/7f/11/2cdabfeae5fee006f8c1b5ac99b8e4c2482766260b72153267c6de526a73/cyberboard_cli-0.1.2.tar.gz",
+      "digests": {
+        "blake2b_256": "7f112cdabfeae5fee006f8c1b5ac99b8e4c2482766260b72153267c6de526a73",
+        "md5": "a3b393f816ac01d8798ba43730d1164e",
+        "sha256": "db2a3d07c9b33cca75b4c262a41103be8899cfad922b64453fdc891fc6590c80"
+      }
+    }
+  ]
+}
