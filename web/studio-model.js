@@ -38,6 +38,19 @@
   if(target){const shift=hue(target[0])-hue(original);d.frames=d.frames.map(f=>f.map(c=>rotated(c,shift)));d.keyframes=d.keyframes.map(f=>f.map(c=>rotated(c,shift)));d.palette=(d.palette?.length?d.palette:[original]).map(c=>rotated(c,shift));}
   d.id='variant-'+Date.now();d.name=base.name+' · '+({cyan:'冰蓝',acid:'酸绿',red:'热红',amber:'琥珀'}[color]||'节奏变体');d.speed_ms=speedMs;d.description='基于「'+base.name+'」的本地模板变体。'+(brief?'创作备注：'+brief:'保留原动画结构，调整配色与播放节奏。');d.origin='template-variant';d.frame_count=d.frames.length;return validate(d);
  }
- function prompt(brief,design){return `为 Cyberboard R4 / R6 设计灯效。\n创作方向：${brief||design.description}\n参考作品：${design.name}\n外观：黑白几何图案、金属反光机身、黑色透明键帽。避免普通彩虹，设计有叙事的几何变形和纵向滚动转场。\n输出单个 JSON 对象，不要 Markdown：\n{id,name,description,palette,speed_ms,frames,keyframes,stages}\nframes：1–255 帧，每帧必须有 200 个 #RRGGBB；40 列 × 5 行，按行从左到右排列。\nkeyframes：1–255 帧，每帧必须有 90 个 #RRGGBB；保留索引 57,61,74,78,82,83,84 必须 #000000；空格灯索引 79,80,81。\nspeed_ms：正整数，建议 40ms。顶部与轴灯同步设计，保留原始 RGB，不因预览而提高亮度。\nstages：每个顶部帧对应的阶段名称。包含起势、展开、高潮、循环衔接，注意只有 5 行的可读性。\n参考配色：${(design.palette||[]).join(', ')}\n不要输出键位或设备配置字段。`}
+ function prompt(brief,design,options={}){return `为 Cyberboard R4 / R6 设计顶部与轴灯动画。
+用户创作目标：${brief||'根据提供的参考图片或自由主题设计清晰、有趣的动画。'}
+优先遵循用户描述和参考图的主体、颜色与风格，不强制使用现有作品的几何套路。${options.useReference?'\n可选风格参考：'+design.name+'；'+(design.description||''):''}
+角色或标志可以保持完整形状，从屏幕外上下滚动经过只有5行的窗口；设计可辨认的动作、转场和自然循环。
+请给作品一个简洁、可读的名称，优先2–12个中文字，不使用hash、编号或技术前缀。
+输出单个完整 JSON 对象，不要 Markdown：
+{id,name,description,palette,speed_ms,frames,keyframes,stages}
+frames：1–255 帧，每帧恰好200个#RRGGBB；40列×5行，按行从左到右。
+keyframes：1–255帧，每帧恰好90个#RRGGBB；保留索引57,61,74,78,82,83,84必须#000000；空格灯索引79,80,81。
+speed_ms：正整数，建议40ms。顶部与轴灯同步设计，保留原始RGB，不因预览而提高亮度。
+stages：各顶部帧的阶段名称，包含开场、变化、高潮和循环衔接。
+可选配色建议：${(design.palette||[]).join(', ')}；用户或参考图已指定配色时以它们为准。
+不要输出键位、设备配置、可执行代码或外部文件引用。`}
+
  global.StudioModel={validate,fromPage,importDesigns,merge,variant,prompt,copy,palettes,cycle};
 })(typeof window!=='undefined'?window:globalThis);

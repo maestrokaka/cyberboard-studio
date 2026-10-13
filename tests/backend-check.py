@@ -230,6 +230,87 @@ class BackendChecks(unittest.TestCase):
         pending = [{"slot": 1, "designId": "neon-rift", "brightness": 100, "speedMs": 40}] * 2
         self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace({"pending": pending}))
 
+    def test_workspace_legacy_defaults_to_empty_trash(self):
+        self.backend.state_dir.mkdir(parents=True)
+        location = self.backend.state_dir / "workspace.json"
+        location.write_text(json.dumps({"designs": [self.design()], "savedAt": "2026-10-13T09:30:00Z"}))
+        result = self.backend.bootstrap({})
+        self.assertEqual(result["workspace"]["trash"], [])
+        self.assertEqual(result["workspace"]["designs"], [self.design()])
+        self.assertNotIn("workspaceWarning", result)
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_workspace_trash_roundtrip_preserves_full_design_and_old_timestamps(self):
+        design = self.design()
+        design["origin"] = "kimi-ai"
+        design["ai"] = {"provider": "kimi-code", "model": "k3", "recipe": {"name": "保留编排"}}
+        entry = {"design": design, "deletedAt": "2000-01-01T00:00:00.000Z"}
+        result = self.backend.saveWorkspace({"trash": [entry]})
+        self.assertEqual(result["trashCount"], 1)
+        restored = self.backend.bootstrap({})["workspace"]
+        self.assertEqual(restored["trash"], [entry])
+        self.assertEqual(restored["designs"], [])
+        # Loading does not expire or silently discard archived work.
+        self.assertEqual(self.backend.bootstrap({})["workspace"]["trash"], [entry])
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_workspace_active_and_trash_have_independent_30_work_caps(self):
+        active, trash = [], []
+        for index in range(30):
+            design = self.design()
+            design["id"] = f"active-{index}"
+            active.append(design)
+            archived = self.design()
+            archived["id"] = f"trash-{index}"
+            trash.append({"design": archived, "deletedAt": "2026-10-13T09:30:00+08:00"})
+        result = self.backend.saveWorkspace({"designs": active, "trash": trash})
+        self.assertEqual((result["designCount"], result["trashCount"]), (30, 30))
+        location = self.backend.state_dir / "workspace.json"
+        previous = location.read_bytes()
+        trash.append({"design": {**self.design(), "id": "trash-overflow"}, "deletedAt": "2026-10-13T00:00:00Z"})
+        self.expect_error("workspace_limit", lambda: self.backend.saveWorkspace({"designs": active, "trash": trash}))
+        self.assertEqual(location.read_bytes(), previous)
+
+    def test_workspace_pending_cannot_reference_archive_only_work(self):
+        entry = {"design": self.design(), "deletedAt": "2026-10-13T00:00:00Z"}
+        pending = [{"slot": 1, "designId": entry["design"]["id"], "brightness": 80, "speedMs": 40}]
+        self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace({"trash": [entry], "pending": pending}))
+        # A re-imported active work may share an old archive ID; active work is
+        # the one used by the draft and archive restoration will choose a new ID.
+        result = self.backend.saveWorkspace({"designs": [self.design()], "trash": [entry], "pending": pending})
+        self.assertEqual(result["pendingCount"], 1)
+
+    def test_invalid_trash_preserves_previously_saved_workspace(self):
+        valid = {"trash": [{"design": self.design(), "deletedAt": "2026-10-13T00:00:00Z"}]}
+        self.backend.saveWorkspace(valid)
+        location = self.backend.state_dir / "workspace.json"
+        previous = location.read_bytes()
+        mutations = [("invalid_workspace", lambda item: item.update(deletedAt="2026-02-30T00:00:00Z")),
+                     ("invalid_workspace", lambda item: item.update(deletedAt="not-a-date")),
+                     ("invalid_workspace", lambda item: item.update(deletedAt="2026-10-13T00:00:00")),
+                     ("invalid_workspace", lambda item: item["design"].update(name="")),
+                     ("invalid_workspace", lambda item: item["design"].update(id="")),
+                     ("invalid_animation", lambda item: item["design"]["frames"][0].pop()),
+                     ("invalid_animation", lambda item: item["design"]["keyframes"][0].pop()),
+                     ("invalid_input", lambda item: item["design"].update(speed_ms=0)),
+                     ("invalid_workspace", lambda item: item["design"].update(extra=float("nan")))]
+        for code, mutate in mutations:
+            bad = copy.deepcopy(valid)
+            mutate(bad["trash"][0])
+            self.expect_error(code, lambda: self.backend.saveWorkspace(bad))
+            self.assertEqual(location.read_bytes(), previous)
+        self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace({"trash": [valid["trash"][0]] * 2}))
+        self.assertEqual(location.read_bytes(), previous)
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_workspace_size_cap_includes_archived_designs(self):
+        self.backend.saveWorkspace({})
+        location = self.backend.state_dir / "workspace.json"
+        previous = location.read_bytes()
+        with patch.object(bridge, "MAX_WORKSPACE_BYTES", 1024):
+            self.expect_error("workspace_too_large", lambda: self.backend.saveWorkspace({"trash": [{"design": self.design(), "deletedAt": "2026-10-13T00:00:00Z"}]}))
+        self.assertEqual(location.read_bytes(), previous)
+
     def test_corrupt_workspace_does_not_prevent_cli_bootstrap(self):
         self.backend.state_dir.mkdir(parents=True)
         location = self.backend.state_dir / "workspace.json"
@@ -300,6 +381,176 @@ class BackendChecks(unittest.TestCase):
     def test_missing_or_mismatched_baseline_prevents_plan(self):
         self.live["layer_data"][0]["layer"][0] = "#00070005"
         self.expect_error("baseline_keymap_changed", lambda: self.backend.plan(self.payload()))
+        self.assertEqual(self.sent, [])
+
+    def live_internal_keys(self):
+        # R6-like readback: 103 internal non-physical codes per layer, while all
+        # 81 physical keys retain their existing bindings.
+        for layer in self.live["layer_data"]:
+            for index in range(81, 184):
+                layer["layer"][index] = f"#0092{index:04X}"
+
+    def test_explicit_live_keymap_policy_preserves_every_code_and_separates_stored_baseline(self):
+        self.baseline["key_layer"]["extension"] = {"keep": "key-layer-metadata"}
+        self.baseline["key_layer"]["layer_data"][0]["annotation"] = "layer-metadata"
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        self.live_internal_keys()
+        original_path = self.real_cli["cb_store"].current_path("AM01R6")
+        original_bytes = original_path.read_bytes()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        stored = bridge.load_json(folder / "stored-before.json")
+        before = bridge.load_json(folder / "before.json")
+        backup = bridge.load_json(Path(result["backupPath"]))
+        self.assertEqual(stored, self.baseline)
+        self.assertEqual(bridge.matrix(before["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(bridge.matrix(self.target["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(bridge.matrix(backup["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(self.target["key_layer"]["extension"], self.baseline["key_layer"]["extension"])
+        self.assertEqual(self.target["key_layer"]["layer_data"][0]["annotation"], "layer-metadata")
+        target_pages = {page["page_index"]: page for page in self.target["page_data"]}
+        for page in self.baseline["page_data"]:
+            if page["page_index"] != 6:
+                self.assertEqual(target_pages[page["page_index"]], page)
+        self.assertEqual(self.target["extraPreserved"], self.baseline["extraPreserved"])
+        self.assertEqual(metadata["planVersion"], 2)
+        self.assertEqual(metadata["storedBaselineHash"], bridge.digest(stored))
+        self.assertEqual(metadata["beforeHash"], bridge.digest(before))
+        self.assertNotEqual(metadata["storedBaselineHash"], metadata["beforeHash"])
+        self.assertEqual(metadata["targetHash"], bridge.digest(self.target))
+        self.assertEqual(result["keymapPreservation"], {"source": "live", "comparedKeycodes": 1400,
+                         "differentFromStored": 721, "differentPhysicalBindings": 0,
+                         "differentInternalKeycodes": 721, "refreshApplied": True})
+        self.assertEqual(metadata["keymapPreservation"], result["keymapPreservation"])
+        self.assertEqual(result["keymap"]["layer_data"], self.live["layer_data"])
+        self.assertEqual(len(bridge.matrix(result["keymap"])), 5600)
+        self.assertEqual(result["keymap"]["source"], "live")
+        self.assertEqual(original_path.read_bytes(), original_bytes)
+        self.assertEqual(self.sent, [])
+
+    def test_live_keymap_policy_enables_write_and_counts_physical_bindings(self):
+        self.baseline["key_layer"]["valid"] = 0
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        self.live_internal_keys()
+        self.live["layer_data"][2]["layer"][5] = "#00070005"
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        self.assertEqual(self.target["key_layer"]["valid"], 1)
+        self.assertEqual(result["keymapPreservation"]["differentFromStored"], 722)
+        self.assertEqual(result["keymapPreservation"]["differentPhysicalBindings"], 1)
+        self.assertEqual(result["keymapPreservation"]["differentInternalKeycodes"], 721)
+        self.assertEqual(bridge.matrix(self.target["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(self.sent, [])
+
+    def test_live_keymap_policy_requires_boolean_and_rejects_combined_key_changes_before_usb(self):
+        for value in ("true", 1, [], None):
+            self.expect_error("invalid_keymap_policy", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": value}))
+        changes = [{"layer": 0, "matrixIndex": 0, "code": "#00070005"}]
+        self.expect_error("invalid_keymap_policy", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": True, "keyChanges": changes}))
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+        self.assertEqual(self.sent, [])
+
+    def test_live_keymap_policy_still_requires_complete_baseline_and_live_read(self):
+        location = self.real_cli["cb_store"].current_path("AM01R6")
+        location.unlink()
+        self.expect_error("baseline_missing", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": True}))
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        drain = self.cli["cb_read"]._drain
+        self.cli["cb_read"]._drain = lambda *args, **kwargs: drain(*args, **kwargs)[:-1]
+        self.expect_error("incomplete_keymap", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": True}))
+        self.assertEqual(self.sent, [])
+
+    def test_live_keymap_plan_revalidates_after_encoding_and_rejects_changes(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        real_validate = bridge.validate_config
+
+        def mutate_after_encoding(config, cli):
+            plan = real_validate(config, cli)
+            self.live["layer_data"][6]["layer"][199] = "#00070006"
+            return plan
+
+        with patch.object(bridge, "validate_config", mutate_after_encoding):
+            self.expect_error("keymap_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_live_keymap_plan_rejects_stale_store_changed_device_and_legacy_plan(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        updated = copy.deepcopy(self.baseline)
+        updated["extraPreserved"]["opaque"].append("outside-write")
+        self.real_cli["cb_store"].save_current("AM01R6", updated)
+        self.expect_error("baseline_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        self.identity.version = "different-firmware"
+        self.expect_error("device_changed", lambda: self.backend.execute({"token": result["token"]}))
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        metadata.pop("planVersion")
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("plan_version_unsupported", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_live_keymap_plan_records_refreshed_keys_only_after_ack_and_complete_readback(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["deviceAck"] and report["keymapMatch"] and report["stateStored"])
+        self.assertEqual(self.recorded, [self.target])
+        self.assertEqual(bridge.matrix(self.real_cli["cb_store"].load_current("AM01R6")["key_layer"]), bridge.matrix(self.live))
+
+    def test_live_keymap_failed_ack_does_not_update_store(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        self.bad_end_header = True
+        self.expect_error("end_ack_failed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.recorded, [])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+
+    def test_live_keymap_failed_readback_does_not_update_store(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        self.retry_mismatches = 99
+        self.expect_error("verification_failed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.after_reads, 3)
+        self.assertEqual(self.recorded, [])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+
+    def test_live_keymap_final_store_recheck_prevents_intervening_write(self):
+        self.live_internal_keys()
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        original = self.backend.stored_config
+        calls = 0
+
+        def changed_before_final_check(pid, required=False):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                updated = copy.deepcopy(self.baseline)
+                updated["extraPreserved"]["opaque"].append("intervening-store-change")
+                self.real_cli["cb_store"].save_current("AM01R6", updated)
+            return original(pid, required=required)
+
+        with patch.object(self.backend, "stored_config", changed_before_final_check):
+            self.expect_error("baseline_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(calls, 2)
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_history_restore_uses_live_keys_and_ignores_historical_key_matrix(self):
+        self.real_cli["cb_store"].snapshot("AM01R6", self.baseline)
+        snapshot = self.backend.history({})["history"][0]["id"]
+        self.live_internal_keys()
+        result = self.backend.restorePlan({"snapshotId": snapshot, "preserveKeymap": True})
+        folder = self.backend.state_dir / "plans" / result["token"]
+        target = bridge.load_json(folder / "target.json")
+        self.assertEqual(bridge.matrix(target["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(result["keymapPreservation"]["differentFromStored"], 721)
+        self.assertEqual(result["changedSlots"], [1, 2, 3])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
         self.assertEqual(self.sent, [])
 
     def test_stale_store_prevents_execute(self):

@@ -11,6 +11,10 @@ internal sealed class StudioForm : Form
 {
     private readonly WebView2 web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(14, 16, 21) };
     private readonly BackendClient backend = new();
+    private readonly BackendClient aiBackend = new();
+    private readonly AISettings aiSettings = new(HostPaths.State);
+    private CancellationTokenSource? aiCancellation;
+    private string? activeAIRequestId;
     private readonly Label loading = new()
     {
         Dock = DockStyle.Fill, Text = "正在载入 Cyberboard Studio…", TextAlign = ContentAlignment.MiddleCenter,
@@ -60,7 +64,7 @@ internal sealed class StudioForm : Form
         Controls.Add(menu);
         Shown += async (_, _) => await InitializeAsync();
         FormClosing += OnClosing;
-        FormClosed += (_, _) => backend.Dispose();
+        FormClosed += (_, _) => { aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -185,7 +189,7 @@ internal sealed class StudioForm : Form
         view.DropDownItems.Add(MenuItem("重新载入", Keys.Control | Keys.R, ReloadWorkbench));
         var help = new ToolStripMenuItem("帮助");
         help.DropDownItems.Add(MenuItem("关于 Cyberboard Studio", Keys.None, () => MessageBox.Show(this,
-            "Cyberboard Studio 0.1.0\nWindows 桌面版\n\n灯效设计、整机预览、JSON 导入导出与本地 USB 同步。",
+            "Cyberboard Studio 0.2.0\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
             "关于 Cyberboard Studio", MessageBoxButtons.OK, MessageBoxIcon.Information)));
         menu.Items.AddRange([file, edit, view, help]);
         return menu;
@@ -202,13 +206,14 @@ internal sealed class StudioForm : Form
     private void ReloadWorkbench()
     {
         if (deviceWritePending) { ShowWriteInProgress(); return; }
+        aiCancellation?.Cancel();
         if (web.CoreWebView2 is not null) web.CoreWebView2.Reload();
     }
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
         if (deviceWritePending) { args.Cancel = true; return; }
-        if (ResourcePolicy.IsDocument(args.Uri)) { navigationGeneration++; return; }
+        if (ResourcePolicy.IsDocument(args.Uri)) { aiCancellation?.Cancel(); navigationGeneration++; return; }
         args.Cancel = true;
         if (args.IsUserInitiated) OpenExternalLink(args.Uri);
     }
@@ -247,11 +252,24 @@ internal sealed class StudioForm : Form
             {
                 case "importJSON": await ImportJsonAsync(id, generation); return;
                 case "exportJSON": await ExportJsonAsync(id, payload, generation); return;
+                case "importAIImages": await ImportAIImagesAsync(id, generation); return;
+                case "getAISettings":
+                    Reply(id, await Task.Run(aiSettings.Get), generation); return;
+                case "saveAISettings":
+                    if (activeAIRequestId is not null) throw new IOException("AI 请求正在进行，请先取消或等待完成再修改模型配置。");
+                    Reply(id, await Task.Run(() => aiSettings.Save(payload)), generation); return;
+                case "testAIConnection":
+                case "generateAI": await RunAIAsync(id, action, payload, generation); return;
+                case "cancelAI":
+                    var cancelId = AISettings.RequestId(payload);
+                    var cancelled = activeAIRequestId == cancelId;
+                    if (cancelled) aiCancellation?.Cancel();
+                    Reply(id, new { cancelled, requestId = cancelId }, generation); return;
             }
             if (!BackendActions.Contains(action)) { ReplyError(id, "不支持的操作：" + action, generation); return; }
-            if (writesDevice && deviceWritePending)
+            if (writesDevice && (deviceWritePending || activeAIRequestId is not null))
             {
-                ReplyError(id, "设备操作正在进行，请等待完成后再试。", generation);
+                ReplyError(id, "设备操作或 AI 请求正在进行，请等待完成后再试。", generation);
                 return;
             }
             if (writesDevice) deviceWritePending = true;
@@ -271,8 +289,68 @@ internal sealed class StudioForm : Form
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            HostLog.Write("request " + action, exception.ToString());
+            if (action is "getAISettings" or "saveAISettings" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
+                HostLog.Write("AI request", exception.GetType().Name);
+            else HostLog.Write("request " + action, exception.ToString());
             ReplyError(id, exception.Message, generation);
+        }
+    }
+
+    private async Task ImportAIImagesAsync(JsonElement id, int generation)
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "参考图 (*.png;*.jpg;*.jpeg;*.webp;*.gif)|*.png;*.jpg;*.jpeg;*.webp;*.gif",
+            Title = "选择最多 3 张参考图，每张最多 20 MB", Multiselect = true,
+            CheckFileExists = true, RestoreDirectory = true
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) { Reply(id, new { cancelled = true }, generation); return; }
+        var paths = dialog.FileNames;
+        if (paths.Length is < 1 or > 3) throw new IOException("一次最多选择 3 张参考图。");
+        foreach (var path in paths)
+        {
+            long length;
+            try { length = new FileInfo(path).Length; }
+            catch { throw new IOException("无法读取所选参考图，请重新选择。"); }
+            if (length is < 1 or > 20L * 1024 * 1024) throw new IOException("参考图必须为有效文件，且每张不超过 20 MB。");
+        }
+        // Native-selected paths are passed only on stdin, never exposed to the web bridge or diagnostics.
+        var result = await Task.Run(() => backend.RunAsync("prepareAIImages", JsonSerializer.SerializeToElement(new { paths }), _ => { }, secret: ""));
+        Reply(id, result, generation);
+    }
+
+    private async Task RunAIAsync(JsonElement id, string action, JsonElement payload, int generation)
+    {
+        if (deviceWritePending) throw new IOException("设备写入正在进行，请等待完成后再使用 AI。");
+        if (activeAIRequestId is not null) throw new IOException("已有 AI 请求正在进行，请先取消或等待完成。");
+        var requestId = action == "generateAI" || payload.TryGetProperty("requestId", out _)
+            ? AISettings.RequestId(payload) : Guid.NewGuid().ToString("N");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(360));
+        activeAIRequestId = requestId;
+        aiCancellation = cancellation;
+        try
+        {
+            var injected = await Task.Run(() => aiSettings.Inject(payload), cancellation.Token);
+            var result = await Task.Run(() => aiBackend.RunAsync(action, injected.Payload, record =>
+            {
+                var values = record.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
+                values.TryAdd("id", id);
+                values["requestId"] = requestId;
+                PostToUi(() => SendEvent(values, generation));
+            }, cancellation.Token, injected.Secret), cancellation.Token);
+            Reply(id, result, generation);
+        }
+        catch (OperationCanceledException)
+        {
+            Reply(id, new { cancelled = true, requestId }, generation);
+        }
+        finally
+        {
+            if (ReferenceEquals(aiCancellation, cancellation))
+            {
+                aiCancellation = null;
+                activeAIRequestId = null;
+            }
         }
     }
 
@@ -340,7 +418,7 @@ internal sealed class StudioForm : Form
 
     private void OnClosing(object? sender, FormClosingEventArgs args)
     {
-        if (!deviceWritePending) return;
+        if (!deviceWritePending) { aiCancellation?.Cancel(); return; }
         args.Cancel = true;
         ShowWriteInProgress();
     }

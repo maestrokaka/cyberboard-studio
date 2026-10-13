@@ -36,10 +36,11 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     command = [str(python), "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
         "--name", NAME, "--target-arch", "arm64", "--distpath", str(dist), "--workpath", str(work / "work"), "--specpath", str(work),
-        "--paths", str(vendor), "--paths", str(tools),
+        "--paths", str(vendor), "--paths", str(tools), "--paths", str(ROOT / "backend"),
         "--add-data", str(vendor / "cyberboard") + ":cyberboard",
         "--add-data", str(ROOT / "vendor/licenses") + ":licenses",
-        "--copy-metadata", "cyberboard-cli", "--hidden-import", "serial.tools.list_ports_osx"]
+        "--copy-metadata", "cyberboard-cli", "--hidden-import", "serial.tools.list_ports_osx",
+        "--hidden-import", "kimi_ai", "--hidden-import", "lighting_recipe", "--hidden-import", "ai_images"]
     for file in sorted(tools.glob("*.py")):
         if file.stem != "cb_keymap_tui":
             command += ["--hidden-import", file.stem]

@@ -1,4 +1,5 @@
 /* The lighting is expressive; the studio chrome stays neutral. */
+.main-shell{min-height:0}
 .photo-stage{padding:24px 32px;background:#111315;height:clamp(280px,36vh,356px)}
 .photo-stage:has(.keyboard-isolated){background:#111315}
 .keyboard-isolated{filter:drop-shadow(0 8px 10px rgba(0,0,0,.22))}
@@ -65,3 +66,32 @@
 .single-product-icon .logo-info p{font-size:13px;line-height:1.9;max-width:470px}
 .single-product-icon .logo-info h2{font-size:22px;margin-top:4px}
 .single-product-icon .logo-info .button{width:auto;min-width:160px}
+
+.composer-heading{flex-wrap:wrap}.composer-heading #aiSettingsLink{margin-left:auto}
+.composer-actions{display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap}
+.composer-actions .button{font-size:11px}.composer-actions #promptBtn{margin-left:auto}
+.ai-reference-row{display:flex;align-items:center;gap:12px;margin-top:4px;font-size:10px;color:#858b94}
+.ai-reference-images{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px}
+.ai-reference-image{display:flex;align-items:center;gap:8px;max-width:calc(33.333% - 7px);min-width:130px;border:1px solid var(--border);border-radius:6px;padding:5px;background:var(--panel)}
+.ai-reference-image img{width:42px;height:42px;object-fit:cover;border-radius:3px}.ai-reference-image span{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:120px}
+.ai-reference-image .icon-button{width:21px;height:23px;padding:0;font-size:17px;margin-left:auto;flex-shrink:0}
+.ai-generation-status{font-size:11px;color:#bdc1e9;border-left:2px solid var(--accent);padding:6px 10px;margin-top:12px;line-height:1.7}
+.ai-generation-status.error,.ai-settings-status.error{color:#edb5b5}
+.ai-creation-note{font-size:11px;color:var(--muted);line-height:1.8;white-space:pre-wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.ai-settings-card h2{margin-bottom:0}.ai-settings-fields{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;gap:12px;margin-top:20px}
+.ai-settings-fields label{font-size:11px;color:var(--muted)}.ai-settings-fields input{min-width:0;width:100%;background:var(--panel);border:1px solid var(--strong);border-radius:6px;padding:8px 10px;font-size:12px}
+.ai-settings-fields select{width:100%;font-size:12px}.ai-settings-fields input:focus{border-color:var(--accent)}
+.ai-settings-card .ai-provider-note,.ai-settings-card #aiCredentialNote{font-size:11px;color:#858b94}
+.ai-settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}.ai-settings-card .ai-settings-actions .button{margin-top:0}
+.ai-settings-status{font-size:11px;color:var(--muted);line-height:1.8;margin-top:14px;overflow-wrap:anywhere}
+.ai-settings-card #settingsPromptBtn{margin-top:14px}
+.ai-creative-options{display:flex;align-items:center;gap:16px;margin:4px 0 6px;font-size:10px;color:#858b94;flex-wrap:wrap}
+.ai-creative-options label{display:flex;align-items:center;gap:6px;color:var(--muted)}.ai-creative-options input{accent-color:var(--accent);margin:0}
+.ai-prompt-examples{display:flex;gap:15px;flex-wrap:wrap;margin:2px 0 5px}.ai-prompt-examples .text-button{font-size:10px}
+.design-name-row{display:flex;gap:6px}.design-name-row input{width:100%;min-width:0;background:var(--surface);border:1px solid var(--strong);border-radius:6px;padding:7px 9px;font-size:12px}.design-name-row input:disabled{color:var(--muted);opacity:.65}
+.design-name-row .button{padding:6px 9px}.library-view-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.library-note{font-size:11px;margin:0 0 18px}
+.library-manage{display:flex;gap:14px;align-items:center;margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:10px}.library-manage .text-button{font-size:10px}
+.library-deleted-date{color:var(--subtle);font-size:10px;margin-top:12px}.danger-text{color:#d2a0a0}.danger-button{background:#6a343b;border-color:#865057;color:#ffe0e4}.danger-button:hover:not(:disabled){background:#7d4149;border-color:#a86b76}
+@media(max-width:1250px){.composer-actions{gap:10px}.composer-actions #promptBtn{margin-left:0}.ai-settings-fields{grid-template-columns:65px minmax(0,1fr);gap:10px}.composer-heading #aiModelBadge{display:inline-flex;font-size:9px}}
+
+.model-config-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);align-items:start;gap:22px}.model-config-note p{line-height:1.9}.model-config-layout .ai-settings-fields{grid-template-columns:85px minmax(0,1fr)}

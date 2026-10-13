@@ -72,7 +72,7 @@ function harness(options = {}) {
     querySelectorAll: selector => documentRoot.querySelectorAll(selector), createElement: tag => new Element(tag),
     addEventListener() {} };
   const calls = [], timers = new Map(); let timerID = 0; let executeReply;
-  const control = { importValue: null, detectValue: null, detectError: null, workspace: options.workspace || null, executionResult: options.executionResult || null };
+  const control = { importValue: null, detectValue: null, detectError: null, workspace: options.workspace || null, executionResult: options.executionResult || null, planKeymap: null, planPreservation: options.planPreservation || {source:'live',comparedKeycodes:1400,differentFromStored:0,differentPhysicalBindings:0,differentInternalKeycodes:0,refreshApplied:false} };
   const window = { KeyboardPreview: class {
     constructor(container, options) { this.container = container; this.onFrame = options.onFrame; this.design = options.design; this.speedMs = options.design.speed_ms; this.playing = true; this.ready = Promise.resolve(this); }
     setDesign(d) { assert.ok(d); this.design = d; return this; }
@@ -83,18 +83,20 @@ function harness(options = {}) {
   }};
   const postMessage = message => {
     calls.push(clone(message));
-    queueMicrotask(() => {
+    queueMicrotask(async () => {
       const { id, action, payload } = message; const D = window.STUDIO_DATA; let result;
+      if(options.handlers?.[action]){try{result=await options.handlers[action](payload,message);window.StudioBridge.receive({id,result});}catch(error){window.StudioBridge.receive({id,error:{message:error.message}});}return;}
       if (action === 'execute') { executeReply = value => window.StudioBridge.receive({ id, result: value }); return; }
       if (action === 'detect' && control.detectError) { window.StudioBridge.receive({ id, error: { message: control.detectError } }); return; }
       switch (action) {
         case 'bootstrap': result = { config: options.emptyBaseline ? null : clone(fixture), device: options.emptyBaseline ? clone(D.snapshot) : clone(syntheticDevice), history: [], cliVersion: 'offline-test', workspace: control.workspace }; break;
+        case 'getAISettings': result={provider:'kimi-code',baseUrl:'https://api.kimi.com/coding/v1',model:'k3',hasKey:false,credentialStore:'test'}; break;
         case 'saveWorkspace': control.workspace = clone(payload); result = { saved: true }; break;
         case 'detect': result = control.detectValue || { connected: true, device: { ...syntheticDevice, connected: true, port: '/dev/mock-board' }, keymap: clone(fixture.key_layer), config: clone(fixture) }; break;
         case 'importJSON': result = control.importValue; break;
         case 'exportJSON': result = { fileName: payload.fileName, path: '/offline/export.json' }; break;
         case 'history': result = { history: [{ id: 'app:offline.json', snapshotId: 'app:offline.json', filename: 'offline.json', createdAt: '2026-10-12T03:00:00Z' }] }; break;
-        case 'plan': case 'restorePlan': { const assignments = payload.assignments || D.designs.map((design, i) => ({ slot: i + 1, design, brightness: 100, speedMs: design.speed_ms })); result = { token: 'offline-token', config: window.StudioModel.merge(fixture, assignments), changedSlots: assignments.map(a => a.slot), totalFrames: 9315, estimatedSeconds: 67, summary: assignments.map(a => ({ slot: a.slot, name: a.design.name, topFrames: a.design.frames.length, keyFrames: a.design.keyframes.length })) }; break; }
+        case 'plan': case 'restorePlan': { const assignments = payload.assignments || D.designs.map((design, i) => ({ slot: i + 1, design, brightness: 100, speedMs: design.speed_ms })); result = { token: 'offline-token', keyChangeCount:0, keymap:control.planKeymap?clone(control.planKeymap):null, keymapPreservation:clone(control.planPreservation), config: window.StudioModel.merge(fixture, assignments), changedSlots: assignments.map(a => a.slot), totalFrames: 9315, estimatedSeconds: 67, summary: assignments.map(a => ({ slot: a.slot, name: a.design.name, topFrames: a.design.frames.length, keyFrames: a.design.keyframes.length })) }; break; }
         default: throw Error('Unexpected mocked request: ' + action);
       }
       window.StudioBridge.receive({ id, result });
@@ -105,7 +107,7 @@ function harness(options = {}) {
     else window.webkit = { messageHandlers: { studio: { postMessage } } };
   }
   const context = { window, document, console, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
-  vm.createContext(context); ['data.js', 'studio-model.js', 'app.js', 'assets/branding/logos-data.js', 'assets/branding/material-icons-data.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
+  vm.createContext(context); ['data.js', 'studio-model.js', 'ai-client.js', 'library-client.js', 'app.js', 'assets/branding/logos-data.js', 'assets/branding/material-icons-data.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
   if (options.logoOverride) Object.assign(window.STUDIO_LOGO_OPTIONS[0], options.logoOverride);
   vm.runInContext(read('brand-review.js'), context, { filename: 'brand-review.js' });
   return { window, document, calls, control, get app() { return window.StudioApp; }, el: id => document.getElementById(id),
@@ -113,7 +115,8 @@ function harness(options = {}) {
     replyExecute(value) { assert.ok(executeReply, 'execute must have an explicit click'); executeReply(value); executeReply = null; } };
 }
 
-(async () => {
+module.exports={harness,settle,clone,syntheticConfig,syntheticDevice};
+if(require.main===module)(async () => {
   const h = harness({platform: process.env.STUDIO_UI_PLATFORM}); await settle(); const state = h.app.state;
   assert.equal(h.window.STUDIO_DATA.baseConfig, null, 'production data never includes the test fixture or a device baseline');
   assert.equal(state.config._fixture, true, 'the mocked backend alone supplies synthetic configuration');
@@ -184,9 +187,9 @@ function harness(options = {}) {
   assert.equal(h.el('brandMark').innerHTML, originalMark, 'changing proposal groups never applies a brand mark');
   await h.flushSave(); assert.equal(brandSnapshot(), brandStateBefore, 'logo review never mutates lighting designs, slots or config');
   assert.deepEqual(h.control.workspace, workspaceBeforeBrand, 'temporary branding must not save workspace changes');
-  assert.equal(h.calls.length, brandCallsBefore, 'branding preview must not request backend or hardware actions');
+  assert.equal(h.calls.filter(c=>c.action!=='getAISettings').length, brandCallsBefore, 'branding preview never requests device or workspace actions; settings may load saved AI metadata');
   await h.el('returnWorkbenchBtn').click();
-  for (const page of ['library', 'device', 'keymap', 'history', 'settings', 'workbench']) {
+  for (const page of ['library', 'models', 'device', 'keymap', 'history', 'settings', 'workbench']) {
     const button = h.document.querySelectorAll('[data-page]').find(x => x.dataset.page === page); await button.click(); await settle();
     assert.equal(state.page, page, 'navigation: ' + page); assert.ok(h.el('page-' + page).classList.contains('active'));
     assert.equal(h.document.querySelectorAll('.page').filter(p => p.classList.contains('active')).length, 1);
@@ -223,7 +226,7 @@ function harness(options = {}) {
     h.window.StudioBridge.event({ event: 'progress', stage, transferred: 4660, total: 9315 }); assert.equal(h.el('syncStage').textContent, expected);
   }
   h.replyExecute({ success: true, deviceAck: true, keymapMatch: true, stateStored: false, warning: '离线测试保存警告', changedSlots: [2], device: { ...syntheticDevice, connected: true } }); await executing;
-  assert.equal(state.executing, false); assert.equal(state.pending.size, 0); assert.match(h.el('syncContent').innerHTML, /本机记录保存未完成/); assert.match(h.el('globalStatus').textContent, /本机记录保存未完成/);
+  assert.equal(state.executing, false); assert.equal(state.pending.size, 0); await h.flushSave(); assert.equal(h.control.workspace.pending.length,0,'successful USB sync must persist cleared drafts after execution releases its lock'); assert.match(h.el('syncContent').innerHTML, /本机记录保存未完成/); assert.match(h.el('globalStatus').textContent, /本机记录保存未完成/);
   assert.equal(h.calls.filter(c => c.action === 'execute').length, 1, 'only explicit execution writes');
   const fresh = harness({platform:'windows', emptyBaseline:true, dataPath:process.env.STUDIO_PACKED_DATA}); await settle();
   assert.equal(fresh.app.state.config, null); assert.equal(fresh.app.state.baselineMissing, true);

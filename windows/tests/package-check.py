@@ -10,7 +10,7 @@ import zipfile
 
 APP = Path(__file__).resolve().parents[2]
 PACKAGE = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.1.0-Windows-x64.zip"
+ARCHIVE = APP / "build/Cyberboard-Studio-0.2.0-Windows-x64.zip"
 
 
 def digest(path):
@@ -34,7 +34,8 @@ class PackageChecks(unittest.TestCase):
                     "WebView2Loader.dll", "resources/python/python.exe",
                     "resources/python/python312.dll", "resources/python/python312.zip",
                     "resources/backend/bridge.py", "resources/backend/migrate-config.py",
-                    "resources/web/index.html", "resources/web/data.js", "迁移原配置.cmd",
+                    "resources/backend/kimi_ai.py", "resources/backend/lighting_recipe.py", "resources/backend/ai_images.py",
+                    "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/library-client.js", "迁移原配置.cmd",
                     "检查运行环境.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
         for name in required:
             self.assertTrue((PACKAGE / name).is_file(), name)
@@ -42,6 +43,10 @@ class PackageChecks(unittest.TestCase):
         config = json.loads((PACKAGE / "Cyberboard Studio.runtimeconfig.json").read_text())
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
+        for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css"):
+            self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
+        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py"):
+            self.assertEqual(digest(PACKAGE / "resources/backend" / name), digest(APP / "backend" / name), name)
 
     def test_executable_and_native_dependencies_are_windows_x64(self):
         for name in ("Cyberboard Studio.exe", "coreclr.dll", "hostfxr.dll", "WebView2Loader.dll",
@@ -78,7 +83,8 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(set(layout), {"kind", "keys"})
         for path in PACKAGE.rglob("*"):
             if path.is_file():
-                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json"})
+                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json"})
+                self.assertNotIn("/credentials/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/history/", path.relative_to(PACKAGE).as_posix())
         self.assertNotIn("/Users/sheva", source)
         self.assertFalse((PACKAGE / "resources/python/pyvenv.cfg").exists())

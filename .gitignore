@@ -23,6 +23,8 @@
 **/plans/
 **/backups/
 **/history/
+**/ai-settings.json
+**/credentials/
 .env
 .env.*
 !.env.example

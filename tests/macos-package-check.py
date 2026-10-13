@@ -84,6 +84,7 @@ def bundle_structure(app):
     contents = app / "Contents"
     resources = contents / "Resources"
     info = plistlib.loads((contents / "Info.plist").read_bytes())
+    require(info.get("CFBundleShortVersionString") == "0.2.0", "App version differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]
@@ -104,8 +105,11 @@ def bundle_structure(app):
             "Frozen backend manifest does not describe a portable arm64 runtime")
     require(manifest.get("private_device_state_bundled") is False, "Frozen backend includes private device state")
     require(not (resources / "backend/bridge.py").exists(), "Source/development backend is included in the release")
-    forbidden_names = {"current.json", "meta.json", "workspace.json", "pyvenv.cfg", ".operation.lock"}
-    forbidden_directories = {".venv", "venv", "history", "devices", "test-fixtures"}
+    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css"):
+        require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
+                "Packaged web source is missing or stale: " + name)
+    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "pyvenv.cfg", ".operation.lock"}
+    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "test-fixtures"}
     for path in app.rglob("*"):
         require(path.name.lower() not in forbidden_names, "Private/development file bundled: " + str(path.relative_to(app)))
         require(not (path.is_dir() and path.name.lower() in forbidden_directories),

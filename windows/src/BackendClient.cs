@@ -11,9 +11,11 @@ internal sealed class BackendClient : IDisposable
     private readonly CancellationTokenSource shutdown = new();
     private const int DiagnosticLimit = 65536;
 
-    public async Task<JsonElement> RunAsync(string action, JsonElement payload, Action<JsonElement> onEvent)
+    public async Task<JsonElement> RunAsync(string action, JsonElement payload, Action<JsonElement> onEvent,
+        CancellationToken cancellationToken = default, string? secret = null)
     {
-        var cancellation = shutdown.Token;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token, cancellationToken);
+        var cancellation = linked.Token;
         await queue.WaitAsync(cancellation);
         try
         {
@@ -77,7 +79,7 @@ internal sealed class BackendClient : IDisposable
                         }
                         if (record.TryGetProperty("event", out _) ||
                             (record.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "event"))
-                            onEvent(record.Clone());
+                            onEvent(secret is null ? record.Clone() : AISettings.Redact(record, secret));
                         else if (record.TryGetProperty("result", out _) || record.TryGetProperty("error", out _))
                             final = record.Clone();
                         else parseError = "后台返回的数据缺少结果字段。";
@@ -87,13 +89,15 @@ internal sealed class BackendClient : IDisposable
                 await process.WaitForExitAsync(cancellation);
                 await input;
                 var diagnosticText = await diagnostics;
-                if (!string.IsNullOrWhiteSpace(diagnosticText)) HostLog.Write("backend " + action, diagnosticText);
+                // AI subprocess diagnostics are never copied to host logs: SDK/network errors may contain credentials.
+                if (secret is null && !string.IsNullOrWhiteSpace(diagnosticText)) HostLog.Write("backend " + action, diagnosticText);
                 if (parseError is not null) throw new IOException(parseError);
                 if (final is null) throw new IOException($"后台没有返回操作结果（{process.ExitCode}）。");
-                if (final.Value.TryGetProperty("error", out var error))
+                var safeFinal = secret is null ? final.Value : AISettings.Redact(final.Value, secret);
+                if (safeFinal.TryGetProperty("error", out var error))
                     throw new IOException(error.ValueKind == JsonValueKind.String ? error.GetString() : error.GetRawText());
                 if (process.ExitCode != 0) throw new IOException($"后台操作未成功完成（{process.ExitCode}）。");
-                return final.Value.GetProperty("result").Clone();
+                return safeFinal.GetProperty("result").Clone();
             }
             catch
             {

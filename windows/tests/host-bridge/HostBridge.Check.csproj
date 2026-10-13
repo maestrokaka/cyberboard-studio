@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/BackendClient.cs" Link="BackendClient.cs" />
+    <Compile Include="../../src/AISettings.cs" Link="AISettings.cs" />
     <Compile Include="../../src/ResourcePolicy.cs" Link="ResourcePolicy.cs" />
     <Content Include="fake-bridge.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

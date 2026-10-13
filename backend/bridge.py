@@ -34,6 +34,10 @@ PLAN_LIFETIME_SECONDS = 30 * 60
 MAX_INPUT_BYTES = 16 * 1024 * 1024
 MAX_WORKSPACE_BYTES = 32 * 1024 * 1024
 
+# Source importlib tests and isolated Windows Python need the sibling modules.
+if str(Path(__file__).parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).parent))
+
 
 class BridgeError(Exception):
     def __init__(self, code: str, message: str, **details):
@@ -254,6 +258,33 @@ class Bridge:
     def event(self, stage, transferred=0, total=0, **extra):
         self.event_sink({"event": "progress", "stage": stage, "transferred": transferred, "total": total, **extra})
 
+    def testAIConnection(self, payload):
+        from kimi_ai import AIError, KimiClient, configuration
+        try:
+            client = KimiClient(configuration(payload.get("ai")),
+                                progress=lambda stage, message: self.event(stage, message=message), timeout=45)
+            return client.test_connection()
+        except AIError as error:
+            raise BridgeError(error.code, error.message) from None
+
+    def generateAI(self, payload):
+        from kimi_ai import AIError, generate
+        try:
+            result = generate(payload, progress=lambda stage, message: self.event(
+                stage, message=message, requestId=payload.get("requestId")))
+            validate_animation(result["design"]["frames"], 200, "顶屏")
+            validate_animation(result["design"]["keyframes"], 90, "轴灯")
+            return result
+        except AIError as error:
+            raise BridgeError(error.code, error.message) from None
+
+    def prepareAIImages(self, payload):
+        from ai_images import ImageError, from_paths
+        try:
+            return from_paths(payload.get("paths"))
+        except ImageError as error:
+            raise BridgeError("ai_image_invalid", str(error)) from None
+
     def stored_product(self):
         store = self.cli["cb_store"]
         devices = store.store_root() / "devices"
@@ -301,20 +332,40 @@ class Bridge:
     def validate_workspace(self, payload):
         require(isinstance(payload, dict), "invalid_workspace", "工作台草稿格式无效。")
         designs, pending = payload.get("designs", []), payload.get("pending", [])
+        trash = payload.get("trash", [])
         require(isinstance(designs, list) and len(designs) <= 30,
                 "workspace_limit", "最多保存 30 套自定义灯效。请导出后清理不需要的作品。")
-        ids = set()
-        for design in designs:
+        require(isinstance(trash, list) and len(trash) <= 30,
+                "workspace_limit", "回收站最多保存 30 套作品。请恢复或明确删除部分作品后再试。")
+
+        def validate_design(design, identities):
             require(isinstance(design, dict), "invalid_workspace", "工作台作品格式无效。")
             identity = design.get("id")
-            require(isinstance(identity, str) and 0 < len(identity) <= 256 and identity not in ids,
+            require(isinstance(identity, str) and 0 < len(identity) <= 256 and identity not in identities,
                     "invalid_workspace", "工作台作品编号缺失或重复。")
-            ids.add(identity)
+            identities.add(identity)
             require(isinstance(design.get("name"), str) and 0 < len(design["name"]) <= 256,
                     "invalid_workspace", "工作台作品名称无效。")
             validate_animation(design.get("frames"), 200, "顶屏")
             validate_animation(design.get("keyframes"), 90, "轴灯")
             integer(design.get("speed_ms"), 1, 32767, "播放间隔")
+
+        ids, trash_ids = set(), set()
+        for design in designs:
+            validate_design(design, ids)
+        for entry in trash:
+            require(isinstance(entry, dict) and set(entry) == {"design", "deletedAt"},
+                    "invalid_workspace", "回收站记录格式无效。")
+            validate_design(entry.get("design"), trash_ids)
+            deleted_at = entry.get("deletedAt")
+            require(isinstance(deleted_at, str) and len(deleted_at) <= 64 and
+                    re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", deleted_at),
+                    "invalid_workspace", "回收站移入时间必须为带时区的 ISO 日期。")
+            try:
+                parsed = datetime.fromisoformat(deleted_at.replace("Z", "+00:00"))
+                require(parsed.tzinfo is not None, "invalid_workspace", "回收站移入时间无效。")
+            except ValueError:
+                raise BridgeError("invalid_workspace", "回收站移入时间无效。") from None
         require(isinstance(pending, list) and len(pending) <= 3,
                 "invalid_workspace", "工作台最多保留 3 个槽位草稿。")
         slots = set()
@@ -325,6 +376,10 @@ class Bridge:
             slots.add(slot)
             require(isinstance(item.get("designId"), str) and 0 < len(item["designId"]) <= 256,
                     "invalid_workspace", "槽位草稿缺少作品编号。")
+            # A re-imported active work may reuse an archived ID. Drafts resolve
+            # against active works first; an archive-only work cannot be assigned.
+            require(item["designId"] not in trash_ids or item["designId"] in ids,
+                    "invalid_workspace", "槽位草稿不能引用回收站中的作品，请先恢复该作品。")
             # Built-in library IDs need not appear in custom designs. The UI
             # resolves them against the bundled library when restoring drafts.
             integer(item.get("brightness"), 0, 100, "亮度")
@@ -345,7 +400,7 @@ class Bridge:
                 isinstance(palette, list) and len(palette) <= 16 and
                 all(isinstance(color, str) and RGB_RE.fullmatch(color) for color in palette),
                 "invalid_workspace", "工作台配色格式无效。")
-        workspace = {"designs": copy.deepcopy(designs), "pending": copy.deepcopy(pending),
+        workspace = {"designs": copy.deepcopy(designs), "trash": copy.deepcopy(trash), "pending": copy.deepcopy(pending),
                      "selectedId": selected, "targetSlot": target, "brief": brief, "palette": copy.deepcopy(palette),
                      "brightness": brightness, "speedMs": speed_ms, "exportFormat": export_format}
         try:
@@ -374,7 +429,7 @@ class Bridge:
         workspace.update(version=1, savedAt=now_iso())
         atomic_json(self.state_dir / "workspace.json", workspace, compact=True)
         return {"saved": True, "savedAt": workspace["savedAt"], "designCount": len(workspace["designs"]),
-                "pendingCount": len(workspace["pending"])}
+                "pendingCount": len(workspace["pending"]), "trashCount": len(workspace["trash"])}
 
     def discover(self, payload=None):
         payload = payload or {}
@@ -489,19 +544,24 @@ class Bridge:
     def history(self, payload):
         return {"history": self.history_items(self.stored_product())}
 
-    def fresh_baseline(self, payload):
+    def fresh_baseline(self, payload, *, preserve_current_keymap=False):
         identity = self.discover(payload)
         require(identity is not None, "device_missing", "请通过 USB 连接键盘后重新检测。")
         config = self.stored_config(identity.product_id, required=True)
         validate_config(config, self.cli)
         live, raw = self.read_live(identity.port)
-        require(matrix(live) == matrix(config["key_layer"]), "baseline_keymap_changed",
-                "键盘上的键位与本机记录不同，已停止同步以保留当前键位。请先核对完整配置。")
+        if not preserve_current_keymap:
+            require(matrix(live) == matrix(config["key_layer"]), "baseline_keymap_changed",
+                    "键盘上的键位与本机记录不同，已停止同步以保留当前键位。请先核对完整配置。")
         return identity, config, live, raw
 
     def prepare(self, payload, baseline_context=None, restore_source=None):
         assignments = payload.get("assignments", [])
         changes = payload.get("keyChanges", [])
+        preserve_current_keymap = payload.get("preserveCurrentKeymap", False)
+        require(type(preserve_current_keymap) is bool, "invalid_keymap_policy", "保留当前键位选项必须是布尔值。")
+        require(not preserve_current_keymap or changes == [], "invalid_keymap_policy",
+                "保留当前键位的灯效同步不能同时包含键位修改。")
         require(isinstance(assignments, list) and isinstance(changes, list) and (assignments or changes),
                 "empty_plan", "请先选择灯效槽或需要修改的键位。")
         require(len(assignments) <= 3, "invalid_slots", "最多同步 3 个灯效槽。")
@@ -522,7 +582,25 @@ class Bridge:
             integer(change.get("matrixIndex"), 0, 199, "键位编号")
             require(isinstance(change.get("code"), str) and KEY_RE.fullmatch(change["code"]),
                     "invalid_key_change", "键位编码需要使用 #MMPPUUUU 格式。")
-        identity, before, live, raw = baseline_context or self.fresh_baseline(payload)
+        identity, stored, live, raw = baseline_context or self.fresh_baseline(
+            payload, preserve_current_keymap=preserve_current_keymap)
+        # Keep the original full record as the unreadable LED/extension baseline.
+        # Only an explicit LED-only policy may accept a different live key matrix.
+        # No CLI current record changes until the final write/readback succeeds.
+        before = copy.deepcopy(stored)
+        before["key_layer"]["valid"] = 1
+        for index, layer in enumerate(live["layer_data"]):
+            before["key_layer"]["layer_data"][index]["layer"] = copy.deepcopy(layer["layer"])
+        physical_positions = {key["matrix_index"] for key in self.layout()}
+        differences = [(layer_index, index)
+                       for layer_index, (old, current) in enumerate(zip(stored["key_layer"]["layer_data"], live["layer_data"]))
+                       for index, (old_code, current_code) in enumerate(zip(old["layer"], current["layer"]))
+                       if old_code.upper() != current_code.upper()]
+        physical_differences = sum(index in physical_positions for _, index in differences)
+        preservation = {"source": "live", "comparedKeycodes": 1400,
+                        "differentFromStored": len(differences), "differentPhysicalBindings": physical_differences,
+                        "differentInternalKeycodes": len(differences) - physical_differences,
+                        "refreshApplied": bool(differences)}
         target = copy.deepcopy(before)
         for item in assignments:
             design = item["design"]
@@ -558,15 +636,17 @@ class Bridge:
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
         backup = self.state_dir / "backups" / f"{stamp}--{token}.json"
         atomic_json(backup, {**before, "_studio_product_id": identity.product_id})
+        atomic_json(folder / "stored-before.json", stored)
         atomic_json(folder / "before.json", before)
         atomic_json(folder / "target.json", target)
         (folder / "before.raw").write_bytes(raw)
-        metadata = {"token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
+        metadata = {"planVersion": 2, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
                     "status": "prepared", "productId": identity.product_id, "firmware": identity.version,
-                    "port": identity.port, "beforeHash": digest(before), "targetHash": digest(target),
+                    "port": identity.port, "storedBaselineHash": digest(stored),
+                    "beforeHash": digest(before), "targetHash": digest(target),
                     "liveKeymapHash": hashlib.sha256(matrix(live)).hexdigest(), "backupPath": str(backup),
                     "changedSlots": sorted(slots), "keyChangeCount": len(changes), "totalFrames": fp.total,
-                    "restoreSource": restore_source}
+                    "restoreSource": restore_source, "keymapPreservation": preservation}
         atomic_json(folder / "plan.json", metadata)
         summary = [{"slot": item["slot"], "name": item["design"].get("name", f"自定义 {item['slot']}"),
                     "topFrames": len(item["design"]["frames"]), "keyFrames": len(item["design"]["keyframes"]),
@@ -576,6 +656,8 @@ class Bridge:
                 "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
                 "backupPath": str(backup), "summary": summary, "keyChangeCount": len(changes),
                 "config": self.provenance(target, "prepared"), "device": self.device_dict(identity),
+                "keymap": self.keymap_view(live),
+                "keymapPreservation": preservation,
                 "ledSource": "last-written", "status": "prepared"}
 
     def plan(self, payload):
@@ -594,7 +676,9 @@ class Bridge:
     def restorePlan(self, payload):
         require(payload.get("preserveKeymap", True) is True, "restore_keymap_not_supported",
                 "历史恢复只恢复灯效，键位保留当前配置。")
-        context = self.fresh_baseline(payload)
+        require(payload.get("keyChanges", []) == [], "invalid_keymap_policy",
+                "保留当前键位的历史恢复不能同时包含键位修改。")
+        context = self.fresh_baseline(payload, preserve_current_keymap=True)
         identity = context[0]
         snapshot_id = payload.get("snapshotId")
         snapshot = load_json(self.snapshot_path(snapshot_id, identity.product_id))
@@ -609,7 +693,7 @@ class Bridge:
                                 "design": {"id": f"restore-{slot}", "name": page.get("//", f"自定义 {slot}"),
                                            "frames": [frame["frame_RGB"] for frame in page["frames"]["frame_data"]],
                                            "keyframes": [frame["frame_RGB"] for frame in page["keyframes"]["frame_data"]]}})
-        return self.prepare({"assignments": assignments}, context, restore_source=snapshot_id)
+        return self.prepare({"assignments": assignments, "preserveCurrentKeymap": True}, context, restore_source=snapshot_id)
 
     def send_config(self, port, fp):
         """CLI-equivalent serial write, with CRC/header checks and real frame progress."""
@@ -659,25 +743,33 @@ class Bridge:
         folder = self.state_dir / "plans" / token
         require((folder / "plan.json").is_file(), "plan_missing", "同步计划已不存在，请重新准备。")
         metadata = load_json(folder / "plan.json")
+        require(metadata.get("planVersion") == 2, "plan_version_unsupported",
+                "这个同步计划来自旧版本，请重新准备后再同步。")
         require(metadata.get("status") == "prepared" and metadata.get("token") == token,
                 "plan_consumed", "这个同步计划已经执行或失效，请重新准备。")
         require(0 <= time.time() - metadata.get("createdTimestamp", 0) <= PLAN_LIFETIME_SECONDS,
                 "plan_expired", "同步计划已过期，请重新准备。")
+        require(all((folder / name).is_file() for name in ("stored-before.json", "before.json", "target.json")),
+                "plan_tampered", "同步计划文件不完整，请重新准备。")
+        stored_before = load_json(folder / "stored-before.json")
         before, target = load_json(folder / "before.json"), load_json(folder / "target.json")
-        require(digest(before) == metadata.get("beforeHash") and digest(target) == metadata.get("targetHash"),
+        require(digest(stored_before) == metadata.get("storedBaselineHash") and
+                digest(before) == metadata.get("beforeHash") and digest(target) == metadata.get("targetHash"),
                 "plan_tampered", "同步计划内容发生变化，请重新准备。")
         current = self.stored_config(metadata["productId"], required=True)
-        require(digest(current) == metadata["beforeHash"], "baseline_changed", "本机配置已更新，请重新准备同步。")
+        require(digest(current) == metadata["storedBaselineHash"], "baseline_changed", "本机配置已更新，请重新准备同步。")
         identity = self.discover({"port": metadata["port"]})
         require(identity is not None and identity.product_id == metadata["productId"] and identity.version == metadata["firmware"],
                 "device_changed", "连接的键盘或固件发生变化，请重新检测。")
+        fp = validate_config(target, self.cli)
+        require(fp.total == metadata["totalFrames"], "plan_tampered", "同步数据量发生变化，请重新准备。")
+        # Read exactly once after encoding, close to JSON_START. Never silently
+        # refresh a reviewed plan if the device keymap changed in the meantime.
         live, raw = self.read_live(identity.port)
         require(hashlib.sha256(matrix(live)).hexdigest() == metadata["liveKeymapHash"],
                 "keymap_changed", "键盘上的键位已变化，请重新准备同步。")
-        fp = validate_config(target, self.cli)
-        require(fp.total == metadata["totalFrames"], "plan_tampered", "同步数据量发生变化，请重新准备。")
         # Final store comparison immediately before the destructive JSON_START.
-        require(digest(self.stored_config(identity.product_id, required=True)) == metadata["beforeHash"],
+        require(digest(self.stored_config(identity.product_id, required=True)) == metadata["storedBaselineHash"],
                 "baseline_changed", "本机配置已更新，请重新准备同步。")
         metadata.update(status="executing", startedAt=now_iso())
         atomic_json(folder / "plan.json", metadata)
@@ -760,7 +852,7 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "history", "plan", "execute", "setTime", "restorePlan", "saveWorkspace"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "history", "plan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()

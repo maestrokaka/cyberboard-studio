@@ -4,6 +4,13 @@ using CyberboardStudio;
 
 internal static class Program
 {
+    private sealed class MemoryVault : ICredentialVault
+    {
+        public Dictionary<string, string> Keys { get; } = new();
+        public string? Read(string provider) => Keys.GetValueOrDefault(provider);
+        public void Write(string provider, string key) => Keys[provider] = key;
+        public void Delete(string provider) => Keys.Remove(provider);
+    }
     private static int passed;
     private static string temp = "";
 
@@ -133,6 +140,93 @@ internal static class Program
                     catch (OperationCanceledException) { }
                 }
                 Check(stopwatch.Elapsed < TimeSpan.FromSeconds(5), "Child cancellation was not prompt.");
+            });
+            await Run("AI official endpoint and model policies reject credential redirection", async () =>
+            {
+                var code = AISettings.Validate(Payload(new { }));
+                Check(code.Provider == "kimi-code" && code.Model == "k3", "Incorrect Code defaults.");
+                var open = AISettings.Validate(Payload(new { provider = "kimi-open" }));
+                Check(open.Model == "kimi-k3", "Incorrect open-platform default.");
+                Check(AISettings.Validate(Payload(new { baseUrl = "https://api.kimi.ai/coding/v1/", model = "kimi:code-v1.0" })).BaseUrl == "https://api.kimi.ai/coding/v1", "Global Code endpoint rejected.");
+                foreach (var endpoint in new[] { "http://api.kimi.com/coding/v1", "https://api.kimi.com.evil/coding/v1", "https://user@api.kimi.com/coding/v1", "https://api.kimi.com/coding/v1?key=x", "https://api.moonshot.cn/v1", "https://127.0.0.1/v1" })
+                    await Fails(() => { AISettings.Validate(Payload(new { baseUrl = endpoint })); return Task.CompletedTask; }, "官方 HTTPS");
+                foreach (var model in new[] { "evil\nheader", "模型", new string('a', 129), "../../model" })
+                    await Fails(() => { AISettings.Validate(Payload(new { model })); return Task.CompletedTask; }, "模型名称");
+                await Fails(() => { AISettings.RequestId(Payload(new { requestId = "bad request" })); return Task.CompletedTask; }, "请求编号");
+            });
+            await Run("AI metadata never stores or returns secrets; blank retains and delete is provider scoped", async () =>
+            {
+                var vault = new MemoryVault();
+                var settings = new AISettings(Path.Combine(temp, "AI 用户配置"), vault);
+                var secret = "sk-offline-check-secret";
+                var saved = JsonSerializer.Serialize(settings.Save(Payload(new { apiKey = "  " + secret + "  " })));
+                Check(!saved.Contains(secret) && saved.Contains("hasKey"), "Save returned secret.");
+                var metadata = File.ReadAllText(Path.Combine(temp, "AI 用户配置", "ai-settings.json"));
+                Check(!metadata.Contains(secret) && !metadata.Contains("apiKey"), "Metadata stored a plaintext credential.");
+                settings.Save(Payload(new { apiKey = "" }));
+                Check(vault.Read("kimi-code") == secret, "Empty key erased an existing credential.");
+                settings.Save(Payload(new { provider = "kimi-open", apiKey = "open-secret" }));
+                settings.Save(Payload(new { provider = "kimi-open", removeKey = true }));
+                Check(vault.Read("kimi-open") is null && vault.Read("kimi-code") == secret, "Removal crossed provider accounts.");
+                settings.Save(Payload(new { provider = "kimi-code" }));
+                var injected = settings.Inject(Payload(new { brief = "雨", ai = new { apiKey = "untrusted", baseUrl = "https://evil" } }));
+                Check(injected.Payload.GetProperty("ai").GetProperty("apiKey").GetString() == secret, "Untrusted frontend credential replaced the vault.");
+                Check(injected.Payload.GetProperty("ai").GetProperty("baseUrl").GetString() == "https://api.kimi.com/coding/v1", "Untrusted frontend endpoint persisted.");
+                await Fails(() => { settings.Save(Payload(new { apiKey = "key\r\nheader" })); return Task.CompletedTask; }, "单行密钥");
+                await Fails(() => { settings.Save(Payload(new { apiKey = new string('a', 4097) })); return Task.CompletedTask; }, "单行密钥");
+            });
+            await Run("legacy Code default migrates once while explicit and open models remain selected", () =>
+            {
+                var directory = Path.Combine(temp, "模型迁移 isolated");
+                Directory.CreateDirectory(directory);
+                var path = Path.Combine(directory, "ai-settings.json");
+                var settings = new AISettings(directory, new MemoryVault());
+                File.WriteAllText(path, JsonSerializer.Serialize(new { provider = "kimi-code", model = "kimi-for-coding" }));
+                var first = JsonSerializer.SerializeToElement(settings.Get());
+                Check(first.GetProperty("model").GetString() == "k3" && first.GetProperty("modelMigrated").GetBoolean(), "First read did not report default migration.");
+                Check(settings.LoadConfiguration().Model == "k3", "Legacy default was not migrated.");
+                using (var document = JsonDocument.Parse(File.ReadAllText(path)))
+                {
+                    Check(document.RootElement.GetProperty("modelDefaultsVersion").GetInt32() == 2, "Migration marker missing.");
+                    Check(!document.RootElement.TryGetProperty("apiKey", out _), "Migration persisted a credential.");
+                }
+                Check(settings.LoadConfiguration().Model == "k3", "Migration was not stable.");
+                settings.Save(Payload(new { model = "kimi-for-coding" }));
+                Check(settings.LoadConfiguration().Model == "kimi-for-coding", "Explicit legacy alias migrated again.");
+                File.WriteAllText(path, JsonSerializer.Serialize(new { provider = "kimi-code", model = "k3-256k" }));
+                Check(settings.LoadConfiguration().Model == "k3-256k", "Custom model replaced.");
+                File.WriteAllText(path, JsonSerializer.Serialize(new { provider = "kimi-open", model = "kimi-k3" }));
+                Check(settings.LoadConfiguration().Model == "kimi-k3", "Open platform model replaced.");
+                var result = JsonSerializer.SerializeToElement(settings.Get());
+                Check(result.GetProperty("modelDefaultsVersion").GetInt32() == 2 && !result.GetProperty("modelMigrated").GetBoolean(), "Migration status wrong.");
+                return Task.CompletedTask;
+            });
+            await Run("AI child stdout and diagnostics cannot expose the credential", async () =>
+            {
+                using var client = new BackendClient();
+                var events = new List<JsonElement>();
+                var secret = "sk-stdout-test-secret";
+                var before = HostLog.Messages.Count;
+                var result = await client.RunAsync("echo", Payload(new { apiKey = secret, nested = new { note = "prefix:" + secret, apiKey = secret } }), events.Add, secret: secret);
+                Check(!result.GetRawText().Contains(secret) && !result.GetRawText().Contains("apiKey"), "Result exposed a credential.");
+                Check(events.All(e => !e.GetRawText().Contains(secret)), "Progress exposed a credential.");
+                Check(HostLog.Messages.Count == before, "AI stderr reached host logs.");
+            });
+            await Run("request cancellation stops AI child while the independent device lane completes", async () =>
+            {
+                using var ai = new BackendClient();
+                using var device = new BackendClient();
+                using var cancellation = new CancellationTokenSource();
+                var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var active = ai.RunAsync("cancel", Payload(new { }), _ => started.TrySetResult(), cancellation.Token, "offline-secret");
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var other = device.RunAsync("queue", Payload(new { lane = "device" }), _ => { });
+                cancellation.Cancel();
+                try { await active.WaitAsync(TimeSpan.FromSeconds(5)); throw new Exception("Expected AI cancellation."); }
+                catch (OperationCanceledException) { }
+                Check((await other).GetProperty("payload").GetProperty("lane").GetString() == "device", "AI cancellation interrupted the unrelated backend.");
+                var next = await ai.RunAsync("echo", Payload(new { after = true }), _ => { });
+                Check(next.GetProperty("payload").GetProperty("after").GetBoolean(), "AI lane was unusable after cancellation.");
             });
             await Run("resource origin, document and external-link policy", () =>
             {

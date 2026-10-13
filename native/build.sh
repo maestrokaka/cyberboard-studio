@@ -59,7 +59,7 @@ mkdir -p "$contents_dir/MacOS" "$contents_dir/Resources" "$build_dir"
 
 /usr/bin/xcrun swiftc -O -swift-version 5 -target "$(/usr/bin/uname -m)-apple-macosx13.0" \
   -module-cache-path "$build_dir/swift-module-cache" \
-  -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers \
+  -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers -framework Security \
   "$native_dir/Studio.swift" -o "$contents_dir/MacOS/CyberboardStudio"
 /bin/cp "$native_dir/Info.plist" "$contents_dir/Info.plist"
 if [[ -n "$dev_python" ]]; then
@@ -77,7 +77,9 @@ if [[ -x "$backend_dir/CyberboardBackend" ]]; then
   /usr/bin/ditto "$backend_dir" "$contents_dir/Resources/backend/CyberboardBackend"
 fi
 if [[ -n "$dev_python" ]]; then
-  /bin/cp "$project_dir/backend/bridge.py" "$contents_dir/Resources/backend/bridge.py"
+  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py; do
+    /bin/cp "$project_dir/backend/$module_name" "$contents_dir/Resources/backend/$module_name"
+  done
 fi
 
 # Generate the approved Dock artwork into the bundle, never into web source.

@@ -1,6 +1,144 @@
 import Cocoa
 import WebKit
 import UniformTypeIdentifiers
+import Security
+
+final class AISettingsStore {
+    private let stateDirectory: URL
+    private let lock = NSLock()
+    private let service = "Cyberboard Studio.Kimi"
+    private var lastModelMigration = false
+    private static let endpoints: [String: [String]] = [
+        "kimi-code": ["https://api.kimi.com/coding/v1", "https://api.kimi.ai/coding/v1"],
+        "kimi-open": ["https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"]
+    ]
+
+    init(stateDirectory: URL) { self.stateDirectory = stateDirectory }
+    private static func failure(_ message: String) -> NSError {
+        NSError(domain: "CyberboardStudio.AI", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    private static func validToken(_ value: String) -> Bool {
+        value.range(of: "\\A[A-Za-z0-9._:-]{1,128}\\z", options: .regularExpression) != nil
+    }
+    static func requestID(_ payload: [String: Any]) throws -> String {
+        guard let value = payload["requestId"] as? String,
+              value.range(of: "\\A[A-Za-z0-9_-]{1,80}\\z", options: .regularExpression) != nil else { throw failure("AI 请求编号无效。") }
+        return value
+    }
+    static func configuration(_ payload: [String: Any]) throws -> [String: String] {
+        let provider = payload["provider"] as? String ?? "kimi-code"
+        guard let endpoints = Self.endpoints[provider] else { throw Self.failure("请选择 Kimi Code 或 Kimi 开放平台。") }
+        var baseURL = (payload["baseUrl"] as? String ?? endpoints[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        while baseURL.hasSuffix("/") { baseURL.removeLast() }
+        guard endpoints.contains(baseURL) else { throw Self.failure("API 地址必须为对应服务的官方 HTTPS 地址。") }
+        let model = (payload["model"] as? String ?? (provider == "kimi-code" ? "k3" : "kimi-k3"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.validToken(model) else { throw Self.failure("模型名称只能包含字母、数字、点、横线、下划线或冒号，最多 128 个字符。") }
+        return ["provider": provider, "baseUrl": baseURL, "model": model]
+    }
+    private func query(_ provider: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider]
+    }
+    private func readKey(_ provider: String) throws -> String? {
+        var request = query(provider)
+        request[kSecReturnData as String] = true
+        request[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(request as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let bytes = item as? Data, let key = String(data: bytes, encoding: .utf8) else {
+            throw Self.failure("无法访问 macOS 钥匙串，请允许 Cyberboard Studio 访问已保存的 API Key。")
+        }
+        return key
+    }
+    private func writeKey(_ provider: String, _ key: String) throws {
+        let attributes = [kSecValueData as String: Data(key.utf8)]
+        let status = SecItemUpdate(query(provider) as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            var request = query(provider)
+            request[kSecValueData as String] = Data(key.utf8)
+            request[kSecAttrLabel as String] = "Cyberboard Studio · \(provider)"
+            guard SecItemAdd(request as CFDictionary, nil) == errSecSuccess else { throw Self.failure("无法将 API Key 保存到 macOS 钥匙串。") }
+        } else if status != errSecSuccess { throw Self.failure("无法更新 macOS 钥匙串中的 API Key。") }
+    }
+    private func writeMetadata(_ config: [String: String]) throws {
+        try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        let path = stateDirectory.appendingPathComponent("ai-settings.json")
+        var metadata: [String: Any] = config
+        metadata["modelDefaultsVersion"] = 2
+        // Only non-secret service metadata is serialized, including during migration.
+        let bytes = try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
+        try bytes.write(to: path, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+    }
+    func loadConfiguration() throws -> [String: String] {
+        lastModelMigration = false
+        let path = stateDirectory.appendingPathComponent("ai-settings.json")
+        if !FileManager.default.fileExists(atPath: path.path) { return try Self.configuration([:]) }
+        do {
+            let bytes = try Data(contentsOf: path)
+            guard bytes.count <= 16384, let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw Self.failure("") }
+            var config = try Self.configuration(value)
+            let version = (value["modelDefaultsVersion"] as? NSNumber)?.intValue ?? 0
+            if version < 2 {
+                if config["provider"] == "kimi-code", config["model"] == "kimi-for-coding" {
+                    config["model"] = "k3"
+                    lastModelMigration = true
+                }
+                try writeMetadata(config)
+            }
+            return config
+        } catch { throw Self.failure("模型配置文件无法读取，请在模型配置中重新保存服务配置。") }
+    }
+    private func publicSettings(_ config: [String: String]) throws -> [String: Any] {
+        var result: [String: Any] = config
+        result["hasKey"] = !(try readKey(config["provider"]!) ?? "").isEmpty
+        result["credentialStore"] = "macOS 钥匙串"
+        result["modelDefaultsVersion"] = 2
+        result["modelMigrated"] = lastModelMigration
+        return result
+    }
+    func get() throws -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        return try publicSettings(loadConfiguration())
+    }
+    func save(_ payload: [String: Any]) throws -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        lastModelMigration = false
+        let config = try Self.configuration(payload)
+        let input = payload["apiKey"] as? String ?? ""
+        guard !input.contains("\r"), !input.contains("\n"), input.count <= 4096 else { throw Self.failure("API Key 格式无效，请粘贴完整的单行密钥。") }
+        let key = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remove = payload["removeKey"] as? Bool ?? false
+        guard !(remove && !key.isEmpty) else { throw Self.failure("删除密钥与设置新密钥不能同时进行。") }
+        if remove {
+            let status = SecItemDelete(query(config["provider"]!) as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.failure("无法删除 macOS 钥匙串中的 API Key。") }
+        } else if !key.isEmpty { try writeKey(config["provider"]!, key) }
+        try writeMetadata(config)
+        return try publicSettings(config)
+    }
+    func inject(_ payload: [String: Any]) throws -> (payload: [String: Any], secret: String) {
+        lock.lock(); defer { lock.unlock() }
+        let config = try loadConfiguration()
+        guard let key = try readKey(config["provider"]!), !key.isEmpty else { throw Self.failure("请先在模型配置中保存 API Key。") }
+        var settings: [String: Any] = config
+        settings["apiKey"] = key
+        var result = payload
+        result["ai"] = settings
+        return (result, key)
+    }
+    static func redact(_ value: Any, secret: String) -> Any {
+        if let string = value as? String { return secret.isEmpty ? string : string.replacingOccurrences(of: secret, with: "[已隐藏]") }
+        if let items = value as? [Any] { return items.map { redact($0, secret: secret) } }
+        if let object = value as? [String: Any] {
+            var safe: [String: Any] = [:]
+            for (key, item) in object where key != "apiKey" { safe[key] = redact(item, secret: secret) }
+            return safe
+        }
+        return value
+    }
+}
 
 // The bridge launches the CLI adapter directly; payloads never enter a shell command.
 final class JSONLineReader {
@@ -10,6 +148,16 @@ final class JSONLineReader {
     private let onEvent: ([String: Any]) -> Void
 
     init(onEvent: @escaping ([String: Any]) -> Void) { self.onEvent = onEvent }
+
+    func read(from handle: FileHandle) {
+        // read(upToCount:) can wait for the entire requested length or EOF on
+        // macOS pipes. availableData returns each available chunk immediately.
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break }
+            append(chunk)
+        }
+    }
 
     func append(_ data: Data) {
         buffer.append(data)
@@ -47,6 +195,14 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var window: NSWindow!
     private var webView: WKWebView!
     private let backendQueue = DispatchQueue(label: "local.cyberboard.studio.backend", qos: .userInitiated)
+    private let aiQueue = DispatchQueue(label: "local.cyberboard.studio.ai", qos: .userInitiated)
+    private let credentialQueue = DispatchQueue(label: "local.cyberboard.studio.credentials", qos: .userInitiated)
+    private let aiProcessLock = NSLock()
+    private var aiProcess: Process?
+    private var aiCancelled = false
+    private var activeAIRequestID: String?
+    private let aiSettings = AISettingsStore(stateDirectory: FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/Cyberboard Studio", isDirectory: true))
     private var deviceWritePending = false
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
@@ -98,11 +254,13 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if deviceWritePending { showWriteInProgress(); return .terminateCancel }
+        cancelActiveAI()
         return .terminateNow
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if deviceWritePending { showWriteInProgress(); return false }
+        cancelActiveAI()
         return true
     }
 
@@ -158,6 +316,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     @objc private func exportFromMenu() { sendEvent(["event": "menu", "action": "exportJSON"]) }
     @objc private func reloadFromMenu() {
         if deviceWritePending { showWriteInProgress(); return }
+        cancelActiveAI()
         webView.reload()
     }
 
@@ -170,11 +329,68 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         switch action {
         case "importJSON": importJSON(id: id)
         case "exportJSON": exportJSON(id: id, payload: payload)
+        case "importAIImages": importAIImages(id: id)
+        case "getAISettings", "saveAISettings":
+            if action == "saveAISettings", activeAIRequestID != nil {
+                reply(id: id, error: "AI 请求正在进行，请先取消或等待完成再修改模型配置。"); return
+            }
+            let generation = navigationGeneration
+            credentialQueue.async { [weak self] in
+                guard let self else { return }
+                do {
+                    let result = try action == "getAISettings" ? self.aiSettings.get() : self.aiSettings.save(payload)
+                    DispatchQueue.main.async { guard generation == self.navigationGeneration else { return }; self.reply(id: id, result: result) }
+                } catch {
+                    DispatchQueue.main.async { guard generation == self.navigationGeneration else { return }; self.reply(id: id, error: error.localizedDescription) }
+                }
+            }
+        case "generateAI", "testAIConnection":
+            guard !deviceWritePending else { reply(id: id, error: "设备写入正在进行，请等待完成后再使用 AI。"); return }
+            guard activeAIRequestID == nil else { reply(id: id, error: "已有 AI 请求正在进行，请先取消或等待完成。"); return }
+            do {
+                let requestID = try (action == "generateAI" || payload["requestId"] != nil)
+                    ? AISettingsStore.requestID(payload) : UUID().uuidString
+                activeAIRequestID = requestID
+                aiProcessLock.lock(); aiCancelled = false; aiProcessLock.unlock()
+                runBackend(id: id, action: action, payload: payload, aiRequestID: requestID)
+            } catch { reply(id: id, error: error.localizedDescription) }
+        case "cancelAI":
+            do {
+                let requestID = try AISettingsStore.requestID(payload)
+                let cancelled = activeAIRequestID == requestID
+                if cancelled { cancelActiveAI() }
+                reply(id: id, result: ["cancelled": cancelled, "requestId": requestID])
+            } catch { reply(id: id, error: error.localizedDescription) }
         default:
             guard backendActions.contains(action) else {
                 reply(id: id, error: "不支持的操作：\(action)"); return
             }
             runBackend(id: id, action: action, payload: payload)
+        }
+    }
+
+    private func importAIImages(id: Any) {
+        let generation = navigationGeneration
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .webP, .gif]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.message = "选择最多 3 张参考图（PNG、JPEG、WebP 或 GIF，每张最多 20 MB）"
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, generation == self.navigationGeneration else { return }
+            guard response == .OK else { self.reply(id: id, result: ["cancelled": true]); return }
+            let urls = panel.urls
+            guard !urls.isEmpty, urls.count <= 3 else { self.reply(id: id, error: "一次最多选择 3 张参考图。"); return }
+            do {
+                for url in urls {
+                    let size = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                    guard size.isRegularFile == true, let bytes = size.fileSize, bytes > 0, bytes <= 20 * 1024 * 1024 else {
+                        self.reply(id: id, error: "参考图必须为有效文件，且每张不超过 20 MB。"); return
+                    }
+                }
+            } catch { self.reply(id: id, error: "无法读取所选参考图，请重新选择。"); return }
+            // Paths come only from the user-approved native dialog; the web bridge cannot call prepareAIImages directly.
+            self.runBackend(id: id, action: "prepareAIImages", payload: ["paths": urls.map { $0.path }])
         }
     }
 
@@ -241,14 +457,24 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
     }
 
-    private func runBackend(id: Any, action: String, payload: [String: Any]) {
+    private func cancelActiveAI() {
+        guard activeAIRequestID != nil else { return }
+        aiProcessLock.lock()
+        aiCancelled = true
+        if let process = aiProcess, process.isRunning { process.terminate() }
+        aiProcessLock.unlock()
+    }
+
+    private func runBackend(id: Any, action: String, payload: [String: Any], aiRequestID: String? = nil) {
         let generation = navigationGeneration
+        let isAI = aiRequestID != nil
         let writesDevice = deviceWriteActions.contains(action)
-        if writesDevice && deviceWritePending {
-            reply(id: id, error: "设备操作正在进行，请等待完成后再试。")
+        if writesDevice && (deviceWritePending || activeAIRequestID != nil) {
+            reply(id: id, error: "设备操作或 AI 请求正在进行，请等待完成后再试。")
             return
         }
         guard let resources = Bundle.main.resourceURL else {
+            if isAI { activeAIRequestID = nil }
             reply(id: id, error: "找不到应用资源目录。")
             return
         }
@@ -268,20 +494,19 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
                   (path as NSString).isAbsolutePath,
                   FileManager.default.isExecutableFile(atPath: path),
                   FileManager.default.fileExists(atPath: script.path) else {
+                if isAI { activeAIRequestID = nil }
                 reply(id: id, error: "后台组件缺失，请重新下载并完整解压 Cyberboard Studio。")
                 return
             }
             executable = URL(fileURLWithPath: path)
             leadingArguments = ["-X", "utf8", "-u", script.path]
         }
-        let input: Data
-        do { input = try JSONSerialization.data(withJSONObject: payload) }
-        catch { reply(id: id, error: "请求数据无法转换为 JSON。"); return }
         if writesDevice { deviceWritePending = true }
         let stateDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Cyberboard Studio", isDirectory: true)
 
-        backendQueue.async { [weak self] in
+        let queue = isAI ? aiQueue : backendQueue
+        queue.async { [weak self] in
             guard let self else { return }
             let process = Process()
             process.executableURL = executable
@@ -298,9 +523,11 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             process.standardInput = stdinPipe
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
+            var secret = ""
             let lines = JSONLineReader { record in
-                var event = record
+                var event = isAI ? AISettingsStore.redact(record, secret: secret) as! [String: Any] : record
                 if event["id"] == nil { event["id"] = id }
+                if let aiRequestID { event["requestId"] = aiRequestID }
                 DispatchQueue.main.async {
                     guard generation == self.navigationGeneration else { return }
                     self.sendEvent(event)
@@ -310,8 +537,36 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             var stderrData = Data()
             let ioGroup = DispatchGroup()
             var launchError: String?
+            var watchdog: DispatchWorkItem?
             do {
-                try process.run()
+                var requestPayload = payload
+                if isAI {
+                    let injected = try self.aiSettings.inject(payload)
+                    requestPayload = injected.payload
+                    secret = injected.secret
+                }
+                let input = try JSONSerialization.data(withJSONObject: requestPayload)
+                if isAI {
+                    self.aiProcessLock.lock()
+                    if self.aiCancelled {
+                        self.aiProcessLock.unlock()
+                        throw NSError(domain: "CyberboardStudio.AI.Cancel", code: 1)
+                    }
+                    self.aiProcess = process
+                    do { try process.run(); self.aiProcessLock.unlock() }
+                    catch { self.aiProcess = nil; self.aiProcessLock.unlock(); throw error }
+                    let timeout = DispatchWorkItem { [weak self, weak process] in
+                        guard let self, let process else { return }
+                        self.aiProcessLock.lock()
+                        if self.aiProcess === process, process.isRunning {
+                            self.aiCancelled = true
+                            process.terminate()
+                        }
+                        self.aiProcessLock.unlock()
+                    }
+                    watchdog = timeout
+                    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 360, execute: timeout)
+                } else { try process.run() }
                 ioGroup.enter()
                 DispatchQueue.global(qos: .utility).async {
                     let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
@@ -325,28 +580,35 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
                     try? stdinPipe.fileHandleForWriting.close()
                     ioGroup.leave()
                 }
-                while let chunk = try stdoutPipe.fileHandleForReading.read(upToCount: 65536), !chunk.isEmpty {
-                    lines.append(chunk)
-                }
+                lines.read(from: stdoutPipe.fileHandleForReading)
                 process.waitUntilExit()
                 ioGroup.wait()
                 lines.finish()
             } catch {
-                launchError = "无法启动后台组件：\(error.localizedDescription)"
+                launchError = isAI ? AISettingsStore.redact(error.localizedDescription, secret: secret) as? String
+                    : "无法启动后台组件：\(error.localizedDescription)"
                 if process.isRunning { process.terminate(); process.waitUntilExit() }
                 try? stdinPipe.fileHandleForWriting.close()
                 ioGroup.wait()
             }
+            watchdog?.cancel()
+            self.aiProcessLock.lock()
+            let cancelled = isAI && self.aiCancelled
+            if isAI, self.aiProcess === process { self.aiProcess = nil }
+            self.aiProcessLock.unlock()
             stderrLock.lock(); let diagnostics = String(decoding: stderrData, as: UTF8.self); stderrLock.unlock()
-            if !diagnostics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !isAI && action != "prepareAIImages" && !diagnostics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 NSLog("Cyberboard Studio backend [%@]: %@", action, diagnostics)
             }
-            let final = lines.finalReply
+            let final = lines.finalReply.map { isAI ? AISettingsStore.redact($0, secret: secret) as! [String: Any] : $0 }
             let errorMessage = launchError ?? lines.parseError
             DispatchQueue.main.async {
                 if writesDevice { self.deviceWritePending = false }
+                if isAI, self.activeAIRequestID == aiRequestID { self.activeAIRequestID = nil }
                 guard generation == self.navigationGeneration else { return }
-                if let error = errorMessage {
+                if cancelled {
+                    self.reply(id: id, result: ["cancelled": true, "requestId": aiRequestID!])
+                } else if let error = errorMessage {
                     self.reply(id: id, error: error)
                 } else if let final {
                     if let error = final["error"] { self.reply(id: id, error: error) }
@@ -373,16 +635,18 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.1.0"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.2.0"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        cancelActiveAI()
         navigationGeneration += 1
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        if deviceWritePending { decisionHandler(.cancel); return }
         if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
         if url.isFileURL, let resources = Bundle.main.resourceURL {
             let webDir = resources.appendingPathComponent("web", isDirectory: true).standardizedFileURL.path + "/"
