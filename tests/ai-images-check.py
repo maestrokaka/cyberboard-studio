@@ -9,12 +9,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PIL import Image, features
+from PIL import Image, ImageCms, features
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 import ai_images as images
 import bridge
+
+PUBLIC_P3_PROFILE = Path("/System/Library/ColorSync/Profiles/Display P3.icc")
 
 
 def encoded(image, format="PNG", **options):
@@ -53,7 +55,8 @@ class ReferenceImageChecks(unittest.TestCase):
         exif[274] = 6  # Rotate 90 degrees clockwise when displayed.
         exif[270] = "private-source-description"
         exif[34853] = {1: "N", 2: (22.0, 30.0, 0.0), 3: "E", 4: (114.0, 0.0, 0.0)}
-        raw = encoded(source, "JPEG", exif=exif, icc_profile=b"private-icc-profile")
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+        raw = encoded(source, "JPEG", exif=exif, icc_profile=profile)
         original = Image.open(io.BytesIO(raw))
         self.assertTrue(original.getexif().get_ifd(34853))
         result = images.normalize(raw, "/private/source/folder/image.jpg")
@@ -63,9 +66,67 @@ class ReferenceImageChecks(unittest.TestCase):
         self.assertEqual(len(normalized.getexif()), 0)
         self.assertNotIn("icc_profile", normalized.info)
         self.assertNotIn(b"private-source-description", normalized_raw)
-        self.assertNotIn(b"private-icc-profile", normalized_raw)
+        self.assertNotIn(profile, normalized_raw)
         self.assertGreater(normalized.getpixel((10, 5))[0], 200)
         self.assertGreater(normalized.getpixel((10, 35))[2], 200)
+
+    def test_packaged_pillow_has_actual_color_conversion_support(self):
+        self.assertTrue(features.check("littlecms2"), "Reference color conversion needs Pillow's LittleCMS module")
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+        result = images.normalize(encoded(Image.new("RGB", (24, 24), (180, 90, 50)), icc_profile=profile))
+        normalized, raw = unpack(result)
+        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(normalized.getpixel((12, 12)), (180, 90, 50))))
+        self.assertNotIn("icc_profile", normalized.info)
+        self.assertNotIn(profile, raw)
+
+    @unittest.skipUnless(PUBLIC_P3_PROFILE.is_file(), "The public macOS Display P3 profile is unavailable")
+    def test_display_p3_color_is_converted_to_srgb_before_profile_is_removed(self):
+        profile = PUBLIC_P3_PROFILE.read_bytes()
+        source = Image.new("RGB", (24, 24), (180, 90, 50))
+        raw = encoded(source, icc_profile=profile)
+        original = bytes(raw)
+        result = images.normalize(raw)
+        normalized, jpeg = unpack(result)
+        # This color is inside sRGB gamut. Merely stripping the P3 profile
+        # leaves (180, 90, 50), whereas the proper sRGB color is (193, 83, 36).
+        actual = normalized.getpixel((12, 12))
+        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(actual, (193, 83, 36))), actual)
+        self.assertGreater(abs(actual[0] - 180), 10)
+        self.assertNotIn("icc_profile", normalized.info)
+        self.assertNotIn(profile, jpeg)
+        self.assertEqual(raw, original)
+
+    @unittest.skipUnless(PUBLIC_P3_PROFILE.is_file(), "The public macOS Display P3 profile is unavailable")
+    def test_display_p3_transparency_is_composited_after_color_conversion(self):
+        profile = PUBLIC_P3_PROFILE.read_bytes()
+        source = Image.new("RGBA", (24, 24), (180, 90, 50, 128))
+        normalized, _ = unpack(images.normalize(encoded(source, icc_profile=profile)))
+        actual = normalized.getpixel((12, 12))
+        # Converted sRGB (193, 83, 36), then alpha 128/255 over white.
+        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(actual, (224, 169, 145))), actual)
+
+    def test_invalid_oversize_and_mismatched_profiles_give_safe_user_errors(self):
+        source = Image.new("RGB", (24, 24), (180, 90, 50))
+        invalid = b"private-source-profile-name-is-not-an-ICC"
+        for profile in (invalid, b"x" * (images.MAX_ICC_BYTES + 1),
+                        ImageCms.ImageCmsProfile(ImageCms.createProfile("LAB")).tobytes()):
+            with self.subTest(size=len(profile)):
+                with self.assertRaises(images.ImageError) as context:
+                    images.normalize(encoded(source, "JPEG", icc_profile=profile))
+                message = str(context.exception)
+                self.assertIn("sRGB", message)
+                self.assertNotIn("private", message)
+                self.assertNotIn("ICC", message)
+        raw = encoded(source, "JPEG", icc_profile=b"x" * (images.MAX_ICC_BYTES + 1))
+        with patch.object(images.ImageCms, "ImageCmsProfile", side_effect=AssertionError("oversize profile was parsed")):
+            with self.assertRaises(images.ImageError):
+                images.normalize(raw)
+
+    def test_untagged_rgb_is_assumed_srgb_and_transparency_stays_unchanged(self):
+        source = Image.new("RGBA", (24, 24), (180, 90, 50, 128))
+        normalized, _ = unpack(images.normalize(encoded(source)))
+        actual = normalized.getpixel((12, 12))
+        self.assertTrue(all(abs(a - b) <= 2 for a, b in zip(actual, (217, 172, 152))), actual)
 
     def test_resize_preserves_aspect_ratio_and_longest_side_limit(self):
         result = images.normalize(encoded(Image.new("RGB", (2560, 1280), "#24DDFC")))

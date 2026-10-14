@@ -311,6 +311,82 @@ class Bridge:
             config.pop("_provenance", None)
         return config
 
+    def require_current_led_baseline(self, pid, current):
+        """Do not reuse an old unreadable LED baseline after a consumed write.
+
+        Plan metadata and its result are independent local completion records.
+        Either can establish verified success; an executing record alone cannot.
+        A trusted CLI update to current resolves the old-baseline uncertainty.
+        """
+        directory = self.state_dir / "plans"
+        if not directory.is_dir():
+            return
+        candidates = []
+        for folder in directory.iterdir():
+            try:
+                metadata = load_json(folder / "plan.json")
+                if not isinstance(metadata, dict) or metadata.get("productId") != pid or \
+                        metadata.get("planVersion") != 2 or metadata.get("token") != folder.name or \
+                        metadata.get("status") not in ("executing", "complete"):
+                    continue
+                if not all(isinstance(metadata.get(field), str) and
+                           re.fullmatch(r"[0-9a-f]{64}", metadata[field])
+                           for field in ("storedBaselineHash", "targetHash")):
+                    continue
+                try:
+                    report = load_json(folder / "result.json")
+                except (OSError, ValueError, TypeError):
+                    report = {}
+                if not isinstance(report, dict):
+                    report = {}
+                readback_attempts = report.get("readbackAttempts", [])
+                if not isinstance(readback_attempts, list):
+                    readback_attempts = []
+                verified_metadata = metadata.get("status") == "complete" and \
+                    metadata.get("deviceAck") is True and metadata.get("keymapMatch") is True and \
+                    metadata.get("verifiedTargetHash") == metadata["targetHash"]
+                verified_report = report.get("success") is True and report.get("deviceAck") is True and \
+                    report.get("keymapMatch") is True and \
+                    report.get("verifiedTargetHash", metadata["targetHash"]) == metadata["targetHash"] and \
+                    any(isinstance(attempt, dict) and attempt.get("keymapMatch") is True and
+                        attempt.get("completeKeycodes") == 1400 for attempt in readback_attempts)
+                stamps = [metadata.get("createdTimestamp"), metadata.get("startedTimestamp"),
+                          metadata.get("completedTimestamp")]
+                if verified_report:
+                    stamps.append(report.get("completedTimestamp"))
+                stamp = max((value for value in stamps if type(value) in (int, float) and math.isfinite(value)), default=0)
+                candidates.append((stamp, folder.name, metadata, verified_metadata or verified_report))
+            except (OSError, ValueError, TypeError, KeyError):
+                continue
+        if not candidates:
+            return
+        _, _, latest, verified = max(candidates, key=lambda value: value[:2])
+        current_hash = digest(current)
+        if current_hash != latest["storedBaselineHash"] or current_hash == latest["targetHash"]:
+            return
+        previous_mtime = latest.get("currentRecordMtimeNs")
+        current_mtime = self.current_record_mtime_ns(pid)
+        if type(previous_mtime) is int and previous_mtime > 0 and \
+                type(current_mtime) is int and current_mtime != previous_mtime:
+            # The CLI current file is the existing trusted configuration input.
+            # A later rewrite can intentionally restore the same old content;
+            # a changed file fingerprint permits it without claiming that an
+            # unknown device write became verified or inferring elapsed time.
+            return
+        if verified:
+            raise BridgeError("baseline_store_incomplete",
+                              "上次灯效已同步，但本机完整配置记录仍是同步前的旧版本。继续同步可能覆盖刚成功的灯效。"
+                              "请先通过可信 CLI 修复或更新完整配置记录，再重新准备同步。")
+        raise BridgeError("baseline_result_unknown",
+                          "上次设备写入的结果未能完整留存，当前灯效基线无法确认。"
+                          "请先通过可信 CLI 更新完整配置记录，再重新准备同步。")
+
+    def current_record_mtime_ns(self, pid):
+        try:
+            return self.cli["cb_store"].current_path(pid).stat().st_mtime_ns
+        except (OSError, AttributeError, TypeError, ValueError):
+            return None
+
     def provenance(self, config, key_source="stored"):
         if config is None:
             return None
@@ -338,6 +414,11 @@ class Bridge:
         require(isinstance(trash, list) and len(trash) <= 30,
                 "workspace_limit", "回收站最多保存 30 套作品。请恢复或明确删除部分作品后再试。")
 
+        def text_fits(value, maximum):
+            # Match JavaScript string.length so emoji cannot cross the shared
+            # frontend/backend metadata limits unnoticed.
+            return isinstance(value, str) and len(value.encode("utf-16-le", errors="surrogatepass")) // 2 <= maximum
+
         def validate_design(design, identities):
             require(isinstance(design, dict), "invalid_workspace", "工作台作品格式无效。")
             identity = design.get("id")
@@ -346,9 +427,37 @@ class Bridge:
             identities.add(identity)
             require(isinstance(design.get("name"), str) and 0 < len(design["name"]) <= 256,
                     "invalid_workspace", "工作台作品名称无效。")
+            require(identity.strip() and design["name"].strip() and
+                    text_fits(identity, 256) and text_fits(design["name"], 256) and
+                    not re.search(r"[\x00-\x1F\x7F]", identity + design["name"]),
+                    "invalid_workspace", "作品编号与名称不能为空白或包含控制字符。")
             validate_animation(design.get("frames"), 200, "顶屏")
             validate_animation(design.get("keyframes"), 90, "轴灯")
             integer(design.get("speed_ms"), 1, 32767, "播放间隔")
+            if "description" in design:
+                require(text_fits(design["description"], 32768),
+                        "invalid_workspace", "作品描述必须是 32768 字以内的文字。")
+            if "palette" in design:
+                require(isinstance(design["palette"], list) and len(design["palette"]) <= 16 and
+                        all(isinstance(color, str) and RGB_RE.fullmatch(color) for color in design["palette"]),
+                        "invalid_workspace", "作品代表色必须为最多 16 个 #RRGGBB 颜色。")
+            if "preview_brightness" in design:
+                integer(design["preview_brightness"], 0, 100, "作品预览亮度")
+            if "frame_count" in design:
+                require(type(design["frame_count"]) is int and design["frame_count"] == len(design["frames"]),
+                        "invalid_workspace", "作品帧数必须与顶部动画一致。")
+            if "stages" in design:
+                stages = design["stages"]
+                require(isinstance(stages, list) and len(stages) <= 255,
+                        "invalid_workspace", "作品阶段必须为最多 255 项的列表。")
+                strings = all(text_fits(stage, 256) for stage in stages)
+                ranges = all(isinstance(stage, dict) and set(stage) == {"name", "end"} and text_fits(stage.get("name"), 256) and
+                             type(stage.get("end")) is int and
+                             1 <= stage["end"] <= len(design["frames"]) for stage in stages)
+                require(strings or ranges, "invalid_workspace", "作品阶段必须全部为名称或合法的阶段范围。")
+                if stages and ranges:
+                    require(all(left["end"] < right["end"] for left, right in zip(stages, stages[1:])),
+                            "invalid_workspace", "作品阶段范围必须按结束帧递增。")
 
         ids, trash_ids = set(), set()
         for design in designs:
@@ -549,25 +658,32 @@ class Bridge:
         require(identity is not None, "device_missing", "请通过 USB 连接键盘后重新检测。")
         config = self.stored_config(identity.product_id, required=True)
         validate_config(config, self.cli)
+        self.require_current_led_baseline(identity.product_id, config)
         live, raw = self.read_live(identity.port)
         if not preserve_current_keymap:
             require(matrix(live) == matrix(config["key_layer"]), "baseline_keymap_changed",
                     "键盘上的键位与本机记录不同，已停止同步以保留当前键位。请先核对完整配置。")
         return identity, config, live, raw
 
-    def prepare(self, payload, baseline_context=None, restore_source=None):
+    def prepare(self, payload, baseline_context=None, restore_source=None, restore_pages=None):
         assignments = payload.get("assignments", [])
         changes = payload.get("keyChanges", [])
         preserve_current_keymap = payload.get("preserveCurrentKeymap", False)
         require(type(preserve_current_keymap) is bool, "invalid_keymap_policy", "保留当前键位选项必须是布尔值。")
         require(not preserve_current_keymap or changes == [], "invalid_keymap_policy",
                 "保留当前键位的灯效同步不能同时包含键位修改。")
-        require(isinstance(assignments, list) and isinstance(changes, list) and (assignments or changes),
+        require(restore_pages is None or isinstance(restore_pages, dict) and 1 <= len(restore_pages) <= 3 and
+                all(type(slot) is int and 1 <= slot <= 3 and isinstance(page, dict) and page.get("page_index") == slot + 4
+                    for slot, page in restore_pages.items()), "invalid_snapshot", "历史灯效页格式无效。")
+        require(restore_pages is None or not assignments and not changes, "invalid_snapshot", "历史恢复不能混入其他配置修改。")
+        require(isinstance(assignments, list) and isinstance(changes, list) and (assignments or changes or restore_pages),
                 "empty_plan", "请先选择灯效槽或需要修改的键位。")
         require(len(assignments) <= 3, "invalid_slots", "最多同步 3 个灯效槽。")
         slots = [integer(item.get("slot"), 1, 3, "自定义槽") for item in assignments if isinstance(item, dict)]
         require(len(slots) == len(assignments) and len(set(slots)) == len(slots),
                 "invalid_slots", "同一个灯效槽不能重复选择。")
+        if restore_pages is not None:
+            slots = sorted(restore_pages)
         # Validate user-authored arrays before any USB operation.
         for item in assignments:
             design = item.get("design")
@@ -602,6 +718,11 @@ class Bridge:
                         "differentInternalKeycodes": len(differences) - physical_differences,
                         "refreshApplied": bool(differences)}
         target = copy.deepcopy(before)
+        if restore_pages is not None:
+            for slot, historical_page in restore_pages.items():
+                page = page_for(target, slot)
+                page.clear()
+                page.update(copy.deepcopy(historical_page))
         for item in assignments:
             design = item["design"]
             page = page_for(target, item["slot"])
@@ -624,8 +745,12 @@ class Bridge:
         unchanged = copy.deepcopy(target)
         for slot in slots:
             page, old = page_for(unchanged, slot), page_for(before, slot)
-            for field in ("frames", "keyframes", "speed_ms", "lightness", "valid", "word_page"):
-                page[field] = copy.deepcopy(old[field])
+            if restore_pages is not None:
+                page.clear()
+                page.update(copy.deepcopy(old))
+            else:
+                for field in ("frames", "keyframes", "speed_ms", "lightness", "valid", "word_page"):
+                    page[field] = copy.deepcopy(old[field])
         for change in changes:
             layer, index = change["layer"], change["matrixIndex"]
             unchanged["key_layer"]["layer_data"][layer]["layer"][index] = before["key_layer"]["layer_data"][layer]["layer"][index]
@@ -652,6 +777,12 @@ class Bridge:
                     "topFrames": len(item["design"]["frames"]), "keyFrames": len(item["design"]["keyframes"]),
                     "brightness": item.get("brightness", 100),
                     "speedMs": item.get("speedMs", item["design"].get("speed_ms", 40))} for item in assignments]
+        if restore_pages is not None:
+            summary = [{"slot": slot, "name": str(page.get("//", f"历史灯效 {slot}"))[:256],
+                        "topFrames": page["frames"]["frame_num"], "keyFrames": page["keyframes"]["frame_num"],
+                        "brightness": page["lightness"], "speedMs": page["speed_ms"],
+                        "enabled": bool(page["valid"]), "wordEnabled": bool(page.get("word_page", {}).get("valid"))}
+                       for slot, page in sorted(restore_pages.items())]
         return {"token": token, "changedSlots": sorted(slots), "totalFrames": fp.total,
                 "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
                 "backupPath": str(backup), "summary": summary, "keyChangeCount": len(changes),
@@ -684,16 +815,14 @@ class Bridge:
         snapshot = load_json(self.snapshot_path(snapshot_id, identity.product_id))
         require(snapshot.get("_studio_product_id", identity.product_id) == identity.product_id,
                 "snapshot_identity", "历史记录属于另一款键盘。")
-        assignments = []
+        pages = {}
         for slot in (1, 2, 3):
             page = page_for(snapshot, slot)
-            require(page["frames"]["frame_num"] > 0 and page["keyframes"]["frame_num"] > 0,
-                    "snapshot_incomplete", "历史记录缺少完整灯效，无法恢复。")
-            assignments.append({"slot": slot, "brightness": page["lightness"], "speedMs": page["speed_ms"],
-                                "design": {"id": f"restore-{slot}", "name": page.get("//", f"自定义 {slot}"),
-                                           "frames": [frame["frame_RGB"] for frame in page["frames"]["frame_data"]],
-                                           "keyframes": [frame["frame_RGB"] for frame in page["keyframes"]["frame_data"]]}})
-        return self.prepare({"assignments": assignments, "preserveCurrentKeymap": True}, context, restore_source=snapshot_id)
+            pages[slot] = copy.deepcopy(page)
+        # Restore the historical custom pages exactly, including disabled, text
+        # and empty pages. Global settings and keys still come from the fresh
+        # current baseline, and final target validation precedes any write.
+        return self.prepare({"preserveCurrentKeymap": True}, context, restore_source=snapshot_id, restore_pages=pages)
 
     def send_config(self, port, fp):
         """CLI-equivalent serial write, with CRC/header checks and real frame progress."""
@@ -758,6 +887,7 @@ class Bridge:
                 "plan_tampered", "同步计划内容发生变化，请重新准备。")
         current = self.stored_config(metadata["productId"], required=True)
         require(digest(current) == metadata["storedBaselineHash"], "baseline_changed", "本机配置已更新，请重新准备同步。")
+        self.require_current_led_baseline(metadata["productId"], current)
         identity = self.discover({"port": metadata["port"]})
         require(identity is not None and identity.product_id == metadata["productId"] and identity.version == metadata["firmware"],
                 "device_changed", "连接的键盘或固件发生变化，请重新检测。")
@@ -771,22 +901,28 @@ class Bridge:
         # Final store comparison immediately before the destructive JSON_START.
         require(digest(self.stored_config(identity.product_id, required=True)) == metadata["storedBaselineHash"],
                 "baseline_changed", "本机配置已更新，请重新准备同步。")
-        metadata.update(status="executing", startedAt=now_iso())
+        metadata.update(status="executing", startedAt=now_iso(), startedTimestamp=time.time(),
+                        currentRecordMtimeNs=self.current_record_mtime_ns(identity.product_id))
         atomic_json(folder / "plan.json", metadata)
         try:
             ack = self.send_config(identity.port, fp)
             self.event("verifying", fp.total, fp.total)
             time.sleep(self.cli["cb_write"].SETTLE_SECONDS)
-            attempts, matched = [], False
+            attempts, archive_warnings, matched = [], [], False
             for attempt in range(3):
                 try:
                     after = self.cli["cb_device"].probe(identity.port, full=True)
                     require(after is not None and after.product_id == identity.product_id and after.version == identity.version,
                             "device_changed", "提交后键盘身份核对失败。")
                     readback, captured = self.read_live(identity.port)
-                    (folder / f"after-{attempt + 1}.raw").write_bytes(captured)
                     matched = matrix(readback) == matrix(target["key_layer"])
                     attempts.append({"attempt": attempt + 1, "keymapMatch": matched, "completeKeycodes": 1400})
+                    # Local diagnostic archives do not determine whether the
+                    # complete device readback matches the submitted keymap.
+                    try:
+                        (folder / f"after-{attempt + 1}.raw").write_bytes(captured)
+                    except Exception as error:
+                        archive_warnings.append(f"第 {attempt + 1} 次键位读回归档未保存：{error}")
                 except (BridgeError, OSError, ValueError) as error:
                     attempts.append({"attempt": attempt + 1, "keymapMatch": False, "reason": str(error)})
                 if matched:
@@ -795,25 +931,6 @@ class Bridge:
                     time.sleep(5)
             require(matched, "verification_failed", "键盘已接收数据，但完整键位核对未通过。请保留备份并重新检测。",
                     deviceMayHaveChanged=True, deviceAck=True, backupPath=metadata["backupPath"], attempts=attempts)
-            # _record_write prints human logs; keep stdout exclusively JSON-lines.
-            captured_out, captured_err = io.StringIO(), io.StringIO()
-            with contextlib.redirect_stdout(captured_out), contextlib.redirect_stderr(captured_err):
-                self.cli["cb_write"]._record_write(identity.product_id, target, identity.version)
-            state_stored = digest(self.stored_config(identity.product_id) or {}) == digest(target)
-            report = {"success": True, "deviceAck": True, "keymapMatch": True, "stateStored": state_stored,
-                      "backupPath": metadata["backupPath"], "changedSlots": metadata["changedSlots"],
-                      "keyChangeCount": metadata["keyChangeCount"], "device": self.device_dict(identity),
-                      "writtenAt": now_iso(), "totalFrames": fp.total, "readbackAttempts": attempts,
-                      "ledVerification": "protocol-ack-only", "ledSource": "last-written",
-                      "ackHex": ack.hex(), "cliLog": captured_out.getvalue().strip()}
-            if captured_err.getvalue().strip() or not state_stored:
-                report["warning"] = "键盘已同步，本机历史记录未能完整保存。"
-                report["storeWarning"] = captured_err.getvalue().strip()
-            atomic_json(folder / "result.json", report)
-            metadata.update(status="complete", completedAt=report["writtenAt"])
-            atomic_json(folder / "plan.json", metadata)
-            self.event("complete", fp.total, fp.total)
-            return report
         except Exception as error:
             metadata.update(status="failed", failedAt=now_iso(), error=str(error))
             atomic_json(folder / "plan.json", metadata)
@@ -821,6 +938,67 @@ class Bridge:
                 raise
             raise BridgeError("write_interrupted", "同步中断，键盘可能已经接收部分数据。请保留备份并重新检测。",
                               deviceMayHaveChanged=True, backupPath=metadata["backupPath"], reason=str(error)) from error
+        # Device success is now established by an ACK and a complete readback.
+        # A later local bookkeeping failure cannot turn it into a USB failure.
+        return self._complete_verified_write(folder, metadata, identity, target, fp, ack, attempts, archive_warnings)
+
+    def _complete_verified_write(self, folder, metadata, identity, target, fp, ack, attempts, archive_warnings=None):
+        captured_out, captured_err = io.StringIO(), io.StringIO()
+        store_warnings, report_warnings = [], list(archive_warnings or [])
+        try:
+            with contextlib.redirect_stdout(captured_out), contextlib.redirect_stderr(captured_err):
+                self.cli["cb_write"]._record_write(identity.product_id, target, identity.version)
+        except Exception as error:
+            store_warnings.append(str(error))
+        if captured_err.getvalue().strip():
+            store_warnings.append(captured_err.getvalue().strip())
+        try:
+            state_stored = digest(self.stored_config(identity.product_id) or {}) == digest(target)
+        except Exception as error:
+            state_stored = False
+            store_warnings.append(str(error))
+        try:
+            device = self.device_dict(identity)
+        except Exception as error:
+            device = {"productId": identity.product_id, "firmware": identity.version,
+                      "port": identity.port, "connected": True, "lastSeen": None}
+            store_warnings.append(str(error))
+        report = {"success": True, "deviceAck": True, "keymapMatch": True, "stateStored": state_stored,
+                  "reportStored": not report_warnings, "backupPath": metadata["backupPath"], "changedSlots": metadata["changedSlots"],
+                  "keyChangeCount": metadata["keyChangeCount"], "device": device,
+                  "writtenAt": now_iso(), "totalFrames": fp.total, "readbackAttempts": attempts,
+                  "completedTimestamp": time.time(), "verifiedTargetHash": metadata["targetHash"],
+                  "ledVerification": "protocol-ack-only", "ledSource": "last-written",
+                  "ackHex": ack.hex(), "cliLog": captured_out.getvalue().strip()}
+
+        def warnings():
+            if store_warnings or not state_stored or report_warnings:
+                report["warning"] = "键盘已同步，本机记录或同步报告未能完整保存，请保留备份。"
+            if store_warnings:
+                report["storeWarning"] = "\n".join(store_warnings)
+            if report_warnings:
+                report["reportWarning"] = "\n".join(report_warnings)
+
+        metadata.update(status="complete", completedAt=report["writtenAt"], completedTimestamp=report["completedTimestamp"],
+                        deviceAck=True, keymapMatch=True, stateStored=state_stored, verifiedTargetHash=metadata["targetHash"])
+        try:
+            atomic_json(folder / "plan.json", metadata)
+        except Exception as error:
+            report["reportStored"] = False
+            report_warnings.append(str(error))
+        warnings()
+        try:
+            atomic_json(folder / "result.json", report)
+        except Exception as error:
+            report["reportStored"] = False
+            report_warnings.append(str(error))
+            warnings()
+        try:
+            self.event("complete", fp.total, fp.total)
+        except Exception as error:
+            report_warnings.append(str(error))
+            warnings()
+        return report
 
     def setTime(self, payload):
         timezone_name = payload.get("timezone", "Asia/Shanghai")

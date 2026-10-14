@@ -5,24 +5,39 @@
  const copy=value=>JSON.parse(JSON.stringify(value));
  const palettes={cyan:['#12E5FF','#A52BFF','#EDF9FF'],acid:['#C8FF23','#167AFF','#EEFFF3'],red:['#FF2929','#47BFFF','#F8FBFF'],amber:['#FFB52B','#337DDE','#FFF5DC']};
  function validate(design){
-  if(!design || typeof design!=='object')throw Error('没有找到灯效设计');
+  if(!design || typeof design!=='object'||Array.isArray(design))throw Error('没有找到灯效设计');
+  for(const field of ['id','name'])if(typeof design[field]!=='string'||!design[field].trim()||design[field].length>256||/[\u0000-\u001F\u007F]/.test(design[field]))throw Error(field+' 必须为 1–256 个字符的有效文本');
+  if(design.description!==undefined&&(typeof design.description!=='string'||design.description.length>32768))throw Error('description 必须为最多 32768 个字符的文本');
+  if(design.palette!==undefined&&(!Array.isArray(design.palette)||design.palette.length>16||design.palette.some(c=>typeof c!=='string'||!/^#[0-9a-f]{6}$/i.test(c))))throw Error('palette 必须为最多 16 个 #RRGGBB 颜色');
   for(const [field,size] of [['frames',200],['keyframes',90]]){
    const frames=design[field];if(!Array.isArray(frames)||frames.length<1||frames.length>255)throw Error(field+' 必须包含 1–255 帧');
    frames.forEach((frame,n)=>{if(!Array.isArray(frame)||frame.length!==size)throw Error(field+' 第 '+(n+1)+' 帧必须有 '+size+' 个灯珠');frame.forEach((c,i)=>{if(typeof c!=='string'||!/^#[0-9a-f]{6}$/i.test(c))throw Error('颜色必须为 #RRGGBB');if(field==='keyframes'&&RESERVED.has(i)&&c.toUpperCase()!=='#000000')throw Error('轴灯保留索引 '+i+' 必须为黑色');});});
+  }
+  if(design.frame_count!==undefined&&(!Number.isInteger(design.frame_count)||design.frame_count!==design.frames.length))throw Error('frame_count 必须与顶部实际帧数一致');
+  if(design.preview_brightness!==undefined&&(!Number.isInteger(design.preview_brightness)||design.preview_brightness<0||design.preview_brightness>100))throw Error('preview_brightness 必须为 0–100 的整数');
+  if(design.stages!==undefined){
+   if(!Array.isArray(design.stages)||design.stages.length>255)throw Error('stages 必须为最多 255 个阶段名称或阶段范围');
+   const ranges=design.stages.length&&typeof design.stages[0]!=='string';let end=0;
+   for(const stage of design.stages){
+    if(!ranges){if(typeof stage!=='string'||stage.length>256)throw Error('stages 阶段名称必须为最多 256 个字符的文本');}
+    else{if(!stage||typeof stage!=='object'||Array.isArray(stage)||Object.keys(stage).some(k=>!['name','end'].includes(k))||typeof stage.name!=='string'||stage.name.length>256||!Number.isInteger(stage.end)||stage.end<=end||stage.end>design.frames.length)throw Error('stages 阶段范围必须有有效名称和依次递增的结束帧');end=stage.end;}
+   }
   }
   if(!Number.isInteger(design.speed_ms)||design.speed_ms<1||design.speed_ms>32767)throw Error('每帧时间必须为 1–32767 毫秒的整数');
   return design;
  }
  function fromPage(page,slot){
+  if(page.valid===false||page.valid===0||page.word_page?.valid)return null;
   const top=page.frames,key=page.keyframes;
-  if(!top?.valid||!top.frame_num||!key?.valid||!key.frame_num)return null;
-  for(const [name,stream] of [['顶部',top],['轴灯',key]]){if(!Number.isInteger(stream.frame_num)||stream.frame_num<1||stream.frame_num>255||!Array.isArray(stream.frame_data)||stream.frame_num!==stream.frame_data.length)throw Error(name+'帧数量与 frame_data 不一致');}
-  const d={id:'import-slot-'+slot+'-'+Date.now(),name:'导入灯效 '+slot,description:'从完整配置中提取顶部与轴灯；原文件键位未导入。',frames:top.frame_data.slice(0,top.frame_num).map(x=>x.frame_RGB.slice()),keyframes:key.frame_data.slice(0,key.frame_num).map(x=>x.frame_RGB.slice()),speed_ms:page.speed_ms,frame_count:top.frame_num,stages:[],palette:[]};
+  if(!top?.valid||!key?.valid||top.frame_num===0||key.frame_num===0)return null;
+  for(const [name,stream] of [['顶部',top],['轴灯',key]]){if(!Number.isInteger(stream.frame_num)||stream.frame_num<1||stream.frame_num>255||!Array.isArray(stream.frame_data)||stream.frame_num!==stream.frame_data.length)throw Error(name+'帧数量与 frame_data 不一致');stream.frame_data.forEach((frame,index)=>{if(!frame||typeof frame!=='object'||Array.isArray(frame)||frame.frame_index!==index||!Array.isArray(frame.frame_RGB))throw Error(name+' frame_index 必须按顺序从 0 连续编号，且包含 RGB 数组');});}
+  const d={id:'import-slot-'+slot+'-'+Date.now(),name:'导入灯效 '+slot,description:'从完整配置中提取顶部与轴灯；原文件键位未导入。',frames:top.frame_data.slice(0,top.frame_num).map(x=>x.frame_RGB.slice()),keyframes:key.frame_data.slice(0,key.frame_num).map(x=>x.frame_RGB.slice()),speed_ms:page.speed_ms,preview_brightness:page.lightness??100,frame_count:top.frame_num,stages:[],palette:[]};
   d.palette=[...new Set(d.frames.flat().filter(c=>c!=='#000000'))].sort((a,b)=>Math.max(...rgb(b))-Math.max(...rgb(a))).slice(0,4);return validate(d);
  }
  function importDesigns(json,fileName='导入灯效'){
-  if(json.page_data){const result=[];for(let slot=1;slot<=3;slot++){const p=json.page_data.find(p=>Number(p.page_index)===slot+4);if(p){const d=fromPage(p,slot);if(d)result.push(d);}}if(!result.length)throw Error('配置没有可用的顶部 + 轴灯自定义动画');return result;}
-  const d=copy(json);d.name=String(d.name||fileName.replace(/\.json$/i,''));d.id=String(d.id||'import-'+Date.now());d.palette=d.palette||[];d.stages=d.stages||[];d.description=d.description||'从 JSON 导入的灯效作品。';validate(d);return[d];
+  if(!json||typeof json!=='object'||Array.isArray(json))throw Error('灯效 JSON 必须为对象');
+  if(json.page_data!==undefined){if(!Array.isArray(json.page_data))throw Error('page_data 必须为配置页数组');const result=[];for(let slot=1;slot<=3;slot++){const pages=json.page_data.filter(p=>p&&Number(p.page_index)===slot+4);if(pages.length>1)throw Error('配置不能重复声明自定义槽位 '+slot);const p=pages[0];if(p){const d=fromPage(p,slot);if(d)result.push(d);}}if(!result.length)throw Error('配置没有可用的顶部 + 轴灯自定义动画');return result;}
+  const d=copy(json);if(d.name===undefined)d.name=String(fileName).replace(/\.json$/i,'').slice(0,256)||'导入灯效';if(d.id===undefined)d.id='import-'+Date.now();if(d.palette===undefined)d.palette=[];if(d.stages===undefined)d.stages=[];if(d.description===undefined)d.description='从 JSON 导入的灯效作品。';validate(d);return[d];
  }
  function merge(config,assignments){
   const result=copy(config);if(!result?.page_data)throw Error('缺少完整配置基线');const slots=new Set();

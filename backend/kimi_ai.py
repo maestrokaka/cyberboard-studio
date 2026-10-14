@@ -15,7 +15,7 @@ BASE_URLS = {
     "kimi-open": ("https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"),
 }
 DEFAULT_MODELS = {"kimi-code": "k3", "kimi-open": "kimi-k3"}
-USER_AGENT = "CyberboardStudio/0.2.1"
+USER_AGENT = "CyberboardStudio/0.2.2"
 MAX_WIRE_BYTES = 2 * 1024 * 1024
 MAX_CONTENT_BYTES = 128 * 1024
 MODEL_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")

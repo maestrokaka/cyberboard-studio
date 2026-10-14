@@ -10,7 +10,7 @@ import zipfile
 
 APP = Path(__file__).resolve().parents[2]
 PACKAGE = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.2.1-Windows-x64.zip"
+ARCHIVE = APP / "build/Cyberboard-Studio-0.2.2-Windows-x64.zip"
 
 
 def digest(path):
@@ -43,8 +43,9 @@ class PackageChecks(unittest.TestCase):
         config = json.loads((PACKAGE / "Cyberboard Studio.runtimeconfig.json").read_text())
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
-        for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css"):
+        for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css", "dialogs.js", "assets/support/wechat-pay.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
+        self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
         for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py"):
             self.assertEqual(digest(PACKAGE / "resources/backend" / name), digest(APP / "backend" / name), name)
 

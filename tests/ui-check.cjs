@@ -226,7 +226,7 @@ if(require.main===module)(async () => {
     h.window.StudioBridge.event({ event: 'progress', stage, transferred: 4660, total: 9315 }); assert.equal(h.el('syncStage').textContent, expected);
   }
   h.replyExecute({ success: true, deviceAck: true, keymapMatch: true, stateStored: false, warning: '离线测试保存警告', changedSlots: [2], device: { ...syntheticDevice, connected: true } }); await executing;
-  assert.equal(state.executing, false); assert.equal(state.pending.size, 0); await h.flushSave(); assert.equal(h.control.workspace.pending.length,0,'successful USB sync must persist cleared drafts after execution releases its lock'); assert.match(h.el('syncContent').innerHTML, /本机记录保存未完成/); assert.match(h.el('globalStatus').textContent, /本机记录保存未完成/);
+  assert.equal(state.executing, false); assert.equal(state.pending.size, 0); await h.flushSave(); assert.equal(h.control.workspace.pending.length,0,'successful USB sync must persist cleared drafts after execution releases its lock'); assert.match(h.el('syncContent').innerHTML, /本机记录或报告保存未完成/); assert.match(h.el('globalStatus').textContent, /本机记录或报告保存未完成/);
   assert.equal(h.calls.filter(c => c.action === 'execute').length, 1, 'only explicit execution writes');
   const fresh = harness({platform:'windows', emptyBaseline:true, dataPath:process.env.STUDIO_PACKED_DATA}); await settle();
   assert.equal(fresh.app.state.config, null); assert.equal(fresh.app.state.baselineMissing, true);

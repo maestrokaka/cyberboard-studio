@@ -33,6 +33,8 @@ internal static class ResourcePolicy
         { return false; }
     }
 
-    public static bool IsExternalLink(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        (uri.Scheme is "https" or "http") && !IsOrigin(value) && string.IsNullOrEmpty(uri.UserInfo);
+    public static bool IsExternalLink(string value) =>
+        string.Equals(value, "mailto:maestrokaka@gmail.com", StringComparison.Ordinal) ||
+        (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        (uri.Scheme is "https" or "http") && !IsOrigin(value) && string.IsNullOrEmpty(uri.UserInfo));
 }

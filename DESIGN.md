@@ -55,3 +55,26 @@ enclosure, a correctly placed display opening, and the approved cat paw. Only
 the paw is rotated 180 degrees; the keyboard and tile keep their orientation.
 The same approved raster asset drives the sidebar, macOS ICNS, and Windows ICO.
 Legacy geometric marks remain temporary previews, not the product identity.
+
+## Interaction and visual review · 2026-10-14
+
+The workbench has two independently scrolling panes. The inspector keeps the
+assignment and sync actions in a fixed bottom section at the 1120×760 desktop
+minimum. Avoid positional nth-of-type styling: groups retain explicit borders.
+Common controls use at least 32px targets; ordinary small text uses #858b94 or
+lighter on charcoal surfaces. Long names and dual-stream progress may wrap.
+Frame labels distinguish top, key LEDs and the common loop when lengths differ.
+The common 10–100ms slider sits beside an exact 1–32767ms number input; imported
+timings are never silently clamped. AI generation retains its narrower range.
+
+Modal sheets have fixed headings and actions, a scrolling body, contained Tab
+focus and return focus on dismissal. Background content is inert while open.
+Reduced-motion behavior and the approved product icon remain unchanged.
+
+Support is an optional page below the primary navigation. Use the approved
+orange icon and a short, static amber pixel line, with restrained charcoal
+surfaces and generous space. The original payment JPEG stays byte-exact; crop
+only through CSS and keep a white quiet zone around the QR. Display the author
+as Kakà and the contact as maestrokaka@gmail.com. No payment amount, tracking or
+automatic transaction belongs in the app. The README uses the same support
+design and contact information.

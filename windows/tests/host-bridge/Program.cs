@@ -236,6 +236,7 @@ internal static class Program
                     Check(!ResourcePolicy.IsOrigin(url), "Unexpected origin accepted: " + url);
                 Check(!ResourcePolicy.IsDocument("https://studio.cyberboard.invalid/other.html"), "Unexpected document accepted.");
                 Check(ResourcePolicy.IsExternalLink("https://example.org/help") && ResourcePolicy.IsExternalLink("http://example.org/help"), "External web links rejected.");
+                Check(ResourcePolicy.IsExternalLink("mailto:maestrokaka@gmail.com") && !ResourcePolicy.IsExternalLink("mailto:other@example.org") && !ResourcePolicy.IsExternalLink("mailto:maestrokaka@gmail.com?attach=private.txt"), "Author email policy must be limited to the configured contact address.");
                 Check(!ResourcePolicy.IsExternalLink(ResourcePolicy.Index) && !ResourcePolicy.IsExternalLink("https://user@example.org/help") && !ResourcePolicy.IsExternalLink("file:///tmp/a") && !ResourcePolicy.IsExternalLink("javascript:alert(1)"), "Unsafe external link accepted.");
                 return Task.CompletedTask;
             });

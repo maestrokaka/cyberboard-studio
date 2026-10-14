@@ -84,7 +84,7 @@ def bundle_structure(app):
     contents = app / "Contents"
     resources = contents / "Resources"
     info = plistlib.loads((contents / "Info.plist").read_bytes())
-    require(info.get("CFBundleShortVersionString") == "0.2.1", "App version differs from this release")
+    require(info.get("CFBundleShortVersionString") == "0.2.2", "App version differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]
@@ -105,9 +105,10 @@ def bundle_structure(app):
             "Frozen backend manifest does not describe a portable arm64 runtime")
     require(manifest.get("private_device_state_bundled") is False, "Frozen backend includes private device state")
     require(not (resources / "backend/bridge.py").exists(), "Source/development backend is included in the release")
-    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css"):
+    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css", "dialogs.js", "assets/support/wechat-pay.jpg"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
                 "Packaged web source is missing or stale: " + name)
+    require(any((backend / "_internal").rglob("_imagingcms*.so")), "Color conversion native module is missing")
     forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "pyvenv.cfg", ".operation.lock"}
     forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "test-fixtures"}
     for path in app.rglob("*"):

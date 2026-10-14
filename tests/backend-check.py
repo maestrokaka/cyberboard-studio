@@ -311,6 +311,59 @@ class BackendChecks(unittest.TestCase):
             self.expect_error("workspace_too_large", lambda: self.backend.saveWorkspace({"trash": [{"design": self.design(), "deletedAt": "2026-10-13T00:00:00Z"}]}))
         self.assertEqual(location.read_bytes(), previous)
 
+    def test_workspace_rejects_malformed_design_metadata_in_active_and_trash(self):
+        self.backend.saveWorkspace({"designs": [self.design()]})
+        location = self.backend.state_dir / "workspace.json"
+        previous = location.read_bytes()
+        invalid = [("palette", {"bad": True}, "invalid_workspace"),
+                   ("palette", "#FFFFFF", "invalid_workspace"),
+                   ("palette", ["blue"], "invalid_workspace"),
+                   ("palette", ["#000000"] * 17, "invalid_workspace"),
+                   ("description", [], "invalid_workspace"),
+                   ("description", "x" * 32769, "invalid_workspace"),
+                   ("name", "\tbroken", "invalid_workspace"),
+                   ("id", "broken\0id", "invalid_workspace"),
+                   ("name", "😀" * 129, "invalid_workspace"),
+                   ("stages", "bad", "invalid_workspace"),
+                   ("stages", [1], "invalid_workspace"),
+                   ("stages", ["x" * 257], "invalid_workspace"),
+                   ("stages", ["a", {"name": "b", "end": 2}], "invalid_workspace"),
+                   ("stages", [{"name": "a", "end": 2}, {"name": "b", "end": 1}], "invalid_workspace"),
+                   ("stages", [{"name": "a", "end": 3}], "invalid_workspace"),
+                   ("stages", [{"name": "a", "end": 1, "start": 0}], "invalid_workspace"),
+                   ("preview_brightness", 101, "invalid_input"),
+                   ("preview_brightness", True, "invalid_input"),
+                   ("frame_count", 1, "invalid_workspace"),
+                   ("frame_count", True, "invalid_workspace")]
+        for field, value, code in invalid:
+            design = {**self.design(), field: value}
+            for payload in ({"designs": [design]}, {"trash": [{"design": design, "deletedAt": "2026-10-14T00:00:00Z"}]}):
+                with self.subTest(field=field, archived="trash" in payload):
+                    self.expect_error(code, lambda: self.backend.saveWorkspace(payload))
+                    self.assertEqual(location.read_bytes(), previous)
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_workspace_supports_long_remarks_stage_ranges_and_optional_metadata(self):
+        design = self.design()
+        design.update(name="😀" * 128, description="创作备注\n" + "长" * 22000,
+                      palette=["#12E5FF", "#FFFFFF"], stages=[{"name": "进入", "end": 1}, {"name": "返回", "end": 2}],
+                      frame_count=2, preview_brightness=65)
+        self.backend.saveWorkspace({"designs": [design]})
+        self.assertEqual(self.backend.load_workspace()[0]["designs"], [design])
+        bare = self.design()
+        self.backend.saveWorkspace({"designs": [bare]})
+        self.assertEqual(self.backend.load_workspace()[0]["designs"], [bare])
+
+    def test_corrupt_design_metadata_in_saved_workspace_is_retained_with_warning(self):
+        self.backend.state_dir.mkdir(parents=True)
+        location = self.backend.state_dir / "workspace.json"
+        location.write_text(json.dumps({"designs": [{**self.design(), "palette": {"bad": True}}]}))
+        previous = location.read_bytes()
+        loaded, warning = self.backend.load_workspace()
+        self.assertIsNone(loaded)
+        self.assertIsInstance(warning, str)
+        self.assertEqual(location.read_bytes(), previous)
+
     def test_corrupt_workspace_does_not_prevent_cli_bootstrap(self):
         self.backend.state_dir.mkdir(parents=True)
         location = self.backend.state_dir / "workspace.json"
@@ -552,6 +605,293 @@ class BackendChecks(unittest.TestCase):
         self.assertEqual(result["changedSlots"], [1, 2, 3])
         self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
         self.assertEqual(self.sent, [])
+
+    def test_history_restore_preserves_disabled_text_empty_and_full_page_controls(self):
+        historical = copy.deepcopy(self.baseline)
+        disabled = bridge.page_for(historical, 1)
+        disabled.update(valid=0, lightness=21, speed_ms=55, historicalExtension={"keep": True})
+        disabled["color"] = {"default": True, "back_rgb": "#112233", "rgb": "#AABBCC"}
+        text = bridge.page_for(historical, 2)
+        text["word_page"] = {"valid": 1, "word_len": 1, "unicode": ["#0041"]}
+        empty = bridge.page_for(historical, 3)
+        empty.update(valid=0, speed_ms=0)
+        for page in (text, empty):
+            for field in ("frames", "keyframes"):
+                page[field] = {"valid": 0, "frame_num": 0, "frame_data": []}
+        historical["key_layer"]["layer_data"][0]["layer"][0] = "#00070006"
+        historical["page_data"][0]["lightness"] = 12
+        self.real_cli["cb_store"].snapshot("AM01R6", historical)
+        snapshot = self.backend.history({})["history"][0]["id"]
+        self.live_internal_keys()
+        result = self.backend.restorePlan({"snapshotId": snapshot, "preserveKeymap": True})
+        target = result["config"]
+        for slot in (1, 2, 3):
+            self.assertEqual(bridge.page_for(target, slot), bridge.page_for(historical, slot))
+        for index in range(5):
+            self.assertEqual(target["page_data"][index], self.baseline["page_data"][index])
+        self.assertEqual(bridge.matrix(target["key_layer"]), bridge.matrix(self.live))
+        self.assertFalse(result["summary"][0]["enabled"])
+        self.assertTrue(result["summary"][1]["wordEnabled"])
+        self.assertEqual(result["summary"][2]["topFrames"], 0)
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        self.assertEqual(self.sent, [])
+
+    def test_history_restore_rejects_corrupt_led_frames_before_write(self):
+        historical = copy.deepcopy(self.baseline)
+        bridge.page_for(historical, 1)["frames"]["frame_data"][0]["frame_index"] = 4
+        self.real_cli["cb_store"].snapshot("AM01R6", historical)
+        snapshot = self.backend.history({})["history"][0]["id"]
+        self.expect_error("invalid_animation", lambda: self.backend.restorePlan({"snapshotId": snapshot, "preserveKeymap": True}))
+        self.assertEqual(self.sent, [])
+
+    def test_verified_device_success_survives_readback_archive_save_failure(self):
+        result = self.prepared()
+        original = Path.write_bytes
+
+        def fail_archive(path, data):
+            if path.name.startswith("after-") and path.suffix == ".raw":
+                raise OSError("isolated readback archive failure")
+            return original(path, data)
+
+        with patch.object(Path, "write_bytes", fail_archive):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"] and report["stateStored"])
+        self.assertFalse(report["reportStored"])
+        self.assertIn("isolated readback archive failure", report["reportWarning"])
+        self.assertIn("warning", report)
+        self.assertEqual(self.after_reads, 1)
+        self.assertEqual(report["readbackAttempts"], [{"attempt": 1, "keymapMatch": True, "completeKeycodes": 1400}])
+        self.assertEqual(self.recorded, [self.target])
+        folder = self.backend.state_dir / "plans" / result["token"]
+        self.assertEqual(bridge.load_json(folder / "plan.json")["status"], "complete")
+        saved = bridge.load_json(folder / "result.json")
+        self.assertTrue(saved["success"] and saved["deviceAck"] and saved["keymapMatch"])
+        self.assertFalse(saved["reportStored"])
+        self.expect_error("plan_consumed", lambda: self.backend.execute({"token": result["token"]}))
+
+    def test_readback_archive_failure_cannot_hide_real_keymap_mismatch(self):
+        result = self.prepared()
+        self.retry_mismatches = 3
+        original = Path.write_bytes
+
+        def fail_archive(path, data):
+            if path.name.startswith("after-") and path.suffix == ".raw":
+                raise OSError("isolated readback archive failure")
+            return original(path, data)
+
+        with patch.object(Path, "write_bytes", fail_archive):
+            with self.assertRaises(bridge.BridgeError) as error:
+                self.backend.execute({"token": result["token"]})
+        self.assertEqual(error.exception.code, "verification_failed")
+        self.assertTrue(error.exception.details["deviceAck"])
+        self.assertEqual(self.after_reads, 3)
+        self.assertTrue(all(not attempt["keymapMatch"] for attempt in error.exception.details["attempts"]))
+        self.assertEqual(self.recorded, [])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        folder = self.backend.state_dir / "plans" / result["token"]
+        self.assertEqual(bridge.load_json(folder / "plan.json")["status"], "failed")
+        self.assertFalse((folder / "result.json").exists())
+
+    def test_verified_device_success_survives_result_report_save_failure(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_report(path, value, **kwargs):
+            if Path(path).name == "result.json":
+                raise OSError("isolated result report failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(bridge, "atomic_json", fail_report):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"] and report["stateStored"])
+        self.assertFalse(report["reportStored"])
+        self.assertIn("warning", report)
+        self.assertEqual(self.recorded, [self.target])
+        metadata = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")
+        self.assertEqual(metadata["status"], "complete")
+        self.expect_error("plan_consumed", lambda: self.backend.execute({"token": result["token"]}))
+
+    def test_verified_device_success_survives_complete_plan_report_save_failure(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_completion(path, value, **kwargs):
+            if Path(path).name == "plan.json" and value.get("status") == "complete":
+                raise OSError("isolated completion report failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(bridge, "atomic_json", fail_completion):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"] and report["stateStored"])
+        self.assertFalse(report["reportStored"])
+        saved = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "result.json")
+        self.assertTrue(saved["deviceAck"] and saved["keymapMatch"])
+        self.assertIn("warning", saved)
+        self.expect_error("plan_consumed", lambda: self.backend.execute({"token": result["token"]}))
+
+    def test_verified_device_success_reports_store_failure_separately(self):
+        result = self.prepared()
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"])
+        self.assertTrue(report["reportStored"])
+        self.assertIn("warning", report)
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+
+    def test_failed_current_store_blocks_new_plan_restore_and_already_prepared_token(self):
+        result = self.prepared()
+        pending = self.payload()
+        pending["assignments"][0]["slot"] = 1
+        pending["preserveCurrentKeymap"] = True
+        old_plan = self.backend.plan(pending)
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"])
+        sent, reads = len(self.sent), self.reads
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.plan(pending))
+        snapshot = self.backend.history({})["history"][0]["id"]
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.restorePlan({"snapshotId": snapshot}))
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.execute({"token": old_plan["token"]}))
+        self.assertEqual((len(self.sent), self.reads), (sent, reads))
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        metadata = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")
+        self.assertTrue(metadata["deviceAck"] and metadata["keymapMatch"])
+        self.assertFalse(metadata["stateStored"])
+        self.assertEqual(metadata["verifiedTargetHash"], bridge.digest(self.target))
+
+    def test_failed_current_store_guard_uses_metadata_when_result_save_fails(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_report(path, value, **kwargs):
+            if Path(path).name == "result.json":
+                raise OSError("isolated result failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")), \
+                patch.object(bridge, "atomic_json", fail_report):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"] or report["reportStored"])
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.plan(self.payload()))
+
+    def test_failed_current_store_guard_uses_result_when_complete_metadata_save_fails(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_completion(path, value, **kwargs):
+            if Path(path).name == "plan.json" and value.get("status") == "complete":
+                raise OSError("isolated completion failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")), \
+                patch.object(bridge, "atomic_json", fail_completion):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"] or report["reportStored"])
+        folder = self.backend.state_dir / "plans" / result["token"]
+        self.assertEqual(bridge.load_json(folder / "plan.json")["status"], "executing")
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.plan(self.payload()))
+
+    def test_missing_both_completion_records_guards_unknown_baseline_without_claiming_verified(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_completion(path, value, **kwargs):
+            if Path(path).name == "result.json" or Path(path).name == "plan.json" and value.get("status") == "complete":
+                raise OSError("isolated completion records failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")), \
+                patch.object(bridge, "atomic_json", fail_completion):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"] or report["reportStored"])
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        self.assertEqual(metadata["status"], "executing")
+        self.assertNotIn("verifiedTargetHash", metadata)
+        self.assertFalse((folder / "result.json").exists())
+        current_path = self.real_cli["cb_store"].current_path("AM01R6")
+        self.assertEqual(metadata["currentRecordMtimeNs"], current_path.stat().st_mtime_ns)
+        self.expect_error("baseline_result_unknown", lambda: self.backend.plan(self.payload()))
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        updated_mtime = metadata["currentRecordMtimeNs"] + 1_000_000_000
+        os.utime(current_path, ns=(updated_mtime, updated_mtime))
+        self.backend.plan(self.payload())
+
+    def test_trusted_cli_same_content_rewrite_resolves_failed_store_guard(self):
+        result = self.prepared()
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            self.backend.execute({"token": result["token"]})
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.plan(self.payload()))
+        metadata = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        current_path = self.real_cli["cb_store"].current_path("AM01R6")
+        updated_mtime = metadata["currentRecordMtimeNs"] + 1_000_000_000
+        os.utime(current_path, ns=(updated_mtime, updated_mtime))
+        self.assertEqual(bridge.digest(self.real_cli["cb_store"].load_current("AM01R6")), metadata["storedBaselineHash"])
+        self.backend.plan(self.payload())
+
+    def test_legacy_failed_store_record_without_mtime_fingerprint_stays_conservative(self):
+        result = self.prepared()
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            self.backend.execute({"token": result["token"]})
+        path = self.backend.state_dir / "plans" / result["token"] / "plan.json"
+        metadata = bridge.load_json(path)
+        metadata.pop("currentRecordMtimeNs")
+        bridge.atomic_json(path, metadata)
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        self.expect_error("baseline_store_incomplete", lambda: self.backend.plan(self.payload()))
+
+    def test_report_only_save_failure_does_not_block_correctly_recorded_current(self):
+        result = self.prepared()
+        original = bridge.atomic_json
+
+        def fail_completion(path, value, **kwargs):
+            if Path(path).name == "result.json" or Path(path).name == "plan.json" and value.get("status") == "complete":
+                raise OSError("isolated completion records failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(bridge, "atomic_json", fail_completion):
+            report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["stateStored"] and report["success"])
+        self.assertFalse(report["reportStored"])
+        pending = self.payload()
+        pending["assignments"][0]["slot"] = 1
+        next_plan = self.backend.plan(pending)
+        target = bridge.load_json(self.backend.state_dir / "plans" / next_plan["token"] / "target.json")
+        self.assertEqual(bridge.page_for(target, 2), bridge.page_for(self.target, 2))
+
+    def test_trusted_cli_current_update_resolves_failed_store_guard(self):
+        result = self.prepared()
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            self.backend.execute({"token": result["token"]})
+        updated = copy.deepcopy(self.target)
+        updated["extraPreserved"]["opaque"].append("trusted-cli-update")
+        self.real_cli["cb_store"].save_current("AM01R6", updated, version="test-r6")
+        pending = self.payload()
+        pending["assignments"][0]["slot"] = 1
+        next_plan = self.backend.plan(pending)
+        target = bridge.load_json(self.backend.state_dir / "plans" / next_plan["token"] / "target.json")
+        self.assertEqual(bridge.page_for(target, 2), bridge.page_for(self.target, 2))
+        self.assertEqual(target["extraPreserved"], updated["extraPreserved"])
+
+    def test_newer_verified_execution_supersedes_older_failed_store_record(self):
+        result = self.prepared()
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")):
+            self.backend.execute({"token": result["token"]})
+        self.real_cli["cb_store"].save_current("AM01R6", self.target, version="test-r6")
+        later = self.prepared()
+        self.backend.execute({"token": later["token"]})
+        # A newer external CLI write is trusted even when it reuses an older
+        # configuration hash; only the latest consumed App write is relevant.
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        self.live = copy.deepcopy(self.baseline["key_layer"])
+        self.after_write = False
+        self.backend.plan(self.payload())
 
     def test_stale_store_prevents_execute(self):
         result = self.prepared()

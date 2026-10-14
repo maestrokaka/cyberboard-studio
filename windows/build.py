@@ -19,7 +19,7 @@ WINDOWS = Path(__file__).resolve().parent
 APP = WINDOWS.parent
 CACHE = APP / ".tools/windows-build"
 OUTPUT = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.2.1-Windows-x64.zip"
+ARCHIVE = APP / "build/Cyberboard-Studio-0.2.2-Windows-x64.zip"
 LOGO = APP / "web/assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png"
 
 
@@ -108,7 +108,7 @@ def assemble(nuget, dotnet, bootstrapper):
     # Debug symbols are development outputs; the complete managed runtime stays.
     (OUTPUT / "Cyberboard Studio.pdb").unlink(missing_ok=True)
     manifest = {
-        "product": "Cyberboard Studio", "version": "0.2.1", "rid": "win-x64",
+        "product": "Cyberboard Studio", "version": "0.2.2", "rid": "win-x64",
         "native": "WinForms + WebView2", "dotnet": frameworks.get("Microsoft.NETCore.App", "10.0.12") + " self-contained",
         "webview2Sdk": "1.0.4258.31", "python": "3.12.10 embedded x64",
         "cli": "0.1.2 with AM01R6 and Windows patches",

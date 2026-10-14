@@ -60,6 +60,7 @@ for (let slot = 1; slot <= 3; slot++) {
   assert.deepEqual(copy(design.frames), page.frames.frame_data.map(frame => frame.frame_RGB));
   assert.deepEqual(copy(design.keyframes), page.keyframes.frame_data.map(frame => frame.frame_RGB));
   assert.equal(design.speed_ms, page.speed_ms);
+  assert.equal(design.preview_brightness,page.lightness,'complete-config imports keep the page brightness without changing RGB');
   for (const unsafe of ['page_data', 'key_layer', 'keymap', 'device', 'VID', 'PID', 'word_page']) {
     assert.ok(!(unsafe in design), 'full-config imports must expose lighting designs only: ' + unsafe);
   }
@@ -113,6 +114,22 @@ for (const index of reserved) invalid(design => { design.keyframes[0][index] = '
 invalid(design => { design.frames = Array.from({ length: 256 }, () => design.frames[0].slice()); });
 invalid(design => { design.keyframes = Array.from({ length: 256 }, () => design.keyframes[0].slice()); });
 for (const speed of [0, -1, 40.5, 32768, Infinity, '40']) invalid(design => { design.speed_ms = speed; });
+// Metadata feeds selection, library rendering and persisted drafts, not only RGB rendering.
+for (const [field, values] of [
+  ['id', [undefined, '', '   ', 7, 'x'.repeat(257), 'bad\nidentifier']],
+  ['name', [undefined, '', [], 'x'.repeat(257), 'bad\u0000name']],
+  ['description', [{bad:true}, null, 'x'.repeat(32769)]],
+  ['palette', [{bad:true}, '#123456', null, ['red'], Array(17).fill('#123456')]],
+  ['stages', [{bad:true}, null, [42], ['x'.repeat(257)], Array(256).fill('phase'), ['text',{name:'range',end:1}]]],
+  ['preview_brightness', [-1, 101, 20.5, '20', null]],
+  ['frame_count', [0, 191, '192', null]]
+]) for(const value of values) invalid(design=>{design[field]=value;});
+const ranges=copy(designs[0]);ranges.stages=[{name:'入场',end:48},{name:'停留',end:120},{name:'离场',end:192}];
+assert.equal(model.validate(ranges),ranges,'legacy range-based stages remain supported');
+for(const stages of [[{name:'A',end:0}],[{name:'A',end:193}],[{name:'A',end:120},{name:'B',end:100}],[{name:'A',end:120,unknown:true}],[{end:120}]])invalid(design=>{design.stages=stages;});
+const longBrief=copy(designs[0]);longBrief.description='x'.repeat(22000);assert.equal(model.validate(longBrief),longBrief,'long valid local creative notes stay compatible');
+const bare=copy(designs[0]);delete bare.id;delete bare.name;delete bare.palette;delete bare.stages;delete bare.description;
+const bareBefore=digest(bare),normalized=model.importDesigns(bare,'未命名.json')[0];assert.equal(normalized.name,'未命名');assert.ok(normalized.id);assert.equal(digest(bare),bareBefore,'import defaults never mutate the supplied document');
 for (const assignment of [
   { slot: 0, design: designs[0], speedMs: 40, brightness: 100 },
   { slot: 4, design: designs[0], speedMs: 40, brightness: 100 },
@@ -133,6 +150,18 @@ for (const field of ['frames', 'keyframes']) {
     malformed.page_data.find(page => page.page_index === 5)[field].frame_num = count;
     assert.throws(() => model.importDesigns(malformed), 'declared frame count must match actual frame data and be 1–255');
   }
+  for(const index of [-1, 1, '0', undefined]){
+    const malformed=copy(config);malformed.page_data.find(page=>page.page_index===5)[field].frame_data[0].frame_index=index;
+    assert.throws(()=>model.importDesigns(malformed),'configuration frame indices must be consecutive integers');
+  }
+  const duplicate=copy(config);duplicate.page_data.find(page=>page.page_index===5)[field].frame_data[1].frame_index=0;
+  assert.throws(()=>model.importDesigns(duplicate),'duplicate frame indices are refused');
+}
+const repeatedSlot=copy(config);repeatedSlot.page_data.push(copy(repeatedSlot.page_data.find(page=>page.page_index===5)));assert.throws(()=>model.importDesigns(repeatedSlot),'duplicate custom pages must not silently select one record');
+for(const json of [null,[],42,{page_data:{bad:true}}])assert.throws(()=>model.importDesigns(json));
+// Inactive, text and zero-frame pages are valid configurations, not Studio animations.
+for(const mutate of [page=>{page.valid=0;page.speed_ms=0;},page=>{page.word_page.valid=1;},page=>{page.frames.frame_num=0;page.frames.frame_data=[];},page=>{page.keyframes.valid=0;}]){
+  const mixed=copy(config),page=mixed.page_data.find(p=>p.page_index===5);mutate(page);const before=digest(mixed);assert.equal(model.fromPage(page,1),null);assert.equal(model.importDesigns(mixed).length,2);assert.equal(digest(mixed),before,'skipped configuration modes remain byte-for-byte untouched');
 }
 const gridCSS = fs.readFileSync(path.join(__dirname, '../web/styles.css'), 'utf8');
 const explicitColumns = Number(gridCSS.match(/\.key-grid\{[^}]*grid-template-columns:repeat\((\d+),/)[1]);

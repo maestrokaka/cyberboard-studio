@@ -189,7 +189,7 @@ internal sealed class StudioForm : Form
         view.DropDownItems.Add(MenuItem("重新载入", Keys.Control | Keys.R, ReloadWorkbench));
         var help = new ToolStripMenuItem("帮助");
         help.DropDownItems.Add(MenuItem("关于 Cyberboard Studio", Keys.None, () => MessageBox.Show(this,
-            "Cyberboard Studio 0.2.1\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
+            "Cyberboard Studio 0.2.2\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
             "关于 Cyberboard Studio", MessageBoxButtons.OK, MessageBoxIcon.Information)));
         menu.Items.AddRange([file, edit, view, help]);
         return menu;

@@ -1,8 +1,10 @@
 # Cyberboard Studio
 
-Cyberboard 的 macOS / Windows 灯效工作台：用 Kimi 和参考图制作顶部与轴灯动画，在真实键盘照片上预览，再通过本机 CLI 同步到键盘。
+**第三方怒喵（Angry Miao）键盘工具，支持 CYBERBOARD R4 / CYBERBOARD R6，适用于 macOS / Windows。**
 
-[下载软件与查看版本记录](https://github.com/maestrokaka/cyberboard-studio/releases) · **[完整使用说明](docs/USER_GUIDE.md)** · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
+用 Kimi 和参考图制作顶部与轴灯动画，在真实键盘照片上预览，再通过本机 CLI 同步到键盘。
+
+[下载软件与查看版本记录](https://github.com/maestrokaka/cyberboard-studio/releases) · **[完整使用说明](docs/USER_GUIDE.md)** · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues) · [支持作者](#支持作者)
 
 第一次使用可先阅读[五分钟上手](docs/USER_GUIDE.md#quick-start)，查看安装、Kimi 连接、文字与参考图创作、预览、JSON、原配置迁移、同步、键位、时间和故障处理的完整步骤。
 
@@ -38,14 +40,28 @@ Cyberboard 的 macOS / Windows 灯效工作台：用 Kimi 和参考图制作顶�
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.2.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
-| `Cyberboard-Studio-0.2.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
+| `Cyberboard-Studio-0.2.2-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
+| `Cyberboard-Studio-0.2.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
 
 两个发布包均带 CLI 和运行环境，无需自己安装 Python。Windows 缺少 WebView2 时，运行包内 `Dependencies/MicrosoftEdgeWebview2Setup.exe`，联网安装后重新打开应用。
 
-当前是 `v0.2.1` 内测版；[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
+当前是 `v0.2.2` 内测版；[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
+
+v0.2.2 改善工作台的独立滚动和固定槽位操作区，修复导入校验、槽位草稿恢复、历史恢复与同步结果提示；参考图片先转换为 sRGB，新增「支持作者」页面。[本次更新说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)
+
+## 支持作者
+
+**为下一束光，留一点能量。**
+
+如果 Cyberboard Studio 让你的键盘多了一点个性，欢迎请作者喝杯咖啡。支持完全自愿，金额随心，不影响任何功能的使用。
+
+[![支持作者 · 微信收款码](docs/screenshots/support-author.png)](docs/screenshots/support-author.png)
+
+用微信扫描图中的收款码（收款人 **Kakà**），也可以点击图片查看清晰大图。
+
+建议、问题反馈或合作，请联系 [maestrokaka@gmail.com](mailto:maestrokaka@gmail.com)。**请不要使用付款留言反馈问题**，方便及时跟进。
 
 ## 当前功能
 
@@ -128,6 +144,8 @@ python windows/build.py --dotnet /path/to/dotnet --nuget /path/to/nuget-cache --
 
 ```sh
 node tests/model-check.cjs
+node tests/frontend-regressions.cjs
+node tests/library-ui-check.cjs
 node tests/renderer-check.cjs
 node tests/ui-check.cjs
 node tests/ai-ui-check.cjs

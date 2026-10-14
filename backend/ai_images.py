@@ -6,18 +6,60 @@ import io
 import warnings
 from pathlib import Path
 
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
 
 MAX_IMAGES = 3
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
 MAX_PIXELS = 32 * 1024 * 1024
 MAX_IMAGE_BYTES = 400 * 1024
 MAX_SIDE = 1280
+MAX_ICC_BYTES = 1024 * 1024
 SUPPORTED = {"PNG", "JPEG", "WEBP", "GIF"}
 
 
 class ImageError(ValueError):
     pass
+
+
+def _srgb_rgba(image):
+    """Interpret embedded color before discarding private image metadata.
+
+    The output JPEG carries no ICC profile, so its pixels must already be
+    sRGB. Copying Display P3 / Adobe RGB channel numbers into an untagged JPEG
+    would change the reference colors. The alpha channel is not color data.
+    """
+    profile_bytes = image.info.get("icc_profile")
+    rgba = image.convert("RGBA")
+    if not profile_bytes:
+        # Untagged images use the same sRGB assumption as the App's RGB data.
+        return rgba
+    if not isinstance(profile_bytes, bytes) or len(profile_bytes) > MAX_ICC_BYTES:
+        raise ImageError("参考图色彩配置过大或无效，请重新导出为 sRGB 图片后添加。")
+    try:
+        profile = ImageCms.ImageCmsProfile(io.BytesIO(profile_bytes))
+        color_space = profile.profile.xcolor_space.strip().upper()
+        if color_space == "RGB":
+            working = rgba
+        elif color_space == "CMYK" and image.mode == "CMYK":
+            working = image
+        elif color_space == "GRAY" and image.mode in ("1", "L", "LA"):
+            working = image.convert("L")
+        elif color_space == "LAB" and image.mode == "LAB":
+            working = image
+        else:
+            raise ImageError("参考图色彩配置与图片不匹配，请重新导出为 sRGB 图片后添加。")
+        converted = ImageCms.profileToProfile(
+            working, profile, ImageCms.createProfile("sRGB"), outputMode="RGB",
+            renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC)
+        output = converted.convert("RGBA")
+        output.putalpha(rgba.getchannel("A"))
+        return output
+    except ImageError:
+        raise
+    except (ImageCms.PyCMSError, OSError, ValueError, TypeError, OverflowError):
+        # Do not silently relabel unknown RGB values as sRGB or expose profile
+        # names / decoder details that may contain metadata from the original.
+        raise ImageError("参考图色彩配置损坏或不受支持，请重新导出为 sRGB 图片后添加。") from None
 
 
 def normalize(raw, name="参考图"):
@@ -32,7 +74,7 @@ def normalize(raw, name="参考图"):
                 if source.width * source.height > MAX_PIXELS:
                     raise ImageError("参考图分辨率过大，请先缩小图片。")
                 source.seek(0)
-                image = ImageOps.exif_transpose(source).convert("RGBA")
+                image = _srgb_rgba(ImageOps.exif_transpose(source))
                 image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
                 flattened = Image.new("RGB", image.size, "white")
                 flattened.paste(image, mask=image.getchannel("A"))

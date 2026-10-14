@@ -635,7 +635,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.2.1"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.2.2"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -652,7 +652,8 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let webDir = resources.appendingPathComponent("web", isDirectory: true).standardizedFileURL.path + "/"
             if url.standardizedFileURL.path.hasPrefix(webDir) { decisionHandler(.allow); return }
         }
-        if navigationAction.navigationType == .linkActivated, ["https", "http"].contains(url.scheme ?? "") {
+        if navigationAction.navigationType == .linkActivated,
+           ["https", "http"].contains(url.scheme ?? "") || url.absoluteString == "mailto:maestrokaka@gmail.com" {
             NSWorkspace.shared.open(url)
         }
         decisionHandler(.cancel)
