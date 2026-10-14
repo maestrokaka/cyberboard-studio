@@ -3,17 +3,41 @@ import WebKit
 import UniformTypeIdentifiers
 import Security
 
+struct AICredentialAccess {
+    let read: (String) throws -> String?
+    let write: (String, String) throws -> Void
+    let delete: (String) throws -> Void
+    var exists: ((String) throws -> Bool)? = nil
+}
+
 final class AISettingsStore {
     private let stateDirectory: URL
     private let lock = NSLock()
     private let service = "Cyberboard Studio.Kimi"
     private var lastModelMigration = false
+    private var profiles: [String: [String: String]] = [:]
+    private let credentialAccess: AICredentialAccess?
+    private let beforeMetadataCommit: (() throws -> Void)?
     private static let endpoints: [String: [String]] = [
         "kimi-code": ["https://api.kimi.com/coding/v1", "https://api.kimi.ai/coding/v1"],
-        "kimi-open": ["https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"]
+        "kimi-open": ["https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"],
+        "minimax": ["https://api.minimax.cn/v1", "https://api.minimax.io/v1"],
+        "deepseek": ["https://api.deepseek.com", "https://api.deepseek.com/v1"]
     ]
 
-    init(stateDirectory: URL) { self.stateDirectory = stateDirectory }
+    init(stateDirectory: URL, credentialAccess: AICredentialAccess? = nil, beforeMetadataCommit: (() throws -> Void)? = nil) {
+        self.stateDirectory = stateDirectory
+        self.credentialAccess = credentialAccess
+        self.beforeMetadataCommit = beforeMetadataCommit
+    }
+    private static let defaultModels = ["kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3", "deepseek": "deepseek-flash"]
+    static func supportsImages(_ config: [String: String]) -> Bool {
+        switch config["provider"] {
+        case "minimax": return ["MiniMax-M3", "MiniMax-M3.1-Flash-Preview"].contains(config["model"] ?? "")
+        case "deepseek": return ["deepseek-flash", "deepseek-v4-flash-vision-exp"].contains(config["model"] ?? "")
+        default: return config["provider"] == "kimi-code" || config["provider"] == "kimi-open"
+        }
+    }
     private static func failure(_ message: String) -> NSError {
         NSError(domain: "CyberboardStudio.AI", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
@@ -27,11 +51,11 @@ final class AISettingsStore {
     }
     static func configuration(_ payload: [String: Any]) throws -> [String: String] {
         let provider = payload["provider"] as? String ?? "kimi-code"
-        guard let endpoints = Self.endpoints[provider] else { throw Self.failure("请选择 Kimi Code 或 Kimi 开放平台。") }
+        guard let endpoints = Self.endpoints[provider] else { throw Self.failure("请选择受支持的模型服务。") }
         var baseURL = (payload["baseUrl"] as? String ?? endpoints[0]).trimmingCharacters(in: .whitespacesAndNewlines)
         while baseURL.hasSuffix("/") { baseURL.removeLast() }
         guard endpoints.contains(baseURL) else { throw Self.failure("API 地址必须为对应服务的官方 HTTPS 地址。") }
-        let model = (payload["model"] as? String ?? (provider == "kimi-code" ? "k3" : "kimi-k3"))
+        let model = (payload["model"] as? String ?? Self.defaultModels[provider]!)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard Self.validToken(model) else { throw Self.failure("模型名称只能包含字母、数字、点、横线、下划线或冒号，最多 128 个字符。") }
         return ["provider": provider, "baseUrl": baseURL, "model": model]
@@ -40,6 +64,7 @@ final class AISettingsStore {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider]
     }
     private func readKey(_ provider: String) throws -> String? {
+        if let credentialAccess { return try credentialAccess.read(provider) }
         var request = query(provider)
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -51,7 +76,27 @@ final class AISettingsStore {
         }
         return key
     }
+    private func keyExists(_ provider: String) throws -> Bool {
+        if let credentialAccess {
+            if let exists = credentialAccess.exists { return try exists(provider) }
+            return !(try credentialAccess.read(provider) ?? "").isEmpty
+        }
+        // Loading settings only needs to know whether a saved item exists.
+        // Never request secret data or wait for a system authorization dialog here.
+        var request = query(provider)
+        request[kSecReturnAttributes as String] = true
+        request[kSecMatchLimit as String] = kSecMatchLimitOne
+        request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(request as CFDictionary, &item)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else {
+            throw Self.failure("此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。")
+        }
+        return true
+    }
     private func writeKey(_ provider: String, _ key: String) throws {
+        if let credentialAccess { try credentialAccess.write(provider, key); return }
         let attributes = [kSecValueData as String: Data(key.utf8)]
         let status = SecItemUpdate(query(provider) as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
@@ -61,24 +106,53 @@ final class AISettingsStore {
             guard SecItemAdd(request as CFDictionary, nil) == errSecSuccess else { throw Self.failure("无法将 API Key 保存到 macOS 钥匙串。") }
         } else if status != errSecSuccess { throw Self.failure("无法更新 macOS 钥匙串中的 API Key。") }
     }
+    private func deleteKey(_ provider: String) throws {
+        if let credentialAccess { try credentialAccess.delete(provider); return }
+        let status = SecItemDelete(query(provider) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.failure("无法删除 macOS 钥匙串中的 API Key。") }
+    }
     private func writeMetadata(_ config: [String: String]) throws {
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         let path = stateDirectory.appendingPathComponent("ai-settings.json")
         var metadata: [String: Any] = config
         metadata["modelDefaultsVersion"] = 2
+        profiles[config["provider"]!] = config
+        metadata["profilesVersion"] = 1
+        metadata["profiles"] = profiles
         // Only non-secret service metadata is serialized, including during migration.
         let bytes = try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
-        try bytes.write(to: path, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+        let temporary = stateDirectory.appendingPathComponent(".ai-settings-" + UUID().uuidString + ".tmp")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try bytes.write(to: temporary, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        try beforeMetadataCommit?()
+        // Rename is the final fallible operation: permissions are set before the
+        // active configuration is replaced, so a reported failure cannot hide a commit.
+        let status = temporary.withUnsafeFileSystemRepresentation { source in
+            path.withUnsafeFileSystemRepresentation { destination in rename(source!, destination!) }
+        }
+        guard status == 0 else { throw Self.failure("无法保存模型配置，原配置已保留。") }
     }
     func loadConfiguration() throws -> [String: String] {
         lastModelMigration = false
+        profiles = [:]
         let path = stateDirectory.appendingPathComponent("ai-settings.json")
         if !FileManager.default.fileExists(atPath: path.path) { return try Self.configuration([:]) }
         do {
             let bytes = try Data(contentsOf: path)
             guard bytes.count <= 16384, let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw Self.failure("") }
             var config = try Self.configuration(value)
+            if let marker = value["profilesVersion"] {
+                guard let version = marker as? NSNumber, CFGetTypeID(version) != CFBooleanGetTypeID(), version.doubleValue == 1 else { throw Self.failure("") }
+            }
+            if let rawProfiles = value["profiles"] {
+                guard let items = rawProfiles as? [String: [String: Any]], items.count <= Self.endpoints.count else { throw Self.failure("") }
+                for (provider, item) in items {
+                    guard Self.endpoints[provider] != nil, item["provider"] as? String == provider else { throw Self.failure("") }
+                    profiles[provider] = try Self.configuration(item)
+                }
+            }
+            profiles[config["provider"]!] = config
             let version = (value["modelDefaultsVersion"] as? NSNumber)?.intValue ?? 0
             if version < 2 {
                 if config["provider"] == "kimi-code", config["model"] == "kimi-for-coding" {
@@ -90,37 +164,100 @@ final class AISettingsStore {
             return config
         } catch { throw Self.failure("模型配置文件无法读取，请在模型配置中重新保存服务配置。") }
     }
-    private func publicSettings(_ config: [String: String]) throws -> [String: Any] {
+    private func publicSettings(_ config: [String: String], hasKey: Any) throws -> [String: Any] {
         var result: [String: Any] = config
-        result["hasKey"] = !(try readKey(config["provider"]!) ?? "").isEmpty
+        result["hasKey"] = hasKey
         result["credentialStore"] = "macOS 钥匙串"
         result["modelDefaultsVersion"] = 2
         result["modelMigrated"] = lastModelMigration
+        result["supportsImages"] = Self.supportsImages(config)
+        var publicProfiles: [String: [String: Any]] = [:]
+        for provider in Self.endpoints.keys.sorted() {
+            let profile = try profiles[provider] ?? Self.configuration(["provider": provider])
+            var item: [String: Any] = profile
+            if provider == config["provider"] {
+                item["hasKey"] = hasKey
+                if hasKey is NSNull { item["credentialError"] = "此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。" }
+            }
+            else {
+                do { item["hasKey"] = try keyExists(provider) }
+                catch {
+                    item["hasKey"] = NSNull()
+                    item["credentialError"] = "此服务的密钥暂时无法读取，请检查系统凭据访问权限后重试。"
+                }
+            }
+            item["supportsImages"] = Self.supportsImages(profile)
+            publicProfiles[provider] = item
+        }
+        result["profiles"] = publicProfiles
         return result
     }
     func get() throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
-        return try publicSettings(loadConfiguration())
+        let config = try loadConfiguration()
+        let hasKey: Any
+        do { hasKey = try keyExists(config["provider"]!) }
+        catch { hasKey = NSNull() }
+        var result = try publicSettings(config, hasKey: hasKey)
+        if hasKey is NSNull { result["credentialError"] = "此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。" }
+        return result
+    }
+    func revealAIKey(_ payload: [String: Any]) throws -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        guard let provider = payload["provider"] as? String, Self.endpoints[provider] != nil else {
+            throw Self.failure("请选择受支持的模型服务。")
+        }
+        // The explicit local reveal action is separate from ordinary settings;
+        // it never loads metadata, changes the active provider or writes a key.
+        do { return ["apiKey": try readKey(provider) ?? ""] }
+        catch { throw Self.failure("无法读取已保存的 API Key，请检查系统凭据访问权限后重试。") }
     }
     func save(_ payload: [String: Any]) throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
+        // A user-initiated save can recover malformed metadata without deleting credentials.
+        do { _ = try loadConfiguration() } catch { profiles = [:] }
         lastModelMigration = false
         let config = try Self.configuration(payload)
         let input = payload["apiKey"] as? String ?? ""
         guard !input.contains("\r"), !input.contains("\n"), input.count <= 4096 else { throw Self.failure("API Key 格式无效，请粘贴完整的单行密钥。") }
         let key = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard key.isEmpty || key.unicodeScalars.allSatisfy({ $0.value >= 33 && $0.value <= 126 }) else { throw Self.failure("API Key 只能包含可打印的单行字符，不包含空格。") }
         let remove = payload["removeKey"] as? Bool ?? false
         guard !(remove && !key.isEmpty) else { throw Self.failure("删除密钥与设置新密钥不能同时进行。") }
-        if remove {
-            let status = SecItemDelete(query(config["provider"]!) as CFDictionary)
-            guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.failure("无法删除 macOS 钥匙串中的 API Key。") }
-        } else if !key.isEmpty { try writeKey(config["provider"]!, key) }
-        try writeMetadata(config)
-        return try publicSettings(config)
+        let provider = config["provider"]!
+        // Prepare every fallible read and the public response before credentials
+        // or active metadata change. Unrelated locked accounts are explicit unknowns.
+        let previousKey = try readKey(provider)
+        let nextKey = remove ? nil : (key.isEmpty ? previousKey : key)
+        profiles[provider] = config
+        let prepared = try publicSettings(config, hasKey: !(nextKey ?? "").isEmpty)
+        let changesKey = nextKey != previousKey
+        do {
+            if changesKey {
+                if let nextKey { try writeKey(provider, nextKey) }
+                else { try deleteKey(provider) }
+            }
+            try writeMetadata(config)
+        } catch {
+            if changesKey {
+                do {
+                    if let previousKey { try writeKey(provider, previousKey) }
+                    else { try deleteKey(provider) }
+                } catch {
+                    throw Self.failure("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请检查系统凭据权限后重新保存该服务。")
+                }
+            }
+            throw Self.failure("模型配置未保存，原配置和密钥已保留。请检查本机存储与凭据访问权限后重试。")
+        }
+        return prepared
     }
-    func inject(_ payload: [String: Any]) throws -> (payload: [String: Any], secret: String) {
+    func inject(_ payload: [String: Any], allowInactive: Bool = false) throws -> (payload: [String: Any], secret: String) {
         lock.lock(); defer { lock.unlock() }
-        let config = try loadConfiguration()
+        let active = try loadConfiguration()
+        let provider = payload["provider"] as? String ?? active["provider"]!
+        guard Self.endpoints[provider] != nil else { throw Self.failure("请选择受支持的模型服务。") }
+        guard allowInactive || provider == active["provider"] else { throw Self.failure("当前模型配置已切换，请刷新后重新制作。") }
+        let config = try provider == active["provider"] ? active : (profiles[provider] ?? Self.configuration(["provider": provider]))
         guard let key = try readKey(config["provider"]!), !key.isEmpty else { throw Self.failure("请先在模型配置中保存 API Key。") }
         var settings: [String: Any] = config
         settings["apiKey"] = key
@@ -206,7 +343,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var deviceWritePending = false
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
-        "bootstrap", "detect", "plan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace"
+        "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace"
     ]
     private let deviceWriteActions: Set<String> = ["execute", "setTime"]
 
@@ -330,7 +467,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         case "importJSON": importJSON(id: id)
         case "exportJSON": exportJSON(id: id, payload: payload)
         case "importAIImages": importAIImages(id: id)
-        case "getAISettings", "saveAISettings":
+        case "getAISettings", "saveAISettings", "revealAIKey":
             if action == "saveAISettings", activeAIRequestID != nil {
                 reply(id: id, error: "AI 请求正在进行，请先取消或等待完成再修改模型配置。"); return
             }
@@ -338,7 +475,12 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             credentialQueue.async { [weak self] in
                 guard let self else { return }
                 do {
-                    let result = try action == "getAISettings" ? self.aiSettings.get() : self.aiSettings.save(payload)
+                    let result: [String: Any]
+                    switch action {
+                    case "getAISettings": result = try self.aiSettings.get()
+                    case "revealAIKey": result = try self.aiSettings.revealAIKey(payload)
+                    default: result = try self.aiSettings.save(payload)
+                    }
                     DispatchQueue.main.async { guard generation == self.navigationGeneration else { return }; self.reply(id: id, result: result) }
                 } catch {
                     DispatchQueue.main.async { guard generation == self.navigationGeneration else { return }; self.reply(id: id, error: error.localizedDescription) }
@@ -541,7 +683,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             do {
                 var requestPayload = payload
                 if isAI {
-                    let injected = try self.aiSettings.inject(payload)
+                    let injected = try self.aiSettings.inject(payload, allowInactive: action == "testAIConnection")
                     requestPayload = injected.payload
                     secret = injected.secret
                 }
@@ -635,7 +777,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.2.2"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.3.0"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

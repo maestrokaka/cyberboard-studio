@@ -2,15 +2,22 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 from pathlib import Path
 import struct
+import sys
 import unittest
 import zipfile
 
 APP = Path(__file__).resolve().parents[2]
-PACKAGE = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.2.2-Windows-x64.zip"
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.3.0-Windows-x64.zip")
+parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
+options, unittest_args = parser.parse_known_args()
+PACKAGE = options.package
+ARCHIVE = options.archive
 
 
 def digest(path):
@@ -36,14 +43,17 @@ class PackageChecks(unittest.TestCase):
                     "resources/backend/bridge.py", "resources/backend/migrate-config.py",
                     "resources/backend/kimi_ai.py", "resources/backend/lighting_recipe.py", "resources/backend/ai_images.py",
                     "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/library-client.js", "迁移原配置.cmd",
-                    "检查运行环境.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
+                    "检查运行环境.cmd", "诊断启动.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
         for name in required:
             self.assertTrue((PACKAGE / name).is_file(), name)
         self.assertFalse((PACKAGE / "Microsoft.Web.WebView2.Wpf.dll").exists())
+        for removed in ("assets/desk.jpg", "assets/photos/r4-cloud-perspective.jpg", "assets/photos/r6-launch-front.png"):
+            self.assertFalse((PACKAGE / "resources/web" / removed).exists(), removed)
         config = json.loads((PACKAGE / "Cyberboard Studio.runtimeconfig.json").read_text())
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
+        self.assertTrue(json.loads((PACKAGE / "release-manifest.json").read_text())["diagnosticStartup"])
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
-        for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css", "dialogs.js", "assets/support/wechat-pay.jpg"):
+        for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
         self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
         for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py"):
@@ -56,6 +66,17 @@ class PackageChecks(unittest.TestCase):
             self.assertEqual(struct.unpack_from("<H", data, offset + 4)[0], 0x8664, name)
         data, offset = pe_header(PACKAGE / "Cyberboard Studio.exe")
         self.assertEqual(struct.unpack_from("<H", data, offset + 24 + 68)[0], 2, "Native app has GUI subsystem")
+
+    def test_apphost_cet_bit_matches_the_selected_package(self):
+        sys.path.insert(0, str(APP / "windows"))
+        from build import cet_compatible
+        expected = options.expected_cet == "enabled"
+        self.assertEqual(cet_compatible(PACKAGE / "Cyberboard Studio.exe"), expected)
+        manifest = json.loads((PACKAGE / "release-manifest.json").read_text())
+        if not expected:
+            self.assertIs(manifest["cetCompat"], False)
+            self.assertIs(manifest["windows10CompatibilityBuild"], True)
+            self.assertIn("CET 是硬件栈保护", (PACKAGE / "使用说明.txt").read_text())
 
     def test_every_shipped_file_hash_and_archive_integrity(self):
         entries = {}
@@ -120,6 +141,38 @@ class PackageChecks(unittest.TestCase):
                      "resources/python/runtime-manifest.json", "release-manifest.json"):
             self.assertTrue((PACKAGE / name).is_file(), name)
 
+    def test_serial_detection_fix_is_in_the_actual_package(self):
+        runtime = PACKAGE / "resources/python"
+        relative = "cyberboard/_tools/cb_device.py"
+        shipped = runtime / "Lib/site-packages" / relative
+        self.assertEqual(digest(shipped), digest(APP / "vendor/cyberboard-cli" / relative))
+        manifest = json.loads((runtime / "runtime-manifest.json").read_text())
+        self.assertEqual(manifest["cli"]["source_files_sha256"][relative], digest(shipped))
+        self.assertIn("def probe_with_diagnostics(", shipped.read_text())
+        self.assertIn("serial_keymap_failed", (PACKAGE / "resources/backend/bridge.py").read_text())
+
+    def test_first_setup_is_in_the_actual_package_without_fake_baseline(self):
+        backend = (PACKAGE / "resources/backend/bridge.py").read_text()
+        web = (PACKAGE / "resources/web/app.js").read_text()
+        for name in ("def initializePlan(", "def execute_initialization(", "confirmInitialization", "live-keymap-only"):
+            self.assertIn(name, backend)
+        for name in ("initializationAcknowledged", "initializePlan", "confirmInitialization", "live-keymap-only"):
+            self.assertIn(name, web)
+        self.assertIn("首次配置（没有这把键盘的完整记录）", (PACKAGE / "使用说明.txt").read_text())
+        self.assertFalse((PACKAGE / "resources/python/devices").exists())
+
+    def test_official_builtin_modes_template_and_targeted_workflow_are_shipped(self):
+        template = json.loads((PACKAGE / "resources/web/assets/builtin-default-pages.json").read_text())
+        self.assertEqual(template, json.loads((APP / "data/builtin-default-pages.json").read_text()))
+        self.assertEqual(template["kind"], "cyberboard-standard-builtin-pages")
+        self.assertEqual([page["page_index"] for page in template["pages"]], list(range(5)))
+        self.assertEqual([page["valid"] for page in template["pages"]], [1, 1, 1, 0, 0])
+        self.assertNotIn("key_layer", template)
+        self.assertTrue(template["source"]["url"].startswith("https://diy.angrymiao.com/"))
+        backend = (PACKAGE / "resources/backend/bridge.py").read_text()
+        for name in ("def readConfiguration(", "def builtInPlan(", "builtin-modes"):
+            self.assertIn(name, backend)
+
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main(argv=[sys.argv[0], *unittest_args], verbosity=2)

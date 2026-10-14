@@ -15,14 +15,14 @@ const designs = [
 const views = read('data/photos/photo-calibration.json');
 const keyLayout = read('data/photos/key-photo-layout.json');
 for (const [name, view] of Object.entries(views)) {
-  view.image = 'assets/' + name + '.jpg';
+  view.image = 'assets/' + (view.asset || name + '.jpg');
   view.keyZones = keyLayout.views[name];
   assert.equal(view.keyZones.length, 83);
 }
 const source = fs.readFileSync(path.join(__dirname, '../web/preview-engine.js'), 'utf8');
 assert.ok(!/\b(fetch|XMLHttpRequest|WebSocket)\s*\(|window\.openai/.test(source));
 
-function harness(reduced = false, tainted = false) {
+function harness(reduced = false, tainted = false, sourceRGB = [100, 160, 220]) {
   const log = { photos: [], photoClips: [], clips: [], top: [], axes: [], warps: [], neutral: [] };
   const callbacks = new Map();
   let nextRAF = 1;
@@ -53,7 +53,7 @@ function harness(reduced = false, tainted = false) {
           throw error;
         }
         const data = new Uint8ClampedArray(w * h * 4);
-        for (let at = 0; at < data.length; at += 4) data.set([100, 160, 220, 255], at);
+        for (let at = 0; at < data.length; at += 4) data.set([...sourceRGB, 255], at);
         return { data, width: w, height: h };
       };
       if (prop === 'putImageData') return pixels => {
@@ -114,8 +114,7 @@ function harness(reduced = false, tainted = false) {
     Image: class {
       constructor() { this.naturalWidth = 1350; this.naturalHeight = 901; }
       set src(value) {
-        assert.match(value, /^assets\/(front|desk)\.jpg$/);
-        if (value.includes('desk')) this.naturalHeight = 863;
+        assert.match(value, /^assets\/(?:front\.jpg|photos\/r4-[a-z-]+\.jpg)$/);
         Promise.resolve().then(() => this.onload());
       }
     }
@@ -136,13 +135,28 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
 
 (async () => {
   const viewDigest = digest(views);
-  const photoDigests = ['front', 'desk'].map(name => crypto.createHash('sha256')
-    .update(fs.readFileSync(path.join(__dirname, '../web/assets/' + name + '.jpg'))).digest('hex'));
+  const originalPhotos = ['web/assets/front.jpg', 'data/photos/source-archive/desk.jpg'];
+  const photoDigests = originalPhotos.map(name => crypto.createHash('sha256')
+    .update(fs.readFileSync(path.join(workspace, name))).digest('hex'));
   const h = harness();
   const frames = [];
   const preview = new h.window.KeyboardPreview(h.container, { views, design: designs[0], onFrame: value => frames.push(value) });
   await preview.ready;
   assert.equal(h.container.children.length, 3);
+  const beforeThumbnails = digest({view:preview.view,framing:preview.framing,frame:preview.frame,
+    keyFrame:preview.keyFrame,tick:preview._tick,playing:preview.playing,design:preview.design});
+  const scheduledBeforeThumbnails = h.callbacks.size;
+  for (const id of Object.keys(views)) {
+    const canvas = h.document.createElement('canvas');
+    canvas.className = 'appearance-thumb';
+    assert.equal(preview.drawAppearanceThumbnail(canvas, id), true);
+  }
+  assert.equal(digest({view:preview.view,framing:preview.framing,frame:preview.frame,
+    keyFrame:preview.keyFrame,tick:preview._tick,playing:preview.playing,design:preview.design}),beforeThumbnails,
+    'static reference thumbnails cannot change the main appearance, animation or RGB');
+  assert.equal(h.callbacks.size, scheduledBeforeThumbnails, 'eight thumbnails cannot add animation players');
+  assert.equal(h.observers.length, 1, 'thumbnails reuse the loaded main preview without extra layout observers');
+  assert.throws(() => preview.drawAppearanceThumbnail(h.document.createElement('canvas'),'desk'));
   assert.equal(preview.playing, true);
   assert.equal(preview.frameCount, 192);
   assert.equal(frames.at(-1).speedMs, 40);
@@ -239,7 +253,7 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   preview.setKeyMode('json'); assert.equal(preview._keySprites.length, 83);
   preview.setRenderer('editor'); assert.equal(preview._texture.width, 1600); assert.equal(preview._texture.height, 200);
   preview.setRenderer('library'); assert.equal(preview._texture.width, 1605); assert.equal(preview._texture.height, 205);
-  for (const name of ['front', 'desk']) {
+  for (const name of ['front']) {
     preview.setView(name).setFraming('full');
     const photo = h.log.photos.at(-1);
     const view = views[name];
@@ -251,17 +265,92 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
     assert.equal(h.container.attributes['data-preview-background'], 'photo');
     assert.ok(!h.container.classList.values.has('keyboard-isolated'));
   }
-  preview.setView('desk').setFraming('keyboard');
-  assert.equal(preview._keyboardOutline.length, 0, 'desk view retains the real desktop photo');
+  assert.throws(() => preview.setView('desk'), /未知照片视角/, 'desk views are removed from the gallery');
+  assert.throws(() => preview.setView('r4-cloud-perspective'), /未知照片视角/, 'angled cloud views are removed from the gallery');
   preview.setView('front').setFraming('keyboard');
   assert.equal(h.log.photoClips.at(-1).length, 1, 'returning to front close-up restores transparent surroundings');
   const projectedTop = views.front.quad.map(([x, y]) => [
     (x - views.front.crop[0]) * preview.background.width / views.front.crop[2],
     (y - views.front.crop[1]) * preview.background.height / views.front.crop[3]]);
   for (const point of projectedTop) assert.ok(inside(point, preview._keyboardOutline), 'calibrated LED corners remain inside the exact outer-case clip');
+  const catalog = read('data/photos/preview-catalog.json');
+  const officialSources = read('data/photos/official-photo-sources.json');
+  assert.equal(catalog.default_appearance_id, 'user-vision');
+  assert.equal(catalog.appearances.length, 8);
+  assert.equal(catalog.appearances.filter(item => item.type === 'official-photo').length, 7);
+  assert.deepEqual(catalog.appearances.map(item => item.name),
+    ['CYBERBOARD R6「Vision」', 'CYBERBOARD R4「Fluo Free」', 'CYBERBOARD R4「Bebop」',
+      'CYBERBOARD R4「Gangstar」', 'CYBERBOARD R4「Cloud White V2」', 'CYBERBOARD R4「Stone Face」',
+      'CYBERBOARD R4「Paisley」', 'CYBERBOARD R4「Vision」']);
+  assert.deepEqual(catalog.galleryAllowedAngles, ['front']);
+  assert.deepEqual(Object.keys(views).sort(), ['front', 'r4-bebop-front', 'r4-cloud-front', 'r4-fluo-front',
+    'r4-gangstar-front', 'r4-paisley-front', 'r4-stone-front', 'r4-vision-front']);
+  assert.equal(views['r4-cloud-front'].key_lighting, 'opaque');
+  for (const id of ['r4-fluo-front', 'r4-bebop-front', 'r4-gangstar-front', 'r4-stone-front', 'r4-paisley-front', 'r4-vision-front']) {
+    assert.equal(views[id].key_lighting, 'glass', 'material follows the actual selected source image');
+  }
+  for (const view of Object.values(views)) {
+    assert.equal(view.name, '正面整机');
+    assert.equal(view.angle, 'front');
+    assert.equal(view.galleryAllowed, true);
+  }
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({ angle: 'front', galleryAllowed: true }), true);
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({ angle: 'perspective', galleryAllowed: true }), false);
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({ angle: 'front', galleryAllowed: false }), false);
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({ name: '正面整机' }), true);
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({ name: '桌面俯视' }), false);
+  assert.equal(h.window.KeyboardPreview.isGalleryAllowed({}), false);
+  const excluded = read('data/photos/excluded-photo-calibration.json');
+  assert.deepEqual(Object.keys(excluded.views).sort(), ['desk', 'r4-bebop-original-front',
+    'r4-cloud-perspective', 'r4-fluo-original-front', 'r6-launch-front']);
+  assert.ok(Object.values(excluded.views).every(view => !h.window.KeyboardPreview.isGalleryAllowed(view)));
+  assert.ok(!fs.existsSync(path.join(workspace, 'web/assets/desk.jpg')));
+  assert.ok(!fs.existsSync(path.join(workspace, 'web/assets/photos/r4-cloud-perspective.jpg')));
+  assert.ok(!fs.existsSync(path.join(workspace, 'web/assets/photos/r6-launch-front.png')));
+  assert.equal(officialSources.settings_source.r6_record.code, 'CYBERBOARD R6');
+  assert.equal(officialSources.settings_source.r6_record.name, 'CYBERBOARD R6');
+  for (const appearance of catalog.appearances) {
+    assert.ok(appearance.viewIds.includes(appearance.defaultViewId));
+    assert.ok(appearance.viewIds.every(id => views[id]), 'every selected appearance has a shipped calibrated view');
+  }
+  for (const record of officialSources.photos) {
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(workspace, record.asset))).digest('hex'),
+      record.sha256, 'official asset stays byte-exact against its source record');
+    if (record.preview_available === false) {
+      assert.equal(views[record.view_id], undefined, 'excluded source photos must not enter the bundled gallery');
+      assert.ok(record.excluded_reason);
+      continue;
+    }
+    const view = views[record.view_id];
+    assert.equal(view.product_id, record.model, 'photo model is explicit and independent of the connected USB device');
+    assert.ok(new Set(view.keyZones.map(zone => zone.index)).size === 83);
+    const [sw, sh] = view.source_size;
+    const crop = view.crop;
+    for (const point of view.keyboard_outline) {
+      assert.ok(point[0] >= crop[0] && point[0] <= crop[0] + crop[2] && point[1] >= crop[1] && point[1] <= crop[1] + crop[3],
+        'close-up crop must retain the complete calibrated enclosure');
+      assert.ok(point[0] >= 0 && point[0] <= sw && point[1] >= 0 && point[1] <= sh);
+    }
+    for (const point of view.quad) assert.ok(inside(point, view.keyboard_outline), record.view_id + ' top LEDs remain within the case');
+    preview.setView(record.view_id).setFraming('keyboard');
+    assert.equal(preview.error, null);
+    assert.equal(preview._keySprites.length, 83);
+    assert.equal(preview._warpTriangles.length, 128);
+    assert.equal(h.container.attributes['data-preview-background'], 'isolated');
+    assert.equal(h.log.photoClips.at(-1).length, 1, 'new views share clipping on all layers');
+    if (view.key_lighting === 'opaque') {
+      const neutral = h.log.neutral.at(-1).data;
+      assert.ok(neutral.every((value, at) => value === [100, 160, 220, 255][at % 4]),
+        'opaque printed keycaps retain their source colors and legends');
+    }
+    preview.setFraming('full');
+    assert.equal(preview._keyboardOutline.length, 0, 'full official image keeps its original scene and source lettering');
+    assert.equal(h.log.photoClips.at(-1).length, 0);
+  }
+  preview.setView('front').setFraming('keyboard');
   assert.equal(digest(views), viewDigest, 'isolating the photo must not mutate calibration coordinates');
-  ['front', 'desk'].forEach((name, index) => assert.equal(crypto.createHash('sha256')
-    .update(fs.readFileSync(path.join(__dirname, '../web/assets/' + name + '.jpg'))).digest('hex'), photoDigests[index],
+  originalPhotos.forEach((name, index) => assert.equal(crypto.createHash('sha256')
+    .update(fs.readFileSync(path.join(workspace, name))).digest('hex'), photoDigests[index],
   'source photo bytes stay unchanged'));
   h.container.clientWidth = 320; h.observers[0].callback(); assert.equal(preview.background.width, 640);
   h.container.clientWidth = 3000; h.observers[0].callback(); assert.equal(preview.background.width, 1400);
@@ -286,6 +375,23 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   await quiet.ready;
   assert.equal(quiet.playing, false); assert.equal(reduced.callbacks.size, 0);
   quiet.destroy();
+  const redPhoto = harness(true, false, [220, 40, 10]);
+  const glass = new redPhoto.window.KeyboardPreview(redPhoto.container, {
+    views: { 'r4-gangstar-front': views['r4-gangstar-front'] }, view: 'r4-gangstar-front', design: designs[0] });
+  await glass.ready;
+  const neutralRed = redPhoto.log.neutral.at(-1).data;
+  assert.ok(neutralRed.some((value, at) => at % 4 === 0 && value === neutralRed[at + 1] && value === neutralRed[at + 2]),
+    'official glass sources neutralize red/orange baked lighting too, without leaving it underneath new RGB');
+  glass.destroy();
+  const filtered = harness(true);
+  const gallery = new filtered.window.KeyboardPreview(filtered.container, { views: { ...views,
+    forbidden: { ...views.front, angle: 'perspective', galleryAllowed: true, image: 'assets/never-load.jpg' },
+    hidden: { ...views.front, angle: 'front', galleryAllowed: false, image: 'assets/never-load.jpg' } }, design: designs[0] });
+  await gallery.ready;
+  assert.equal(Object.keys(gallery.views).length, 8, 'excluded and non-front photos are rejected before any image load');
+  assert.throws(() => gallery.setView('forbidden'));
+  assert.throws(() => gallery.setView('hidden'));
+  gallery.destroy();
   const early = harness();
   const disposed = new early.window.KeyboardPreview(early.container, { views, design: designs[1] });
   disposed.destroy(); await disposed.ready;
@@ -307,5 +413,5 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   broken.setKeyMode('json');
   assert.equal(broken.diagnostic.name, 'SecurityError'); assert.equal(errors.length, 2);
   broken.destroy(); assert.equal(tainted.container.children.length, 0);
-  console.log('PASS: real 192-frame designs, exact RGB and brightness, 128 perspective triangles, 83 lamp zones, independent space lamps, loop/seek/play/pause, shared transparent enclosure clip on all 3 layers, unmodified source photos and calibration, photo/full-view mode reset, watermark-free full crop, visibility, responsive width, reduced motion, cleanup and persistent canvas SecurityError diagnostics.');
+  console.log('PASS: eight formally named front-only gallery appearances, merged duplicate R6, source-specific glass/opaque material, unchanged source/archive bytes, forbidden-angle filtering, real 192-frame designs, exact RGB and brightness, 128 perspective triangles, 83 lamp zones, independent space lamps, loop/seek/play/pause, shared transparent enclosure clip, internal full-view reset, visibility, responsive width, reduced motion, cleanup and persistent canvas SecurityError diagnostics.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

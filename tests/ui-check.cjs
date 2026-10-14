@@ -22,11 +22,11 @@ const unescape = s => String(s).replace(/&quot;/g, '"').replace(/&#39;/g, "'").r
 class Element {
   constructor(tag, attributes = {}) {
     this.tagName = tag.toUpperCase(); this.attributes = {}; this.children = []; this.parent = null;
-    this.listeners = {}; this.dataset = {}; this.style = {}; this.className = ''; this.hidden = false; this.disabled = false;
+    this.listeners = {}; this.dataset = {}; this.style = {}; this.className = ''; this.hidden = false; this.disabled = false; this.checked = false;
     this._value = undefined; this._html = ''; this._text = ''; this.classList = new Classes(this);
     Object.entries(attributes).forEach(([key, value]) => this.setAttribute(key, value));
   }
-  setAttribute(name, value) { this.attributes[name] = String(value); if (name === 'id') this.id = value; if (name === 'class') this.className = value; if (name.startsWith('data-')) this.dataset[dataKey(name)] = unescape(value); if (name === 'value') this._value = unescape(value); if (name === 'hidden' || name === 'disabled') this[name] = true; }
+  setAttribute(name, value) { this.attributes[name] = String(value); if (name === 'id') this.id = value; if (name === 'class') this.className = value; if (name.startsWith('data-')) this.dataset[dataKey(name)] = unescape(value); if (name === 'value') this._value = unescape(value); if (name === 'hidden' || name === 'disabled' || name === 'checked') this[name] = true; }
   getAttribute(name) { return this.attributes[name] ?? null; }
   get value() { if (this._value !== undefined) return this._value; if (this.tagName === 'SELECT') { const options = this.querySelectorAll('option'); return (options.find(o => o.attributes.selected !== undefined) || options[0])?.value || ''; } return ''; }
   set value(value) { this._value = String(value); }
@@ -37,7 +37,9 @@ class Element {
   appendChild(child) { child.parent = this; this.children.push(child); return child; }
   insertAdjacentHTML(position, html) { if (position === 'beforeend') { this._html += html; parse(html, this); } else if (position === 'afterend') { parse(html, this.parent); } else throw Error('Unsupported test insertion: ' + position); }
   addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); }
-  async click() { if (this.disabled) return; if (this.onclick) await this.onclick({ target: this }); for (const callback of this.listeners.click || []) await callback({ target: this }); }
+  async click() { if (this.disabled) return; if (this.tagName === 'INPUT' && this.getAttribute('type') === 'checkbox') { this.checked = !this.checked; if (this.onchange) await this.onchange({ target: this }); } if (this.onclick) await this.onclick({ target: this }); for (const callback of this.listeners.click || []) await callback({ target: this }); }
+  focus() { let root = this; while (root.parent) root = root.parent; if (root.ownerDocument) root.ownerDocument.activeElement = this; }
+  scrollIntoView(options) { this.scrollOptions = options; }
   querySelectorAll(selector) { return descendants(this).filter(el => matches(el, selector)); }
   getContext() { return this.context ||= { fillStyle: '', fillRect() {} }; }
 }
@@ -71,6 +73,7 @@ function harness(options = {}) {
   const document = { getElementById: id => descendants(documentRoot).find(el => el.id === id) || null,
     querySelectorAll: selector => documentRoot.querySelectorAll(selector), createElement: tag => new Element(tag),
     addEventListener() {} };
+  documentRoot.ownerDocument = document;
   const calls = [], timers = new Map(); let timerID = 0; let executeReply;
   const control = { importValue: null, detectValue: null, detectError: null, workspace: options.workspace || null, executionResult: options.executionResult || null, planKeymap: null, planPreservation: options.planPreservation || {source:'live',comparedKeycodes:1400,differentFromStored:0,differentPhysicalBindings:0,differentInternalKeycodes:0,refreshApplied:false} };
   const window = { KeyboardPreview: class {
@@ -79,15 +82,16 @@ function harness(options = {}) {
     setBrightness(v) { this.brightness = v; return this; }
     setSpeed(v) { this.speedMs = v; return this; }
     setView(v) { this.view = v; } setFraming(v) { this.framing = v; } setRenderer(v) { this.renderer = v; } setKeyMode(v) { this.keyMode = v; }
+    drawAppearanceThumbnail(canvas, viewId) { (this.thumbnailCalls ||= []).push({ canvas, viewId }); canvas.thumbnailViewId = viewId; return true; }
     pause() { this.playing = false; } play() { this.playing = true; } seek(v) { this.frame = v; }
   }};
   const postMessage = message => {
     calls.push(clone(message));
     queueMicrotask(async () => {
       const { id, action, payload } = message; const D = window.STUDIO_DATA; let result;
-      if(options.handlers?.[action]){try{result=await options.handlers[action](payload,message);window.StudioBridge.receive({id,result});}catch(error){window.StudioBridge.receive({id,error:{message:error.message}});}return;}
+      if(options.handlers?.[action]){try{result=await options.handlers[action](payload,message);window.StudioBridge.receive({id,result});}catch(error){window.StudioBridge.receive({id,error:{message:error.message,code:error.code,details:error.details}});}return;}
       if (action === 'execute') { executeReply = value => window.StudioBridge.receive({ id, result: value }); return; }
-      if (action === 'detect' && control.detectError) { window.StudioBridge.receive({ id, error: { message: control.detectError } }); return; }
+      if (action === 'detect' && control.detectError) { window.StudioBridge.receive({ id, error: typeof control.detectError === 'string' ? { message: control.detectError } : clone(control.detectError) }); return; }
       switch (action) {
         case 'bootstrap': result = { config: options.emptyBaseline ? null : clone(fixture), device: options.emptyBaseline ? clone(D.snapshot) : clone(syntheticDevice), history: [], cliVersion: 'offline-test', workspace: control.workspace }; break;
         case 'getAISettings': result={provider:'kimi-code',baseUrl:'https://api.kimi.com/coding/v1',model:'k3',hasKey:false,credentialStore:'test'}; break;
@@ -107,9 +111,7 @@ function harness(options = {}) {
     else window.webkit = { messageHandlers: { studio: { postMessage } } };
   }
   const context = { window, document, console, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
-  vm.createContext(context); ['data.js', 'studio-model.js', 'ai-client.js', 'library-client.js', 'app.js', 'assets/branding/logos-data.js', 'assets/branding/material-icons-data.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
-  if (options.logoOverride) Object.assign(window.STUDIO_LOGO_OPTIONS[0], options.logoOverride);
-  vm.runInContext(read('brand-review.js'), context, { filename: 'brand-review.js' });
+  vm.createContext(context); ['data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
   return { window, document, calls, control, get app() { return window.StudioApp; }, el: id => document.getElementById(id),
     async flushSave() { for (const [id, item] of [...timers]) if (item.ms <= 250) { timers.delete(id); await item.fn(); } await settle(); },
     replyExecute(value) { assert.ok(executeReply, 'execute must have an explicit click'); executeReply(value); executeReply = null; } };
@@ -122,73 +124,25 @@ if(require.main===module)(async () => {
   assert.equal(state.config._fixture, true, 'the mocked backend alone supplies synthetic configuration');
   assert.equal(state.workspaceLoaded, true); assert.equal(state.designs.length, 3); assert.equal(state.pending.size, 0);
   assert.equal(h.calls.filter(c => c.action === 'execute').length, 0, 'startup must never write');
-  const brandSnapshot = () => JSON.stringify({ config: state.config, designs: state.designs, pending: [...state.pending], slots: state.slots,
-    selectedId: state.selected.id, brightness: state.brightness, speedMs: state.speedMs, targetSlot: state.targetSlot });
-  const brandStateBefore = brandSnapshot(), brandCallsBefore = h.calls.length, workspaceBeforeBrand = clone(h.control.workspace);
-  const originalMark = h.el('brandMark').innerHTML, originalMarkClass = h.el('brandMark').className;
   const formalLogo = 'assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png';
-  assert.equal(h.el('brandMark').querySelectorAll('img').length, 1, 'the formal PNG is the default sidebar mark');
+  assert.equal(h.el('brandMark').querySelectorAll('img').length, 1, 'the approved PNG remains the sidebar mark');
   assert.equal(h.el('brandMark').querySelectorAll('img')[0].getAttribute('src'), formalLogo);
   assert.ok(h.el('brandMark').classList.contains('brand-official-mark'));
-  assert.equal(h.el('brandMark').classList.contains('brand-preview-mark'), false);
-  assert.equal(h.window.STUDIO_LOGO_OPTIONS.length, 5, 'exactly five logo alternatives are bundled');
-  assert.equal(h.window.STUDIO_MATERIAL_ICON_OPTIONS.length, 1, 'one formal product icon is bundled');
-  assert.equal(h.window.StudioBrandReview.group, 'material');
-  assert.equal(h.document.querySelectorAll('.logo-option').length, 1);
-  assert.equal(h.document.querySelectorAll('[data-logo-preview]').length, 1);
-  assert.ok(h.el('brandMaterialTabBtn').classList.contains('selected'));
-  assert.ok(h.el('logoGrid').classList.contains('single-product-icon'));
-  assert.match(h.el('logoGrid').innerHTML, /正式 Logo/);
-  assert.equal(h.el('resetLogoBtn').hidden, true);
-  await h.el('brandReviewBtn').click(); assert.equal(state.page, 'branding');
-  assert.ok(h.el('page-branding').classList.contains('active')); assert.equal(h.el('pageTitle').textContent, 'Logo 与图标');
-  const productOption = h.window.STUDIO_MATERIAL_ICON_OPTIONS[0];
-  assert.equal(productOption.image, formalLogo); assert.equal(productOption.formal, true);
-  assert.equal(h.window.StudioBrandReview.selectedId, null, 'startup shows the formal mark without a temporary preview');
-  await h.document.querySelectorAll('[data-logo-preview]')[0].click();
-  assert.equal(h.window.StudioBrandReview.selectedId, productOption.id);
-  if (productOption.image) {
-    assert.equal(h.el('brandMark').querySelectorAll('img').length, 1);
-    assert.equal(h.el('brandMark').querySelectorAll('img')[0].getAttribute('src'), productOption.image);
-  } else assert.equal(h.el('brandMark').innerHTML, productOption.svg);
-  assert.ok(h.el('brandMark').classList.contains('brand-preview-mark'));
-  assert.equal(h.el('brandMark').classList.contains('brand-official-mark'), false, 'temporary preview removes the formal mark style');
-  await h.el('returnWorkbenchBtn').click(); assert.equal(state.page, 'workbench');
-  assert.equal(h.window.StudioBrandReview.selectedId, productOption.id, 'the product icon can be visually compared on the workbench');
-  h.app.navigate('settings'); await h.el('settingsBrandBtn').click(); assert.equal(state.page, 'branding');
-  await h.el('brandGeometryTabBtn').click(); assert.equal(h.window.StudioBrandReview.group, 'geometry');
-  assert.ok(h.el('brandGeometryTabBtn').classList.contains('selected'));
-  assert.equal(h.el('logoGrid').classList.contains('single-product-icon'), false);
-  assert.equal(h.document.querySelectorAll('.logo-option').length, 5);
-  assert.equal(h.document.querySelectorAll('[data-logo-preview]').length, 5);
-  for (const option of h.window.STUDIO_LOGO_OPTIONS) {
-    await h.document.querySelectorAll('[data-logo-preview]').find(b => b.dataset.logoPreview === option.id).click();
-    assert.equal(h.window.StudioBrandReview.selectedId, option.id);
-    assert.equal(h.el('brandMark').innerHTML, option.svg, 'selected vector mark appears in sidebar');
-    assert.ok(h.el('brandMark').classList.contains('brand-preview-mark'));
-    assert.equal(h.el('brandMark').classList.contains('brand-official-mark'), false);
-    assert.equal(h.el('resetLogoBtn').hidden, false);
-    assert.match(h.el('logoPreviewStatus').textContent, new RegExp(option.name));
-    assert.equal(h.document.querySelectorAll('.previewing').length, 1);
-  }
-  await h.el('returnWorkbenchBtn').click(); assert.equal(state.page, 'workbench');
-  assert.equal(h.window.StudioBrandReview.selectedId, h.window.STUDIO_LOGO_OPTIONS[4].id, 'temporary sidebar preview can be compared on workbench');
-  h.app.navigate('settings'); await h.el('settingsBrandBtn').click(); assert.equal(state.page, 'branding');
-  await h.el('resetLogoBtn').click(); assert.equal(h.window.StudioBrandReview.selectedId, null);
-  assert.equal(h.el('brandMark').innerHTML, originalMark, 'restore returns the formal sidebar PNG');
-  assert.equal(h.el('brandMark').querySelectorAll('img').length, 1);
-  assert.equal(h.el('brandMark').querySelectorAll('img')[0].getAttribute('src'), formalLogo);
-  assert.equal(h.el('brandMark').querySelectorAll('i').length, 0);
-  assert.equal(h.el('brandMark').className, originalMarkClass, 'restore recovers all formal mark classes');
-  assert.equal(h.el('brandMark').classList.contains('brand-preview-mark'), false);
-  assert.equal(h.el('resetLogoBtn').hidden, true); assert.equal(h.el('logoPreviewStatus').textContent, '正式 Logo');
-  await h.el('brandMaterialTabBtn').click(); assert.equal(h.window.StudioBrandReview.group, 'material');
-  assert.equal(h.document.querySelectorAll('.logo-option').length, 1);
-  assert.equal(h.el('brandMark').innerHTML, originalMark, 'changing proposal groups never applies a brand mark');
-  await h.flushSave(); assert.equal(brandSnapshot(), brandStateBefore, 'logo review never mutates lighting designs, slots or config');
-  assert.deepEqual(h.control.workspace, workspaceBeforeBrand, 'temporary branding must not save workspace changes');
-  assert.equal(h.calls.filter(c=>c.action!=='getAISettings').length, brandCallsBefore, 'branding preview never requests device or workspace actions; settings may load saved AI metadata');
-  await h.el('returnWorkbenchBtn').click();
+  for (const id of ['page-branding','brandReviewBtn','settingsBrandBtn','logoGrid']) assert.equal(h.el(id), null, 'temporary logo review is removed from the product');
+  assert.equal(h.window.StudioBrandReview, undefined);assert.equal(h.document.querySelectorAll('.name-editor')[0].hidden,true,'fixed built-in names do not occupy the parameter editor');
+  for (const id of ['inspectorParametersTab','inspectorAITab','inspectorParametersPanel','inspectorAIPanel']) assert.equal(h.el(id), null, 'AI creation remains visible on the workbench');
+  assert.equal(h.document.querySelectorAll('.composer').length,1,'AI creation stays in the central workbench');
+  assert.equal(h.el('syncSingleBtn').disabled, true,'an offline keyboard cannot receive a draft');
+  assert.equal(h.el('syncBtn').hidden, true,'the all-drafts action is reserved for multiple drafts');
+  const initialLighting = JSON.stringify({selected:state.selected,brightness:state.brightness,speedMs:state.speedMs,pending:[...state.pending]});
+  await h.document.querySelectorAll('[data-target-slot]').find(b=>b.dataset.targetSlot==='2').click();
+  assert.equal(state.targetSlot,2);assert.equal(h.el('targetSlotLabel').textContent,'目标槽位 02');
+  assert.equal(JSON.stringify({selected:state.selected,brightness:state.brightness,speedMs:state.speedMs,pending:[...state.pending]}),initialLighting,'choosing a target must not replace the preview or reset its parameters');
+  assert.equal(h.document.querySelectorAll('[data-target-slot]').filter(b=>b.getAttribute('aria-pressed')==='true').length,1);
+  await h.document.querySelectorAll('[data-preview-slot]').find(b=>b.dataset.previewSlot==='2').click();
+  assert.equal(state.selected.id,state.slots[1].design.id,'only the separate preview action loads a slot work');
+  assert.equal(state.brightness,state.slots[1].brightness);assert.equal(state.speedMs,state.slots[1].speedMs);assert.equal(state.pending.size,0);
+  h.el('designSelect').value=h.window.STUDIO_DATA.designs[0].id;h.el('designSelect').onchange({target:h.el('designSelect')});
   for (const page of ['library', 'models', 'device', 'keymap', 'history', 'settings', 'workbench']) {
     const button = h.document.querySelectorAll('[data-page]').find(x => x.dataset.page === page); await button.click(); await settle();
     assert.equal(state.page, page, 'navigation: ' + page); assert.ok(h.el('page-' + page).classList.contains('active'));
@@ -198,13 +152,13 @@ if(require.main===module)(async () => {
   assert.equal(h.document.querySelectorAll('[data-preview-design]').length, 1); assert.match(h.el('libraryCount').textContent, /^1 /);
   h.el('librarySearch').value = '不存在的作品'; h.el('librarySearch').oninput(); assert.match(h.el('libraryGrid').innerHTML, /没有匹配/);
   h.app.navigate('workbench'); h.el('brightness').value = '64'; h.el('brightness').oninput({ target: h.el('brightness') }); h.el('speed').value = '53'; h.el('speed').oninput({ target: h.el('speed') });
-  await h.document.querySelectorAll('[data-slot]').find(b => b.dataset.slot === '2').click(); await h.el('assignBtn').click();
-  assert.equal(state.pending.get(2).brightness, 64); assert.equal(state.pending.get(2).speedMs, 53); assert.equal(h.app.preview.brightness, 64); assert.equal(h.el('syncBtn').disabled, false);
+  await h.document.querySelectorAll('[data-target-slot]').find(b => b.dataset.targetSlot === '2').click(); await h.el('assignBtn').click();
+  assert.equal(state.pending.get(2).brightness, 64); assert.equal(state.pending.get(2).speedMs, 53); assert.equal(h.app.preview.brightness, 64); assert.equal(h.el('syncSingleBtn').disabled, true);assert.equal(h.el('syncBtn').hidden, true);assert.equal(h.el('assignBtn').textContent,'更新槽位 02 草稿');assert.match(h.el('targetSlotContents').textContent,/待同步/);
   await h.flushSave(); const saved = clone(h.control.workspace); assert.equal(saved.pending[0].slot, 2); assert.equal(saved.pending[0].brightness, 64);
   await h.app.exportJSON(); const exported = h.calls.filter(c => c.action === 'exportJSON').at(-1).payload.json;
   assert.equal(exported.preview_brightness, 64); assert.equal(exported.speed_ms, 53);
   h.control.importValue = { fileName: 'reimport.json', json: { ...exported, id: 'offline-import', name: '离线导入作品' } };
-  await h.app.importJSON(); assert.equal(state.selected.id, 'offline-import'); assert.equal(state.brightness, 64); assert.equal(state.speedMs, 53); assert.equal(state.designs.length, 4);
+  await h.app.importJSON(); assert.equal(state.selected.id, 'offline-import'); assert.equal(state.brightness, 64); assert.equal(state.speedMs, 53); assert.equal(state.designs.length, 4);assert.equal(h.document.querySelectorAll('.name-editor')[0].hidden,false,'imported works expose the existing validated name editor');
   await h.flushSave(); assert.equal(h.control.workspace.designs.length, 1);
   const restored = harness({ workspace: clone(h.control.workspace) }); await settle();
   assert.equal(restored.app.state.designs.length, 4); assert.equal(restored.app.state.pending.get(2).brightness, 64); assert.equal(restored.app.state.selected.id, 'offline-import'); assert.equal(restored.app.state.brightness, 64);
@@ -212,15 +166,24 @@ if(require.main===module)(async () => {
   for (const button of h.document.querySelectorAll('[data-layer]')) { await button.click(); assert.equal(h.document.querySelectorAll('[data-key]').length, 81); }
   await h.document.querySelectorAll('[data-key]')[0].click(); assert.match(h.el('bindingPanel').innerHTML, /矩阵/);
   await h.el('detectBtn').click(); assert.equal(state.device.connected, true); assert.ok(state.keymap); assert.match(h.el('keymapSource').textContent, /实时/);
-  h.control.detectError = '模拟 USB 读取失败'; await h.el('detectBtn').click(); assert.equal(state.device.connected, false); assert.equal(state.keymap, null); assert.doesNotMatch(h.el('keymapSource').textContent, /实时/);
+  await h.flushSave();
+  const retainedWork = () => JSON.stringify({designs:state.designs,selected:state.selected,brightness:state.brightness,speedMs:state.speedMs,targetSlot:state.targetSlot,pending:[...state.pending],slots:state.slots,config:state.config});
+  const workBeforeTimeout = retainedWork(), workspaceBeforeTimeout = JSON.stringify(h.control.workspace);
+  h.control.detectError = {code:'serial_keymap_failed',message:'COM12 键位查询通信超时。请关闭其他键盘配置软件，重新连接后再检查。',details:{port:'COM12',stage:'keymap',kind:'timeout',reason:'Write timeout'}};
+  await h.el('detectBtn').click();
+  assert.equal(state.device.connected, false); assert.equal(state.keymap, null); assert.doesNotMatch(h.el('keymapSource').textContent, /实时/);
+  assert.equal(h.el('toast').textContent, h.control.detectError.message, 'structured transport failures display the friendly message without raw JSON');
+  assert.equal(retainedWork(), workBeforeTimeout, 'failed detection preserves cached configuration, preview parameters, works and slot drafts');
+  await h.flushSave();assert.equal(JSON.stringify(h.control.workspace), workspaceBeforeTimeout, 'failed detection does not replace the saved workspace');
+  assert.equal(h.el('syncSingleBtn').disabled, true);assert.equal(h.el('detectBtn').disabled, false);
   h.control.detectError = null; h.control.detectValue = { connected: true, device: { productId: 'CB04', firmware: 'offline-r4', port: '/dev/mock-r4' }, keymap: syntheticConfig().key_layer, config: null };
   await h.el('detectBtn').click(); assert.equal(state.config, null); assert.equal(state.baselineMissing, true); assert.ok(state.slots.every(s => s.design === null));
   h.control.detectValue = null; await h.el('detectBtn').click();
-  const beforePlan = h.calls.length; await h.el('syncBtn').click();
+  const beforePlan = h.calls.length; await h.el('syncSingleBtn').click();
   assert.equal(h.el('syncModal').hidden, false); assert.equal(state.plan.token, 'offline-token'); assert.equal(h.el('executeBtn').disabled, false);
   assert.equal(h.calls.slice(beforePlan).filter(c => c.action === 'plan').length, 1); assert.equal(h.calls.filter(c => c.action === 'execute').length, 0, 'planning must not execute');
   await h.el('cancelSyncBtn').click(); assert.equal(state.plan, null); assert.equal(h.el('syncModal').hidden, true);
-  await h.el('syncBtn').click(); const executing = h.el('executeBtn').click(); await settle();
+  await h.el('syncSingleBtn').click(); const executing = h.el('executeBtn').click(); await settle();
   assert.equal(state.executing, true); assert.equal(h.el('cancelSyncBtn').disabled, true); h.app.navigate('library'); assert.notEqual(state.page, 'library');
   for (const [stage, expected] of [['starting', '开始传输'], ['page_control', '传输完整配置'], ['committing', '等待设备提交'], ['verifying', '读取键位并验证']]) {
     h.window.StudioBridge.event({ event: 'progress', stage, transferred: 4660, total: 9315 }); assert.equal(h.el('syncStage').textContent, expected);
@@ -241,12 +204,5 @@ if(require.main===module)(async () => {
   assert.match(fresh.el('toast').textContent, /缺少完整配置基线/);
   assert.equal(fresh.calls.filter(c=>c.action==='exportJSON').length,0);
   const browser = harness({ native: false }); await settle(); assert.match(browser.el('globalStatus').textContent, /界面预览模式/); assert.equal(browser.calls.length, 0);
-  const escapedBrand = harness({ native: false, logoOverride: { name: '<script>alert(1)</script>', description: '<img src=x onerror="alert(1)"> & unsafe' } }); await settle();
-  await escapedBrand.el('brandGeometryTabBtn').click();
-  assert.match(escapedBrand.el('logoGrid').innerHTML, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.match(escapedBrand.el('logoGrid').innerHTML, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; unsafe/);
-  assert.equal(escapedBrand.el('logoGrid').querySelectorAll('img').length, 0, 'description markup must not become an HTML element');
-  assert.equal(escapedBrand.el('logoGrid').querySelectorAll('script').length, 0, 'logo names must be escaped in labels and headings');
-  assert.equal(escapedBrand.calls.length, 0);
-  console.log('UI checks passed: formal PNG sidebar mark and five legacy geometric alternatives, image / SVG temporary sidebar preview and formal PNG / class restore, group tabs, escaped branding descriptions, both branding entry points, navigation, library, assignments, JSON round-trip, persistence, 81×7 keymap, disconnect, missing baseline, plan-only flow, real stage labels and store warnings. No device was accessed.');
+  console.log('UI checks passed: approved sidebar PNG, removed logo review, always-visible AI creation, target-only slot cards and separate preview, navigation, library, assignments, JSON round-trip, persistence, 81×7 keymap, disconnect, missing baseline, plan-only flow, real stage labels and store warnings. No device was accessed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

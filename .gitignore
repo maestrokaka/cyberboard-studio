@@ -1,6 +1,8 @@
 # Local application builds and downloaded runtimes
 /build/
+/branding/archive/
 /.tools/
+/windows/tests/host-bridge/.tools/
 /.venv/
 **/bin/
 **/obj/

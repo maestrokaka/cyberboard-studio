@@ -119,7 +119,7 @@ def main():
     manifest = {"target": "win-x64", "python": {"version": "3.12.10", "file": PYTHON_ZIP,
         "url": PYTHON_URL, "sha256": sha(python_archive), "license": "PSF-2.0 and bundled third-party notices in LICENSE.txt"},
         "cli": {"name": "cyberboard-cli", "version": "0.1.2", "license": "MIT", "source": "https://github.com/GeneralD/cyberboard-cli",
-        "local_patches": ["AM01R6 identity detection (verified vendored patch)", "Windows COM port discovery", "Windows msvcrt per-device lock", "LOCALAPPDATA store default", "portable doctor diagnostics"],
+        "local_patches": ["AM01R6 identity detection (verified vendored patch)", "Windows COM port discovery with isolated transport failures and per-port diagnostics", "Windows msvcrt per-device lock", "LOCALAPPDATA store default", "portable doctor diagnostics"],
         "vendored_files": modified, "source_files_sha256": cli_files, "upstream_wheel": upstream_cli,
         "restored_schema": {"source": "https://raw.githubusercontent.com/GeneralD/cyberboard-cli/v0.1.2/schemas/cyberboard-config.schema.json",
         "sha256": sha(site / "cyberboard/schemas/cyberboard-config.schema.json")}},

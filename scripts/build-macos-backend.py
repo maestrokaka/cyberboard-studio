@@ -2,6 +2,7 @@
 """Freeze the bridge/CLI into a relocatable macOS onedir, without user state."""
 from __future__ import annotations
 import argparse
+import hashlib
 import importlib.metadata
 import json
 import os
@@ -147,6 +148,15 @@ def main():
     manifest["mach_o_minimum_macos"] = ".".join(map(str, maximum))
     manifest["declared_app_minimum_macos"] = "13.0"
     manifest["mach_o_binaries"] = machos
+    # Bind the frozen runtime to the reviewed source, so release checks catch
+    # same-version bundles whose action names match but implementation is old.
+    source_files = sorted((ROOT / "backend").glob("*.py")) + [
+        ROOT / "vendor/cyberboard-cli/cyberboard/_tools/cb_device.py"
+    ]
+    manifest["source_hashes"] = {
+        str(file.relative_to(ROOT)): hashlib.sha256(file.read_bytes()).hexdigest()
+        for file in source_files
+    }
     (bundle / "backend-build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print("Relocated offline bootstrap passed; no USB or user device state.")
     print(executable)

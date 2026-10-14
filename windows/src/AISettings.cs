@@ -21,19 +21,32 @@ internal sealed class AISettings
     private readonly string state;
     private readonly ICredentialVault vault;
     private readonly object gate = new();
+    private readonly Action? beforeMetadataCommit;
     private bool lastModelMigration;
+    private readonly Dictionary<string, AIConfiguration> profiles = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, string[]> Endpoints = new(StringComparer.Ordinal)
     {
         ["kimi-code"] = ["https://api.kimi.com/coding/v1", "https://api.kimi.ai/coding/v1"],
-        ["kimi-open"] = ["https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"]
+        ["kimi-open"] = ["https://api.moonshot.cn/v1", "https://api.moonshot.ai/v1"],
+        ["minimax"] = ["https://api.minimax.cn/v1", "https://api.minimax.io/v1"],
+        ["deepseek"] = ["https://api.deepseek.com", "https://api.deepseek.com/v1"]
+    };
+    private static readonly Dictionary<string, string> DefaultModels = new(StringComparer.Ordinal)
+    { ["kimi-code"] = "k3", ["kimi-open"] = "kimi-k3", ["minimax"] = "MiniMax-M3", ["deepseek"] = "deepseek-flash" };
+    internal static bool SupportsImages(AIConfiguration config) => config.Provider switch
+    {
+        "minimax" => config.Model is "MiniMax-M3" or "MiniMax-M3.1-Flash-Preview",
+        "deepseek" => config.Model is "deepseek-flash" or "deepseek-v4-flash-vision-exp",
+        _ => config.Provider is "kimi-code" or "kimi-open"
     };
     private static readonly Regex ModelPattern = new(@"\A[A-Za-z0-9._:-]{1,128}\z", RegexOptions.CultureInvariant);
     private static readonly Regex RequestPattern = new(@"\A[A-Za-z0-9_-]{1,80}\z", RegexOptions.CultureInvariant);
 
-    public AISettings(string state, ICredentialVault? vault = null)
+    public AISettings(string state, ICredentialVault? vault = null, Action? beforeMetadataCommit = null)
     {
         this.state = state;
         this.vault = vault ?? new DPAPICredentialVault(Path.Combine(state, "credentials"));
+        this.beforeMetadataCommit = beforeMetadataCommit;
     }
 
     internal static string RequestId(JsonElement payload)
@@ -49,10 +62,10 @@ internal sealed class AISettings
     internal static AIConfiguration Validate(JsonElement value)
     {
         var provider = Text(value, "provider") ?? "kimi-code";
-        if (!Endpoints.TryGetValue(provider, out var endpoints)) throw new IOException("请选择 Kimi Code 或 Kimi 开放平台。");
+        if (!Endpoints.TryGetValue(provider, out var endpoints)) throw new IOException("请选择受支持的模型服务。");
         var baseUrl = (Text(value, "baseUrl") ?? endpoints[0]).Trim().TrimEnd('/');
         if (!endpoints.Contains(baseUrl, StringComparer.Ordinal)) throw new IOException("API 地址必须为对应服务的官方 HTTPS 地址。");
-        var model = (Text(value, "model") ?? (provider == "kimi-code" ? "k3" : "kimi-k3")).Trim();
+        var model = (Text(value, "model") ?? DefaultModels[provider]).Trim();
         if (!ModelPattern.IsMatch(model)) throw new IOException("模型名称只能包含字母、数字、点、横线、下划线或冒号，最多 128 个字符。");
         return new AIConfiguration(provider, baseUrl, model);
     }
@@ -64,10 +77,14 @@ internal sealed class AISettings
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
+            profiles[config.Provider] = config;
             File.WriteAllText(temporary, JsonSerializer.Serialize(new
             {
-                provider = config.Provider, baseUrl = config.BaseUrl, model = config.Model, modelDefaultsVersion = 2
+                provider = config.Provider, baseUrl = config.BaseUrl, model = config.Model, modelDefaultsVersion = 2,
+                profilesVersion = 1, profiles = profiles.ToDictionary(p => p.Key, p => new
+                { provider = p.Value.Provider, baseUrl = p.Value.BaseUrl, model = p.Value.Model })
             }, new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+            beforeMetadataCommit?.Invoke();
             File.Move(temporary, path, overwrite: true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
@@ -76,6 +93,7 @@ internal sealed class AISettings
     internal AIConfiguration LoadConfiguration()
     {
         lastModelMigration = false;
+        profiles.Clear();
         var path = Path.Combine(state, "ai-settings.json");
         if (!File.Exists(path)) return Validate(JsonSerializer.SerializeToElement(new { }));
         try
@@ -84,6 +102,17 @@ internal sealed class AISettings
             using var document = JsonDocument.Parse(File.ReadAllText(path));
             var value = document.RootElement;
             var config = Validate(value);
+            if (value.TryGetProperty("profilesVersion", out var schema) && (!schema.TryGetInt32(out var schemaNumber) || schemaNumber != 1)) throw new IOException();
+            if (value.TryGetProperty("profiles", out var stored))
+            {
+                if (stored.ValueKind != JsonValueKind.Object || stored.EnumerateObject().Count() > Endpoints.Count) throw new IOException();
+                foreach (var item in stored.EnumerateObject())
+                {
+                    if (!Endpoints.ContainsKey(item.Name) || Text(item.Value, "provider") != item.Name || profiles.ContainsKey(item.Name)) throw new IOException();
+                    profiles[item.Name] = Validate(item.Value);
+                }
+            }
+            profiles[config.Provider] = config;
             var version = value.TryGetProperty("modelDefaultsVersion", out var marker) && marker.TryGetInt32(out var number) ? number : 0;
             if (version < 2)
             {
@@ -102,7 +131,20 @@ internal sealed class AISettings
     private object Public(AIConfiguration config, bool hasKey) => new
     {
         provider = config.Provider, baseUrl = config.BaseUrl, model = config.Model,
-        hasKey, credentialStore = "Windows DPAPI（当前用户）", modelDefaultsVersion = 2, modelMigrated = lastModelMigration
+        hasKey, credentialStore = "Windows DPAPI（当前用户）", modelDefaultsVersion = 2, modelMigrated = lastModelMigration,
+        supportsImages = SupportsImages(config), profiles = Endpoints.Keys.ToDictionary(provider => provider, provider =>
+        {
+            var profile = profiles.GetValueOrDefault(provider) ?? Validate(JsonSerializer.SerializeToElement(new { provider }));
+            var item = new Dictionary<string, object?>
+            { ["provider"] = provider, ["baseUrl"] = profile.BaseUrl, ["model"] = profile.Model, ["supportsImages"] = SupportsImages(profile) };
+            if (provider == config.Provider) item["hasKey"] = hasKey;
+            else
+            {
+                try { item["hasKey"] = !string.IsNullOrEmpty(vault.Read(provider)); }
+                catch { item["hasKey"] = null; item["credentialError"] = "此服务的密钥暂时无法读取，请检查系统凭据访问权限后重试。"; }
+            }
+            return item;
+        })
     };
 
     public object Get()
@@ -114,30 +156,75 @@ internal sealed class AISettings
         }
     }
 
+    public object RevealAIKey(JsonElement payload)
+    {
+        lock (gate)
+        {
+            var provider = Text(payload, "provider");
+            if (provider is null || !Endpoints.ContainsKey(provider)) throw new IOException("请选择受支持的模型服务。");
+            // Explicit local viewing is the only ordinary UI action returning a
+            // saved secret. It never writes or switches the active configuration.
+            try { return new { apiKey = vault.Read(provider) ?? "" }; }
+            catch { throw new IOException("无法读取已保存的 API Key，请检查系统凭据访问权限后重试。"); }
+        }
+    }
+
     public object Save(JsonElement payload)
     {
         lock (gate)
         {
+            // Explicit saves recover invalid metadata while retaining every credential account.
+            try { LoadConfiguration(); } catch { profiles.Clear(); }
             lastModelMigration = false;
             var config = Validate(payload);
             var key = Text(payload, "apiKey") ?? "";
             if (key.Contains('\r') || key.Contains('\n') || key.Length > 4096) throw new IOException("API Key 格式无效，请粘贴完整的单行密钥。");
             key = key.Trim();
+            if (key.Any(c => c < 33 || c > 126)) throw new IOException("API Key 只能包含可打印的单行字符，不包含空格。");
             var remove = payload.TryGetProperty("removeKey", out var removeValue) && removeValue.ValueKind == JsonValueKind.True;
             if (remove && key.Length > 0) throw new IOException("删除密钥与设置新密钥不能同时进行。");
-            Directory.CreateDirectory(state);
-            if (remove) vault.Delete(config.Provider);
-            else if (key.Length > 0) vault.Write(config.Provider, key);
-            WriteMetadata(config);
-            return Public(config, !string.IsNullOrEmpty(vault.Read(config.Provider)));
+            // Read the target's prior key and construct the response before side
+            // effects. No credential read can turn a committed save into a failure.
+            var previousKey = vault.Read(config.Provider);
+            var nextKey = remove ? null : (key.Length == 0 ? previousKey : key);
+            profiles[config.Provider] = config;
+            var prepared = Public(config, !string.IsNullOrEmpty(nextKey));
+            var changesKey = nextKey != previousKey;
+            try
+            {
+                if (changesKey)
+                {
+                    if (nextKey is not null) vault.Write(config.Provider, nextKey);
+                    else vault.Delete(config.Provider);
+                }
+                WriteMetadata(config);
+            }
+            catch
+            {
+                if (changesKey)
+                {
+                    try
+                    {
+                        if (previousKey is not null) vault.Write(config.Provider, previousKey);
+                        else vault.Delete(config.Provider);
+                    }
+                    catch { throw new IOException("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请检查系统凭据权限后重新保存该服务。"); }
+                }
+                throw new IOException("模型配置未保存，原配置和密钥已保留。请检查本机存储与凭据访问权限后重试。");
+            }
+            return prepared;
         }
     }
 
-    public (JsonElement Payload, string Secret) Inject(JsonElement payload)
+    public (JsonElement Payload, string Secret) Inject(JsonElement payload, bool allowInactive = false)
     {
         lock (gate)
         {
-            var config = LoadConfiguration();
+            var active = LoadConfiguration();
+            var provider = Text(payload, "provider") ?? active.Provider;
+            if (!Endpoints.ContainsKey(provider)) throw new IOException("请选择受支持的模型服务。");
+            if (!allowInactive && provider != active.Provider) throw new IOException("当前模型配置已切换，请刷新后重新制作。");
+            var config = provider == active.Provider ? active : profiles.GetValueOrDefault(provider) ?? Validate(JsonSerializer.SerializeToElement(new { provider }));
             var secret = vault.Read(config.Provider);
             if (string.IsNullOrEmpty(secret)) throw new IOException("请先在模型配置中保存 API Key。");
             var values = payload.EnumerateObject().Where(p => p.Name != "ai")
@@ -182,7 +269,7 @@ internal sealed class DPAPICredentialVault(string directory) : ICredentialVault
 
     private string PathFor(string provider)
     {
-        if (provider is not ("kimi-code" or "kimi-open")) throw new IOException("未知凭据服务。");
+        if (provider is not ("kimi-code" or "kimi-open" or "minimax" or "deepseek")) throw new IOException("未知凭据服务。");
         return Path.Combine(directory, provider + ".dpapi");
     }
 

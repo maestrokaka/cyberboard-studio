@@ -19,6 +19,11 @@ def emit(value):
 if args.action == "error":
     print("中文错误诊断：拒绝模拟操作", file=sys.stderr, flush=True)
     emit({"error": {"code": "simulated", "message": "模拟失败：没有触碰键盘"}})
+elif args.action == "error-value":
+    # Exercise failures from the production process/JSON parser, including
+    # malformed payloads and hostile AI echoes, without opening real devices.
+    print("模拟诊断：" + str(payload.get("diagnostic", "无敏感内容")), file=sys.stderr, flush=True)
+    emit({"error": payload.get("error")})
 elif args.action == "malformed":
     print("{broken JSON", flush=True)
     emit({"result": {"ok": True}})

@@ -17,15 +17,27 @@ def main():
     app = Path(__file__).resolve().parents[1]
     inputs, assets = app / "data", app / "web/assets"
     assets.mkdir(parents=True, exist_ok=True)
+    # Public official defaults contain builtin pages only, never a device keymap.
+    builtin_source = inputs / "builtin-default-pages.json"
+    builtin = load(builtin_source)
+    if builtin.get("kind") != "cyberboard-standard-builtin-pages" or [p["page_index"] for p in builtin.get("pages", [])] != list(range(5)):
+        raise ValueError("Official builtin-page resource is invalid")
+    (assets / "builtin-default-pages.json").write_bytes(builtin_source.read_bytes())
     views = load(inputs / "photos/photo-calibration.json")
     zones = load(inputs / "photos/key-photo-layout.json")["views"]
     for name, view in views.items():
         view.pop("source_file", None)
-        view.pop("asset", None)
-        original = assets / f"{name}.jpg"
+        asset_name = view.pop("asset", f"{name}.jpg")
+        original = (assets / asset_name).resolve()
+        if not original.is_relative_to(assets.resolve()):
+            raise ValueError("Preview photo must be inside the public asset directory")
+        mime = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}.get(original.suffix.lower())
+        if mime is None:
+            raise ValueError("Unsupported preview photo format: " + original.suffix)
         # Data URLs let WebKit sample the original pixels without local-file
-        # origin errors. The committed JPGs are reused, never redrawn or edited.
-        view["image"] = "data:image/jpeg;base64," + base64.b64encode(original.read_bytes()).decode("ascii")
+        # origin errors. Committed photos are reused byte-for-byte in their
+        # original formats, including the official R6 PNG artwork.
+        view["image"] = "data:" + mime + ";base64," + base64.b64encode(original.read_bytes()).decode("ascii")
         view["keyZones"] = zones[name]
     designs = [load(inputs / "designs" / name) for name in
                ("neon-rift.design.json", "data-storm.design.json", "redline-rush.design.json")]
@@ -43,10 +55,13 @@ def main():
         json.dumps(layout, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     bundle = {"views": views, "designs": designs, "baseConfig": None,
               "snapshot": {"productId": None, "firmware": None, "connected": False}, "keyLayout": keys}
+    catalog_path = inputs / "photos/preview-catalog.json"
+    if catalog_path.is_file():
+        bundle["previewCatalog"] = load(catalog_path)
     (app / "web/data.js").write_text(
         "window.STUDIO_DATA=" + json.dumps(bundle, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8")
-    print("Bundled 3 creative works, unchanged photos and generic geometry. No device record or USB access.")
+    print(f"Bundled 3 creative works, {len(views)} unchanged photo views and generic geometry. No device record or USB access.")
 
 
 if __name__ == "__main__":

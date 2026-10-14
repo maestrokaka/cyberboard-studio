@@ -9,6 +9,14 @@
     [1435, 849], [1431, 856], [235, 860], [230, 857], [228, 850]
   ];
 
+  // Gallery entries retain a real horizontal front photograph. Explicitly
+  // excluded or angled sources may be archived, but cannot become preview views.
+  // Older front-only callers may identify their view with the original label.
+  function galleryAllowed(view) {
+    return Boolean(view && view.galleryAllowed !== false &&
+      (view.angle === 'front' || (!view.angle && view.name === '正面整机')));
+  }
+
   function homography(q) {
     const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
     const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
@@ -101,13 +109,14 @@
         throw new TypeError('预览需要容器、照片视角和灯效设计');
       }
       this.container = container;
-      this.views = options.views;
+      this.views = Object.fromEntries(Object.entries(options.views).filter(([, view]) => galleryAllowed(view)));
+      if (!Object.keys(this.views).length) throw new TypeError('预览需要水平正面整机照片');
       this.onFrame = typeof options.onFrame === 'function' ? options.onFrame : function () {};
       this.onError = typeof options.onError === 'function' ? options.onError : function () {};
       this.error = null;
       this.diagnostic = null;
       this._errorBanner = null;
-      this.view = 'front';
+      this.view = this.views[options.view] ? options.view : this.views.front ? 'front' : Object.keys(this.views)[0];
       this.framing = 'keyboard';
       this.renderer = 'editor';
       this.keyMode = 'json';
@@ -294,6 +303,37 @@
       return this;
     }
 
+    drawAppearanceThumbnail(canvas, viewId) {
+      this._ensureActive();
+      const view = this.views[viewId], image = this._images[viewId];
+      if (!view) throw new RangeError('未知参考外观');
+      if (!this._ready) return false;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('缩略图画布不可用');
+      const [cx, cy, cw, ch] = view.crop, [sw, sh] = view.source_size;
+      const outline = view.keyboard_outline || (viewId === 'front' ? FRONT_KEYBOARD_OUTLINE : null);
+      if (!outline || outline.length < 3) throw new Error('缺少键盘外壳轮廓');
+      canvas.width = 320;
+      canvas.height = Math.round(canvas.width * ch / cw);
+      const scale = canvas.width / cw;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.save();
+      try {
+        context.beginPath();
+        outline.forEach(([x, y], index) => {
+          const point = [(x - cx) * scale, (y - cy) * scale];
+          if (index === 0) context.moveTo(...point);
+          else context.lineTo(...point);
+        });
+        context.closePath();
+        context.clip();
+        const sx = image.naturalWidth / sw, sy = image.naturalHeight / sh;
+        context.drawImage(image, cx * sx, cy * sy, cw * sx, ch * sy,
+          0, 0, canvas.width, canvas.height);
+      } finally { context.restore(); }
+      return true;
+    }
+
     setFraming(framing) {
       this._ensureActive();
       if (!['keyboard', 'full'].includes(framing)) throw new RangeError('未知画面范围');
@@ -401,6 +441,10 @@
       const neutral = this._bg.createImageData(width, height);
       neutral.data.set(source.data);
       const shade = new Float32Array(width * height), coverage = new Float32Array(width * height);
+      // Opaque caps show spill around their lower edge, not colors painted over
+      // their legends. The material profile is photo metadata, never device RGB.
+      const opaque = this.views[this.view].key_lighting === 'opaque';
+      const allColors = this.views[this.view].key_neutralization === 'all-colors';
       for (const zone of zones) {
         const q = zone.quad, h = homography(q), inverse = invert(h);
         const x0 = Math.max(0, Math.floor(Math.min(...q.map(p => p[0]))));
@@ -425,9 +469,14 @@
           const signal = Math.min(255, (maximum - minimum) * .7 + maximum * (.28 + .18 * spatial));
           const dest = (yy * w + xx) * 4;
           pixels.data[dest] = pixels.data[dest + 1] = pixels.data[dest + 2] = 255;
-          pixels.data[dest + 3] = Math.round(Math.min(255, signal * spatial * edge));
-          coverage[index] = Math.max(coverage[index], edge);
-          shade[index] = Math.max(shade[index], (.22 + .6 * spatial) * edge);
+          const rim = Math.exp(-Math.min(u, 1 - u, v, 1 - v) * Math.min(averageWidth, averageHeight) / 1.5);
+          pixels.data[dest + 3] = opaque
+            ? Math.round(90 * spatial * edge * rim)
+            : Math.round(Math.min(255, signal * spatial * edge));
+          if (!opaque) {
+            coverage[index] = Math.max(coverage[index], edge);
+            shade[index] = Math.max(shade[index], (.22 + .6 * spatial) * edge);
+          }
         }
         context.putImageData(pixels, 0, 0);
         const colored = document.createElement('canvas');
@@ -441,8 +490,9 @@
         const maximum = Math.max(r, g, b), minimum = Math.min(r, g, b);
         const blueish = (b > r * .5 && b > g * 1.05) || b > r * 1.1;
         const gray = minimum + (maximum - minimum) * .25;
-        const decolor = blueish ? coverage[index] : 0;
-        const dim = 1 - shade[index] * (blueish ? .82 : .42);
+        const lit = allColors || blueish;
+        const decolor = lit ? coverage[index] : 0;
+        const dim = 1 - shade[index] * (lit ? .82 : .42);
         for (let channel = 0; channel < 3; channel++) {
           neutral.data[p + channel] = Math.round((source.data[p + channel] * (1 - decolor) + gray * decolor) * dim);
         }
@@ -574,7 +624,7 @@
       this.container.style.aspectRatio = cw + ' / ' + ch;
       this.background.width = this.overlay.width = this.keyOverlay.width = width;
       this.background.height = this.overlay.height = this.keyOverlay.height = height;
-      const isolated = this.view === 'front' && this.framing === 'keyboard';
+      const isolated = this.framing === 'keyboard' && (this.view === 'front' || Array.isArray(view.keyboard_outline));
       const outline = isolated ? (view.keyboard_outline || FRONT_KEYBOARD_OUTLINE) : [];
       if (isolated && (!Array.isArray(outline) || outline.length < 3 || outline.some(point =>
         !Array.isArray(point) || point.length !== 2 || !point.every(Number.isFinite) ||
@@ -602,5 +652,6 @@
     }
   }
 
+  KeyboardPreview.isGalleryAllowed = galleryAllowed;
   global.KeyboardPreview = KeyboardPreview;
 })(window);

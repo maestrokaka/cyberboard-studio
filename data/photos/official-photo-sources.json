@@ -1,0 +1,983 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-10-14",
+  "scope": "Official source photographs retained byte-exact. Source coordinates and key-light placement are manually estimated visual references, not measured hardware geometry.",
+  "rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+  "catalog_source": "https://www.angrymiao.com/cn/products/",
+  "settings_source": {
+    "url": "https://cdn-www.angrymiao.com/config/settings.json",
+    "sha256": "4a22008ecc9da7619674dfe8093ff585551b59da8eee05cb3cfa9f2fce8eb91e",
+    "r6_record": {
+      "id": 1791942809019,
+      "name": "CYBERBOARD R6",
+      "cn_status": "GB",
+      "cn_url": "https://j.youzan.com/yoVjj0",
+      "cn_button": "点击加购",
+      "cn_is_home": true,
+      "cn_home_media_list": [
+        {
+          "name": "20261014-095105.png",
+          "type": "image",
+          "url": "https://angrymiao-mall.oss-cn-shenzhen.aliyuncs.com/product/141061014eMl8ZrxVsLdh0IjC8ipbyEI08hPUBNvk.png"
+        },
+        {
+          "name": "20261014-095126.png",
+          "type": "image",
+          "url": "https://angrymiao-mall.oss-cn-shenzhen.aliyuncs.com/product/141061014gny0tUuGu1v1prRYHesWp0j29ie4x5eH.png"
+        }
+      ],
+      "cn_top_name": "CYBERBOARD R6",
+      "overseas_status": "GB",
+      "overseas_url": "https://j.youzan.com/yoVjj0",
+      "overseas_home_media_list": [
+        {
+          "name": "20261014-095105.png",
+          "type": "image",
+          "url": "https://angrymiao-mall.oss-cn-shenzhen.aliyuncs.com/product/141061014jRFvg3efu0oMsbIad9RchUNnpJR9t9w1.png"
+        },
+        {
+          "name": "20261014-095126.png",
+          "type": "image",
+          "url": "https://angrymiao-mall.oss-cn-shenzhen.aliyuncs.com/product/141061014aFCnK84ugww02poDhIKpzMAkVK8jrWIP.png"
+        }
+      ],
+      "overseas_top_name": "CYBERBOARD R6",
+      "code": "CYBERBOARD R6",
+      "create_time": "2026-10-14T09:55:13+08:00",
+      "cn_priority": 10050,
+      "update_time": "2026-10-14T09:55:24+08:00"
+    }
+  },
+  "photos": [
+    {
+      "appearance_id": "r4-fluo-free",
+      "view_id": "r4-fluo-original-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Fluo Free 荧光",
+      "asset": "data/photos/source-archive/r4-fluo-original-front.jpg",
+      "page_url": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "image_url": "https://cdn-www.angrymiao.com/cyberboard_r4/cyberboard_r4_17_01.jpg",
+      "sha256": "3b0b45825e7f85b93d2bd8e8b35faf6a8322aa3b1a1ff76fc00c582073a4f8a7",
+      "byte_length": 333062,
+      "source_size": [
+        2560,
+        1707
+      ],
+      "calibration": "data/photos/excluded-photo-calibration.json#views/r4-fluo-original-front",
+      "key_zones": "data/photos/excluded-photo-calibration.json#keyZones/r4-fluo-original-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas clipping only, keyboard framing",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": false,
+      "excluded_reason": "Replaced by same-colorway official storefront front image with matching horizontal camera and complete mounted keycaps."
+    },
+    {
+      "appearance_id": "r4-bebop",
+      "view_id": "r4-bebop-original-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Bebop 波普",
+      "asset": "data/photos/source-archive/r4-bebop-original-front.jpg",
+      "page_url": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "image_url": "https://cdn-www.angrymiao.com/cyberboard_r4/cyberboard_r4_08.jpg",
+      "sha256": "7a302a05110783669fc12e31cf2ad773d6a5d37d0e1581aa1a310ef7d1a3f3ed",
+      "byte_length": 258187,
+      "source_size": [
+        2560,
+        1711
+      ],
+      "calibration": "data/photos/excluded-photo-calibration.json#views/r4-bebop-original-front",
+      "key_zones": "data/photos/excluded-photo-calibration.json#keyZones/r4-bebop-original-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas clipping only, keyboard framing",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": false,
+      "excluded_reason": "Replaced by same-colorway official storefront front image with matching horizontal camera and complete mounted keycaps."
+    },
+    {
+      "appearance_id": "r4-cloud-white",
+      "view_id": "r4-cloud-perspective",
+      "model": "CYBERBOARD R4",
+      "official_name": "Cloud White 云白 V2",
+      "asset": "data/photos/source-archive/r4-cloud-perspective.jpg",
+      "page_url": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "image_url": "https://cdn-www.angrymiao.com/cyberboard_r4/cyberboard_r4_18.jpg",
+      "sha256": "6ca362ff27fb3de637d340ee2523112909b61fd64617013acad4f6132674e6ea",
+      "byte_length": 232016,
+      "source_size": [
+        2560,
+        1707
+      ],
+      "calibration": "data/photos/excluded-photo-calibration.json#views/r4-cloud-perspective",
+      "key_zones": "data/photos/excluded-photo-calibration.json#keyZones/r4-cloud-perspective",
+      "pixel_editing": false,
+      "background_removal": "Canvas clipping only, keyboard framing",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": false,
+      "excluded_reason": "No complete horizontal front-view photo was found; the angled Cloud White source is retained for provenance only and is excluded from the gallery."
+    },
+    {
+      "appearance_id": "r6-launch",
+      "view_id": "r6-launch-front",
+      "model": "CYBERBOARD R6",
+      "official_name": "CYBERBOARD R6",
+      "asset": "data/photos/source-archive/r6-launch-front.png",
+      "page_url": "https://www.angrymiao.com/cn/products/",
+      "image_url": "https://angrymiao-mall.oss-cn-shenzhen.aliyuncs.com/product/141061014eMl8ZrxVsLdh0IjC8ipbyEI08hPUBNvk.png",
+      "sha256": "b8fc73493843d62ba624250e00d439283b558b08a130fa7147a199b82cbeb15b",
+      "byte_length": 2930757,
+      "source_size": [
+        2560,
+        1440
+      ],
+      "calibration": "data/photos/excluded-photo-calibration.json#views/r6-launch-front",
+      "key_zones": "data/photos/excluded-photo-calibration.json#keyZones/r6-launch-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas clipping only, keyboard framing",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": false,
+      "appearance_name": "Vision",
+      "appearance_name_source": "User confirmed; the official registry verifies CYBERBOARD R6 model, not the colorway name.",
+      "merged_into_appearance_id": "user-vision",
+      "merged_into_view_id": "front",
+      "excluded_reason": "User confirmed this is the same Vision colorway as the original R6 photograph. Merged into one gallery appearance, using the user-selected original horizontal front photo."
+    },
+    {
+      "appearance_id": "r4-gangstar",
+      "view_id": "r4-gangstar-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Gangstar",
+      "asset": "web/assets/photos/r4-gangstar-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/a6e0442506ef30d7453c6bf83bb96dd4_bb7c1484-ca0e-4843-b9e7-3e7e28f7bd4b.jpg?v=1722507537",
+      "sha256": "58db9bcd5d1a311577801df876be0816cd0863d8cb6f98d86e690d724e56b5ed",
+      "byte_length": 240399,
+      "source_size": [
+        1900,
+        1200
+      ],
+      "source_variant_title": "Gangstar (Purple) / Bundle",
+      "source_variant_id": 46457460949216,
+      "source_sku": "03.001.301.002.004ZH",
+      "source_available_at_retrieval": false,
+      "source_media_position": 1,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-gangstar-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-gangstar-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-cloud-white",
+      "view_id": "r4-cloud-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Cloud White V2",
+      "asset": "web/assets/photos/r4-cloud-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/f92a146ffe9f809da2c113e3020c810c_37ce445a-c799-47a4-8514-c6ef076ceecf.jpg?v=1744346173",
+      "sha256": "62f87977531b31767ce0d1511d911935f999411aaa660e4f76a83c5f44b334ef",
+      "byte_length": 291083,
+      "source_size": [
+        3840,
+        2400
+      ],
+      "source_variant_title": "Could White / Bundle",
+      "source_variant_id": 46676231618784,
+      "source_sku": null,
+      "source_available_at_retrieval": false,
+      "source_media_position": 10,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-cloud-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-cloud-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-stone-face",
+      "view_id": "r4-stone-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Stone Face",
+      "asset": "web/assets/photos/r4-stone-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/2_116b6b95-3944-4b6d-ae83-8c81903dedb9.jpg?v=1744346173",
+      "sha256": "9e6773116abf7d1229edcf65ecd9d2c313460df1fbedf4ea914dd40f09fb08d1",
+      "byte_length": 196395,
+      "source_size": [
+        1900,
+        1200
+      ],
+      "source_variant_title": "Stone Face(Grey) / Bundle",
+      "source_variant_id": 46730270900448,
+      "source_sku": "03.001.301.004.006ZH",
+      "source_available_at_retrieval": false,
+      "source_media_position": 14,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-stone-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-stone-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-fluo-free",
+      "view_id": "r4-fluo-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Fluo Free",
+      "asset": "web/assets/photos/r4-fluo-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/65c1c730b7f43295d8a2e548c26879c5_5bc6cb0e-5d12-474a-a08f-9a6d6d14bcda.jpg?v=1744346173",
+      "sha256": "a5252211676e8f3e8b0231c89dd7db967acf13b3305e1d7b8a5bde0b0f1bd771",
+      "byte_length": 392318,
+      "source_size": [
+        3840,
+        2400
+      ],
+      "source_variant_title": "Fluo Free (Lime) / Bundle",
+      "source_variant_id": 44330247749856,
+      "source_sku": "03.001.301.005.009ZH",
+      "source_available_at_retrieval": false,
+      "source_media_position": 16,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-fluo-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-fluo-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-paisley",
+      "view_id": "r4-paisley-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Paisley",
+      "asset": "web/assets/photos/r4-paisley-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/3_3fd5692f-0380-452a-b35e-013295041fdc.jpg?v=1722507423",
+      "sha256": "445628bba7a72ce4da3fd556ac8343598616a2b7598a76d6f4131834324ad604",
+      "byte_length": 261914,
+      "source_size": [
+        1900,
+        1200
+      ],
+      "source_variant_title": "Paisley Bundle",
+      "source_variant_id": 44968951906528,
+      "source_sku": "03.001.301.015.003ZH",
+      "source_available_at_retrieval": true,
+      "source_media_position": 10,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-paisley-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-paisley-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-bebop",
+      "view_id": "r4-bebop-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Bebop",
+      "asset": "web/assets/photos/r4-bebop-front.jpg",
+      "page_url": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti",
+      "product_json_url": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti.js",
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/1_eaeefdf6-7bcb-4417-bad1-95c0e190f492.jpg?v=1711339545",
+      "sha256": "d2c6ba3f73c5641f6ffedac81edc0f3602e3329e393eca10482e6bcb819b4a77",
+      "byte_length": 222585,
+      "source_size": [
+        1900,
+        1200
+      ],
+      "source_variant_title": "Bebop Bundle",
+      "source_variant_id": 44968951840992,
+      "source_sku": "03.001.301.001.015ZH",
+      "source_available_at_retrieval": false,
+      "source_media_position": 16,
+      "identity_evidence": "Direct colorway variant plus official product media; Cloud White V2 canonical spelling verified in the CN R4 localization, whose store alias is Could White. Cloud and Stone assembled JPEGs are adjacent to the matching variant GIF and base-kit media.",
+      "calibration": "data/photos/photo-calibration.json#r4-bebop-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-bebop-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "source_media_kind": "Official product image; not an AI recreation",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    },
+    {
+      "appearance_id": "r4-vision",
+      "view_id": "r4-vision-front",
+      "model": "CYBERBOARD R4",
+      "official_name": "Vision",
+      "asset": "web/assets/photos/r4-vision-front.jpg",
+      "page_url": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "image_url": "https://cdn-www.angrymiao.com/cyberboard_r4/cyberboard_r4_12.jpg",
+      "sha256": "ba31119a5df0f3b17fc21bd503da625f7421cc94bf315c9c4686e0046de2c5f7",
+      "byte_length": 663107,
+      "source_size": [
+        2560,
+        1708
+      ],
+      "identity_evidence": "The official R4 page explicitly names Vision as its hidden colorway. Its original full front image is referenced as cyberboard_r4_12 in the R4 component. This does not relabel the user-confirmed R6 photo or infer USB generation from Novel products.",
+      "calibration": "data/photos/photo-calibration.json#r4-vision-front",
+      "key_zones": "data/photos/key-photo-layout.json#views/r4-vision-front",
+      "pixel_editing": false,
+      "background_removal": "Canvas enclosure clip only",
+      "image_rights": "Product photographs belong to Angry Miao or their credited photographers; public availability is not an open-source image license. Source attribution is retained; software license does not relicense these photographs.",
+      "preview_available": true
+    }
+  ],
+  "archived_user_photos": [
+    {
+      "view_id": "desk",
+      "asset": "data/photos/source-archive/desk.jpg",
+      "sha256": "227bf7793c6537691d984ac17c77ba5c35a27d8bda8cc2c1fca49bd5a1ec586e",
+      "byte_length": 99976,
+      "preview_available": false,
+      "source": "User-provided original desktop photograph",
+      "excluded_reason": "Desktop scene angle removed; the gallery now accepts horizontal front full-keyboard photos only.",
+      "pixel_editing": false
+    }
+  ],
+  "candidate_review": [
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 1,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/a6e0442506ef30d7453c6bf83bb96dd4_bb7c1484-ca0e-4843-b9e7-3e7e28f7bd4b.jpg?v=1722507537",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-gangstar-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "58db9bcd5d1a311577801df876be0816cd0863d8cb6f98d86e690d724e56b5ed"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 2,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/2_d5c400d0-9a1a-46fd-8743-0c2185ad5ebd.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal photograph and incomplete front facing screen.",
+      "sha256": "eb0abf2e03f49e9c1cbaa402c040f1f955570138a6528db5925f30a137718777"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 3,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/3_8bfc75f3-cd94-41b6-ae21-0abf301821cd.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Close-up cuts the case and key area.",
+      "sha256": "5c4d473792585e8577d4db32fecb6aebb4538dbff16557af612375a91f567274"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 4,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_1.gif?v=1744346173",
+      "source_size": [
+        1920,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Eligible horizontal GIF alternative; selected same-color JPEG with native static pixels.",
+      "sha256": "7770ef9d5ae1d2a767a58e247fa5ce2130fb29345c956e6dbec910522aa8dc2f"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 5,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/c3b525178663494eb29496acae34c842_7f49ee0a-bba1-4a9d-b3ca-be6912ddf61b.jpg?v=1744346173",
+      "source_size": [
+        3840,
+        2400
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "cb41495c09cd75a805f472c33d89d67a6b4ed838131604f6fa09d9b925100e1f"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 6,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/image_5_695eb848-42a6-45b3-a61c-bd7688d810cc.png?v=1744346173",
+      "source_size": [
+        1468,
+        980
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal desktop photograph.",
+      "sha256": "b49290452e62bde825644b3bd2a04c071523acb01f093b46b64554414dcf0436"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 7,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/1_64e78f61-ec88-464b-94b0-44d423a19364.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal view and cropped upper-right side.",
+      "sha256": "cc4e2bcb038af68d9bfbf10f4b9ca73e74c33830f022224af60a051dd0354590"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 8,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/4_b30706da-68a7-45b5-a97e-42e523dec1a0.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Cropped close-up.",
+      "sha256": "82b43cb1f6230242c768c98ef6545898dc94e60409c027abeb99b3763a03f375"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 9,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_4.gif?v=1744346173",
+      "source_size": [
+        1920,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Eligible horizontal GIF alternative; selected same-color high-resolution JPEG.",
+      "sha256": "f06b0a56ee0e6c6c6c7bff4806c2b8cabe5467986b75370aac54b9d680116148"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 10,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/f92a146ffe9f809da2c113e3020c810c_37ce445a-c799-47a4-8514-c6ef076ceecf.jpg?v=1744346173",
+      "source_size": [
+        3840,
+        2400
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-cloud-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "62f87977531b31767ce0d1511d911935f999411aaa660e4f76a83c5f44b334ef"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 11,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/3ecdd863372d0de84028ec289aa7bc6b_6c218d31-1328-4211-9b5e-d601f06fa20e.jpg?v=1744346173",
+      "source_size": [
+        3840,
+        2400
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "ba5696b8b089a8b323ca6cbd965dc7cc62588a2937ba229ae1c643b825c0266a"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 12,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_3.gif?v=1744346173",
+      "source_size": [
+        1920,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Eligible horizontal GIF alternative; selected same-color JPEG.",
+      "sha256": "a368436a91326dcc9fca6c838fdf5ec40fc4ad0828600b9125f26cbb080a79d7"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 13,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/1_571f0d8d-e700-42ab-8889-b9b269effe3b.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "9a566d070b593bb234c16fff6f921848d8c9a85ebeb58b6fa7451e93820857c1"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 14,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/2_116b6b95-3944-4b6d-ae83-8c81903dedb9.jpg?v=1744346173",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-stone-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "9e6773116abf7d1229edcf65ecd9d2c313460df1fbedf4ea914dd40f09fb08d1"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 15,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_2.gif?v=1744346173",
+      "source_size": [
+        1920,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Eligible horizontal GIF alternative; selected same-color high-resolution JPEG.",
+      "sha256": "2c2defcb5fbdd887489140696b20c306176dfa9127512f66be634a4b92bdd5df"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 16,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/65c1c730b7f43295d8a2e548c26879c5_5bc6cb0e-5d12-474a-a08f-9a6d6d14bcda.jpg?v=1744346173",
+      "source_size": [
+        3840,
+        2400
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-fluo-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "a5252211676e8f3e8b0231c89dd7db967acf13b3305e1d7b8a5bde0b0f1bd771"
+    },
+    {
+      "product_handle": "am-cyberboard-r4",
+      "media_position": 17,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/a9b2a6a021aa65ecce3536ef972787a0_d626a5dc-22d2-4a3c-8d01-77fef20dece5.jpg?v=1733913391",
+      "source_size": [
+        3840,
+        2400
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "e1e9bdb4676081cc14fd5d00a0fffd7f81cee7d3c9bcddf21d0c67893a3fae85"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 1,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_08.jpg?v=1733195501",
+      "source_size": [
+        2560,
+        1711
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Eligible Bebop front alternative; selected matching storefront camera JPEG with glass keycaps.",
+      "sha256": "a5ded077235e03f1bdf78863e6b97809993351544558fda8842978831ecbeee3"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 2,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_10.jpg?v=1733195502",
+      "source_size": [
+        6000,
+        4000
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Cropped close-up.",
+      "sha256": "cc75a2338f5a5d1d7350c3a1e3a02904b429878195cd412e951c5917b89ca707"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 3,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_09.jpg?v=1733195501",
+      "source_size": [
+        2560,
+        1707
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Rear diagonal photograph.",
+      "sha256": "c9939157cc2c7810ea20f9681f930a423e91613f5e4b82676e6bdebe4e8b580b"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 4,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/7_6c593e59-2dd6-4008-bf44-826b9a8ea6bc.jpg?v=1717585913",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Oblique low desktop angle.",
+      "sha256": "1c4aec067718dd260ca05f17ab18eeaa8443510d1e6f3179f6e60d04a235d865"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 5,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/8_385443b0-d602-4cc4-8232-562c254e5e6f.jpg?v=1717585913",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Side-panel close-up, incomplete keyboard.",
+      "sha256": "76359649498dd01296bffc2122330007f5c91558bb16b0edd9a0504f4ef2cf03"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 6,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/9_ca811cfc-d2a2-48a0-8101-096c5c6bfe43.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Underside; LEDs and keys not visible.",
+      "sha256": "3c43ae8d80daf92bc23ffccc9c1b48e5f17b82a291a5e88a36d032247d66c59a"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 7,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/5_1d347216-c543-4c00-8061-ad965e2c0900.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal overhead view.",
+      "sha256": "58faacd5c525353796b927c36825734ab7210cbf8c2022a10c32866ce31df11d"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 8,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/6_815b6037-2b18-40d6-8a45-6225e81969f8.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Rotated cropped close-up.",
+      "sha256": "9fcf500913179dd447d5bdc50949b18262e456f1d6d6e6fbb44441d85b48b62a"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 9,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/4_c277a6fb-f528-4f3e-ab26-d87277da7938.jpg?v=1722507423",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "240abe7104bda0af4aabf14333aab4203642c7ca95631c1ad3d2b22621208f8f"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 10,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/3_3fd5692f-0380-452a-b35e-013295041fdc.jpg?v=1722507423",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-paisley-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "445628bba7a72ce4da3fd556ac8343598616a2b7598a76d6f4131834324ad604"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 11,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/cyberboard_r4_04.jpg?v=1722507418",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal photograph with footwear occlusion.",
+      "sha256": "c838d21f2c4e00cf51365700c8b4ce060ff42b7c7e38bbe29a276ac94421cf9f"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 12,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/1_e4c81172-2116-4f73-a187-73433acbafea.jpg?v=1717585913",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Hand obscures the keyboard.",
+      "sha256": "977ade64496a8ef762e41c8ff8855ebdb9af3a981ac67ab94704a09a0bd5e9c1"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 13,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/2_a2baed13-0bad-41fa-84c4-905119f65236.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Diagonal and case occlusion.",
+      "sha256": "4df9aaff820a3858047329236a205764c64e828602f137a80c367e42d8d61aed"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 14,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/3_efa1318a-6a40-4687-8218-4a436ab9daa3.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Display close-up cuts key area.",
+      "sha256": "7104b37b84322eedd2f471a77497ef7fa3c3a01636e003d390ec5aa6d6407fce"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 15,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/4_6fdaa42f-d5e8-4094-9f51-72aff6357425.jpg?v=1717585914",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Underside; LEDs and keys not visible.",
+      "sha256": "42a7547502ffd9922dac6c89fbd2f474630e3f7fcb30e4f01f5052c3111cacd8"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 16,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/1_eaeefdf6-7bcb-4417-bad1-95c0e190f492.jpg?v=1711339545",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "selected",
+      "selected_view_id": "r4-bebop-front",
+      "reason": "Complete horizontal mounted front view; all enclosure edges and keycaps visible.",
+      "sha256": "d2c6ba3f73c5641f6ffedac81edc0f3602e3329e393eca10482e6bcb819b4a77"
+    },
+    {
+      "product_handle": "am-cyberboard-r4-graffiti",
+      "media_position": 17,
+      "image_url": "https://cdn.shopify.com/s/files/1/0288/3695/4244/files/2_e68ecb4a-f5d3-4051-ba9b-05d75741966c.jpg?v=1722507423",
+      "source_size": [
+        1900,
+        1200
+      ],
+      "decision": "not-selected",
+      "selected_view_id": null,
+      "reason": "Bare kit has no complete mounted keycaps.",
+      "sha256": "10f5a80e1bb46672f28bb15f11afb8827776e56ad77b1ff538e6c1076d33c1f9"
+    }
+  ],
+  "search_coverage": {
+    "asOf": "2026-10-14",
+    "counts": {
+      "officialSettingsProducts": 77,
+      "cyberboardRelatedSettings": 14,
+      "shopProductUrlsInSitemap": 120,
+      "shopCollectionsInSitemap": 49,
+      "uniqueCyberboardKeyboardProductsAcrossTwoCollections": 10,
+      "configurationVariantsAcrossTheseProducts": 36,
+      "imageMediaAcrossTheseProducts": 127,
+      "unavailableVariantsRetained": 33,
+      "explicitR4ProductListings": 2,
+      "explicitR4ConfigurationVariants": 11,
+      "distinctExplicitR4Colorways": 6,
+      "visuallyReviewedR4Media": 34,
+      "qualifiedR4MountedHorizontalFrontCandidates": 6,
+      "qualifiedR4MountedHorizontalFrontCandidatesIncludingCnHiddenVision": 7,
+      "bundledUniqueAppearanceModelPairs": 8
+    },
+    "primarySources": {
+      "officialCnProducts": "https://www.angrymiao.com/cn/products/",
+      "officialR4Page": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "officialFrontend": "https://www.angrymiao.com/js/app.17d45cb9.js",
+      "officialFullSettings": "https://cdn-www.angrymiao.com/config/settings.json",
+      "shopSitemap": "https://store.angrymiao.com/sitemap.xml",
+      "collectionWithR4": "https://store.angrymiao.com/collections/cyberboard-collection/products.json?limit=250&page=1",
+      "historicalCollectionWithWukong": "https://store.angrymiao.com/collections/cyberboard/products.json?limit=250&page=1"
+    },
+    "limitations": [
+      "Unfiltered all-products JSON returned HTTP 429; used official sitemap and successful complete collection metadata instead; did not bypass or repeatedly retry the rate limit.",
+      "Current public indexes cannot establish exhaustiveness for deleted/unpublished products.",
+      "Novel 1 Gold Paisley, Novel 2 Eclipse, Novel 3 Euphoria and Novel 4 Wukong remain officially named Novel products; their exact R4/R6 generation is unverified and must not be relabeled R6. The official settings even use a legacy cyberboard-r5-gold-paisley URL for Novel 1.",
+      "The current official R6 record is a group-buy item; its CN/overseas cover media does not provide an exhaustive named R6 colorway/SKU list.",
+      "Base-kit views without full keycaps and diagonal, side/back or obstructed images are excluded from mounted horizontal-front candidates."
+    ],
+    "officialSettingsCyberboardItems": [
+      {
+        "id": 1791942809019,
+        "name": "CYBERBOARD R6",
+        "code": "CYBERBOARD R6",
+        "cnStatus": "GB",
+        "overseasStatus": "GB",
+        "cnIsHome": true,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1756781061942,
+        "name": "CYBERBOARD Novel 4",
+        "code": "CYBERBOARD NOVEL 4",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": true,
+        "overseasIsHome": true
+      },
+      {
+        "id": 1747463120037,
+        "name": "CYBERBOARD NOVEL 3",
+        "code": "CYBERBOARD NOVEL 3",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": false,
+        "overseasIsHome": true
+      },
+      {
+        "id": 1733970797259,
+        "name": "CYBERBOARD NOVEL 2",
+        "code": "CYBERBOARD NOVEL 2",
+        "cnStatus": "soldOut",
+        "overseasStatus": "jump",
+        "cnIsHome": false,
+        "overseasIsHome": false
+      },
+      {
+        "id": 1723618306558,
+        "name": "CYBERBOARD NOVEL 1",
+        "code": "CYBERBOARD GOLD PAISLEY",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": false,
+        "overseasIsHome": true
+      },
+      {
+        "id": 1703139106214,
+        "name": "CYBERBOARD GLACIER R2",
+        "code": "CYBERBOARD GLACIER R2",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": false,
+        "overseasIsHome": false
+      },
+      {
+        "id": 1692686521521,
+        "name": "CYBERBOARD R4",
+        "code": "CYBERBOARD R4",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": true,
+        "overseasIsHome": true
+      },
+      {
+        "id": 1666521174330,
+        "name": "CYBERBOARD R2/R3 手感优化内胆包",
+        "code": "CYBERBOARD TYPING KIT",
+        "cnStatus": "inStock",
+        "overseasStatus": "inStock",
+        "cnIsHome": false,
+        "overseasIsHome": false
+      },
+      {
+        "id": 1663216416298,
+        "name": "CYBERBOARD",
+        "code": "CYBERBOARD",
+        "cnStatus": "soldOut",
+        "overseasStatus": "soldOut",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1663216547520,
+        "name": "CYBERBOARD 冰霜圣诞版",
+        "code": "CYBERBOARD XMAS",
+        "cnStatus": "soldOut",
+        "overseasStatus": "soldOut",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1663216760738,
+        "name": "CYBERBOARD R2",
+        "code": "CYBERBOARD R2",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1663216630722,
+        "name": "CYBERBOARD R3",
+        "code": "CYBERBOARD R3",
+        "cnStatus": "soldOut",
+        "overseasStatus": "soldOut",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1663216476797,
+        "name": "CYBERBOARD 冰川套装",
+        "code": "CYBERBOARD GB",
+        "cnStatus": "soldOut",
+        "overseasStatus": "soldOut",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      },
+      {
+        "id": 1663216679242,
+        "name": "CYBERBOARD Terminal",
+        "code": "CYBERBOARD TERMINAL",
+        "cnStatus": "soldOut",
+        "overseasStatus": "inStock",
+        "cnIsHome": null,
+        "overseasIsHome": null
+      }
+    ],
+    "out_of_scope_or_unverified_generation": [
+      {
+        "name": "CYBERBOARD R2/R3/Glacier/Terminal/XMAS",
+        "reason": "Official names do not establish requested R4/R6 generations."
+      },
+      {
+        "name": "Novel 1 Gold Paisley / Novel 2 Eclipse / Novel 3 Euphoria / Novel 4 Wukong",
+        "reason": "Official public labels are Novel products, with no verified R4/R6 generation; no invented R6 relabeling."
+      }
+    ]
+  },
+  "user_photo_confirmation": {
+    "appearance_id": "user-vision",
+    "view_id": "front",
+    "model": "CYBERBOARD R6",
+    "colorway": "Vision",
+    "identity_source": "Explicit user confirmation",
+    "asset": "web/assets/front.jpg",
+    "sha256": "81d9a7febbb516171f3f1a87e74f88b8bf048e419f577b8a7a1872ac2a5a363f",
+    "official_registry_url": "https://cdn-www.angrymiao.com/config/settings.json",
+    "registry_verifies": "CYBERBOARD R6 model, not a named colorway list",
+    "same_colorway_official_image": "r6-launch-front; archived because the user selected the original front photo for this appearance"
+  }
+}

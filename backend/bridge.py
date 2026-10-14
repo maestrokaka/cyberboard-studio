@@ -3,6 +3,7 @@
 
 bootstrap/history are offline. detect/keymap are USB reads. plan/restorePlan
 prepare a reviewable full configuration; only execute writes that configuration.
+initializePlan prepares a new full configuration when no previous record exists.
 setTime writes the RTC only. LED state is always labelled last-written because
 the device protocol cannot read LED pixels back.
 """
@@ -28,11 +29,18 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 TOKEN_RE = re.compile(r"^[a-f0-9]{32}$")
 RGB_RE = re.compile(r"^#[a-fA-F0-9]{6}$")
 KEY_RE = re.compile(r"^#[a-fA-F0-9]{8}$")
+UNICODE_RE = re.compile(r"^#[a-fA-F0-9]{4}$")
 SNAPSHOT_RE = re.compile(r"^[A-Za-z0-9_.-]+\.json$")
 RESERVED_LEDS = (57, 61, 74, 78, 82, 83, 84)
 PLAN_LIFETIME_SECONDS = 30 * 60
 MAX_INPUT_BYTES = 16 * 1024 * 1024
 MAX_WORKSPACE_BYTES = 32 * 1024 * 1024
+INITIALIZATION_LIMITATIONS = (
+    "键盘原灯效无法读取，也没有原完整配置备份；初始化后无法恢复未知的原灯效。",
+    "内置模式（页面 0–4）使用官网标准配置，电量、马赛克与时钟默认启用；这不是键盘原来的设置。未分配的自定义槽将停用并写为黑色。",
+    "仅原样保留 USB 读取的 1400 个键码；独立交换、换键表将清空，宏和其他未支持的功能无法保证保留。",
+)
+BUILTIN_NAMES = ("电量", "马赛克", "时钟", "文字", "流光")
 
 # Source importlib tests and isolated Windows Python need the sibling modules.
 if str(Path(__file__).parent) not in sys.path:
@@ -214,29 +222,155 @@ def page_for(config, slot):
     return pages[0]
 
 
+def page_at(config, index):
+    pages = [page for page in config.get("page_data", []) if isinstance(page, dict) and page.get("page_index") == index]
+    require(len(pages) == 1, "invalid_baseline", f"本机配置缺少页面 {index}，无法安全同步。")
+    return pages[0]
+
+
+def nonzero(value):
+    if value is None or value == "":
+        return False
+    if isinstance(value, str):
+        try:
+            return int(value) != 0
+        except ValueError:
+            return True
+    return bool(value)
+
+
+def substantive(value):
+    """Only known unencoded feature containers use this; metadata is ignored."""
+    if isinstance(value, dict):
+        return any(substantive(item) for key, item in value.items() if key != "//")
+    if isinstance(value, list):
+        return bool(value)
+    return nonzero(value)
+
+
+def unsupported_write_paths(config):
+    """Known active features omitted by the current full-config encoder."""
+    if not isinstance(config, dict):
+        return []
+    paths = []
+    for field in ("Fn_key", "MACRO_key", "tab_key", "macro_key", "ph_key"):
+        if substantive(config.get(field)):
+            paths.append(f"/{field}")
+        count = f"{field}_num"
+        if nonzero(config.get(count)):
+            paths.append(f"/{count}")
+    for field in ("HATSU", "hatsu"):
+        if substantive(config.get(field)):
+            paths.append(f"/{field}")
+
+    def spotlight(container, prefix):
+        if not isinstance(container, dict) or "spotlight_frames" not in container:
+            return
+        group = container["spotlight_frames"]
+        if substantive(group):
+            paths.append(f"{prefix}/spotlight_frames")
+
+    spotlight(config, "")
+    pages = config.get("page_data", [])
+    if isinstance(pages, list):
+        for index, page in enumerate(pages):
+            spotlight(page, f"/page_data/{index}")
+    return paths
+
+
+def unsafe_wire_flag_paths(config):
+    paths = []
+
+    def inspect(container, field, prefix):
+        if isinstance(container, dict) and field in container and type(container[field]) not in (bool, int):
+            paths.append(f"{prefix}/{field}")
+
+    inspect(config.get("key_layer"), "valid", "/key_layer")
+    for index, page in enumerate(config.get("page_data", [])):
+        if not isinstance(page, dict):
+            continue
+        prefix = f"/page_data/{index}"
+        inspect(page, "valid", prefix)
+        inspect(page.get("color"), "default", f"{prefix}/color")
+        for field in ("word_page", "frames", "keyframes"):
+            inspect(page.get(field), "valid", f"{prefix}/{field}")
+    return paths
+
+
+def require_supported_write(config):
+    paths = unsupported_write_paths(config)
+    require(not paths, "unsupported_config_features",
+            "这份 JSON 含有当前写入器无法保留的功能。完整内容仍可读取与导出；请使用官方工具处理这些功能。",
+            unsupportedPaths=paths)
+    flags = unsafe_wire_flag_paths(config)
+    require(not flags, "ambiguous_wire_flags", "配置的启用标记不是布尔值或整数，写入可能错误开启模式。请先通过可信工具修正。",
+            unsupportedPaths=flags)
+
+
+def configuration_diff(before, after, path=""):
+    if before == after:
+        return []
+    if isinstance(before, dict) and isinstance(after, dict):
+        differences = []
+        for key in sorted(set(before) | set(after)):
+            child = f"{path}/{str(key).replace('~', '~0').replace('/', '~1')}"
+            if key not in before:
+                differences.append({"path": child, "before": None, "after": copy.deepcopy(after[key])})
+            elif key not in after:
+                differences.append({"path": child, "before": copy.deepcopy(before[key]), "after": None})
+            else:
+                differences.extend(configuration_diff(before[key], after[key], child))
+        return differences
+    return [{"path": path, "before": copy.deepcopy(before), "after": copy.deepcopy(after)}]
+
+
+def overlay_fields(current, replacement):
+    for field, value in replacement.items():
+        if isinstance(value, dict) and isinstance(current.get(field), dict):
+            overlay_fields(current[field], value)
+        else:
+            current[field] = copy.deepcopy(value)
+
+
+def validate_page(page):
+    require(isinstance(page, dict), "invalid_baseline", "页面配置无效。")
+    integer(page.get("lightness"), 0, 100, "亮度")
+    integer(page.get("speed_ms"), 0 if page.get("valid") in (0, False) else 1, 32767, "播放间隔")
+    color = page.get("color")
+    require(isinstance(color, dict) and all(isinstance(color.get(field), str) and RGB_RE.fullmatch(color[field])
+                                          for field in ("back_rgb", "rgb")), "invalid_config", "页面颜色配置无效。")
+    words = page.get("word_page")
+    require(isinstance(words, dict), "invalid_config", "页面文字配置不完整。")
+    length = integer(words.get("word_len"), 0, 255, "文字长度")
+    text = words.get("unicode")
+    require(isinstance(text, list) and (length == 0 or len(text) == length) and
+            all(isinstance(code, str) and UNICODE_RE.fullmatch(code) for code in text),
+            "invalid_config", "页面文字长度或编码无效。")
+    for field, count in (("frames", 200), ("keyframes", 90)):
+        group = page.get(field)
+        require(isinstance(group, dict), "invalid_baseline", "页面的动画配置不完整。")
+        n = integer(group.get("frame_num"), 0, 255, "帧数")
+        if n:
+            data = group.get("frame_data")
+            require(isinstance(data, list) and len(data) == n,
+                    "invalid_animation", "帧数和动画数据不一致。")
+            require(all(isinstance(frame, dict) and frame.get("frame_index") == i for i, frame in enumerate(data)),
+                    "invalid_animation", "动画帧编号必须从 0 连续排列。")
+            validate_animation([frame.get("frame_RGB") for frame in data], count, "顶屏" if count == 200 else "轴灯")
+
+
 def validate_config(config, cli):
     require(isinstance(config, dict) and isinstance(config.get("page_data"), list),
             "invalid_baseline", "本机配置不是完整的键盘配置。")
     require(config.get("page_num") == len(config["page_data"]),
             "invalid_baseline", "本机配置的页面数不一致。")
+    require_supported_write(config)
     indices = [page.get("page_index") for page in config["page_data"]]
     require(len(set(indices)) == len(indices) and all(type(i) is int and 0 <= i <= 255 for i in indices),
             "invalid_baseline", "配置包含无效页面编号。")
     validate_layers(config.get("key_layer"))
     for page in config["page_data"]:
-        integer(page.get("lightness"), 0, 100, "亮度")
-        integer(page.get("speed_ms"), 0 if page.get("valid") in (0, False) else 1, 32767, "播放间隔")
-        for field, count in (("frames", 200), ("keyframes", 90)):
-            group = page.get(field)
-            require(isinstance(group, dict), "invalid_baseline", "页面的动画配置不完整。")
-            n = integer(group.get("frame_num"), 0, 255, "帧数")
-            if n:
-                data = group.get("frame_data")
-                require(isinstance(data, list) and len(data) == n,
-                        "invalid_animation", "帧数和动画数据不一致。")
-                require(all(isinstance(frame, dict) and frame.get("frame_index") == i for i, frame in enumerate(data)),
-                        "invalid_animation", "动画帧编号必须从 0 连续排列。")
-                validate_animation([frame.get("frame_RGB") for frame in data], count, "顶屏" if count == 200 else "轴灯")
+        validate_page(page)
     try:
         fp = cli["cb_write"].plan(config)
     except (KeyError, ValueError, TypeError, OverflowError) as error:
@@ -244,6 +378,82 @@ def validate_config(config, cli):
     require(fp.total > 0 and all(len(frame) == 64 and cli["cb_protocol"].crc_ok(frame) for frame in fp.frames),
             "invalid_wire_frames", "配置校验未通过，未进行写入。")
     return fp
+
+
+def validate_builtin_pages(pages):
+    require(isinstance(pages, list) and len(pages) == 5 and
+            all(isinstance(page, dict) for page in pages) and
+            [page.get("page_index") for page in pages] == list(range(5)),
+            "builtin_defaults_invalid", "官网标准内置模式资源缺少完整的页面 0–4。")
+    allowed = {"//", "valid", "page_index", "lightness", "speed_ms", "color", "word_page", "frames", "keyframes"}
+    required = allowed - {"//"}
+    for page in pages:
+        require(required <= set(page) <= allowed,
+                "builtin_defaults_invalid", "官网标准内置模式资源包含缺失或不支持的页面字段。")
+        for field, fields in (("color", {"//", "default", "back_rgb", "rgb"}),
+                              ("word_page", {"//", "valid", "word_len", "unicode"}),
+                              ("frames", {"//", "valid", "frame_num", "frame_data"}),
+                              ("keyframes", {"//", "valid", "frame_num", "frame_data"})):
+            group = page.get(field)
+            require(isinstance(group, dict) and fields - {"//"} <= set(group) <= fields,
+                    "builtin_defaults_invalid", "官网标准内置模式资源包含不完整的页面控制数据。")
+        require(not unsafe_wire_flag_paths({"page_data": [page]}),
+                "builtin_defaults_invalid", "官网标准内置模式资源的启用标记无效。")
+        validate_page(page)
+        for field in ("frames", "keyframes"):
+            require(isinstance(page[field].get("frame_data"), list),
+                    "builtin_defaults_invalid", "官网标准内置模式资源的动画占位数据无效。")
+    return pages
+
+
+def initial_configuration(product_id, live, builtin_pages):
+    """Public, explicitly new configuration; never a factory/prior baseline.
+
+    The only device-derived data is the CRC-checked live seven-layer matrix.
+    Empty exchange/swap tables are a declared replacement policy. Unsupported
+    Fn/macro tables are deliberately absent, rather than invented defaults.
+    """
+    validate_layers(live)
+    pages = copy.deepcopy(validate_builtin_pages(builtin_pages))
+    for index in range(5, 8):
+
+        def stream(count):
+            return {"valid": 0, "frame_num": 1,
+                    "frame_data": [{"frame_index": 0, "frame_RGB": ["#000000"] * count}]}
+
+        pages.append({"valid": False, "page_index": index, "lightness": 0, "speed_ms": 40,
+                      "color": {"default": False, "back_rgb": "#000000", "rgb": "#000000"},
+                      "word_page": {"valid": 0, "word_len": 0, "unicode": []},
+                      "frames": stream(200), "keyframes": stream(90)})
+    key_layer = copy.deepcopy(live)
+    key_layer["valid"] = 1  # A false flag would silently skip every keymap wire frame.
+    return {"product_info": {"product_id": product_id}, "page_num": 8, "page_data": pages,
+            "key_layer": key_layer, "exchange_num": 0, "exchange_key": [],
+            "swap_key_num": 0, "swap_key": []}
+
+
+def validate_initial_configuration(target, live, applied_slots, cli, builtin_pages):
+    """Enforce the reviewed initialization policy as well as wire validity."""
+    require(isinstance(applied_slots, list) and 1 <= len(applied_slots) <= 3 and
+            all(type(slot) is int and 1 <= slot <= 3 for slot in applied_slots) and
+            len(set(applied_slots)) == len(applied_slots), "plan_tampered", "首次配置槽位计划无效，请重新准备。")
+    neutral = initial_configuration(target.get("product_info", {}).get("product_id"), live, builtin_pages)
+    unchanged = copy.deepcopy(target)
+    require(isinstance(target.get("page_data"), list) and
+            [page.get("page_index") for page in target["page_data"]] == list(range(8)),
+            "plan_tampered", "首次配置页面计划无效，请重新准备。")
+    for slot in applied_slots:
+        page, original = page_for(unchanged, slot), page_for(neutral, slot)
+        require(page.get("valid") is True and page.get("word_page") == original["word_page"] and
+                page.get("color") == original["color"],
+                "plan_tampered", "首次配置包含未授权的页面设置。")
+        for field in ("frames", "keyframes"):
+            require(page.get(field, {}).get("valid") == 1 and page.get(field, {}).get("frame_num", 0) > 0,
+                    "plan_tampered", "首次配置缺少已选择的动画。")
+        for field in ("valid", "frames", "keyframes", "lightness", "speed_ms"):
+            page[field] = copy.deepcopy(original[field])
+    require(unchanged == neutral, "plan_tampered", "首次配置包含未授权的键位或模式变化。")
+    return validate_config(target, cli)
 
 
 class Bridge:
@@ -259,9 +469,9 @@ class Bridge:
         self.event_sink({"event": "progress", "stage": stage, "transferred": transferred, "total": total, **extra})
 
     def testAIConnection(self, payload):
-        from kimi_ai import AIError, KimiClient, configuration
+        from kimi_ai import AIError, AIClient, configuration
         try:
-            client = KimiClient(configuration(payload.get("ai")),
+            client = AIClient(configuration(payload.get("ai")),
                                 progress=lambda stage, message: self.event(stage, message=message), timeout=45)
             return client.test_connection()
         except AIError as error:
@@ -305,7 +515,8 @@ class Bridge:
     def stored_config(self, pid, required=False):
         config = self.cli["cb_store"].load_current(pid) if pid else None
         require(not required or config is not None, "baseline_missing",
-                "缺少 CLI 本机完整配置记录，不能安全保留其他灯效槽。请迁移这把键盘此前成功写入的完整配置记录；应用导入只导入灯效。")
+                "缺少这把键盘在本机的完整配置记录，不能安全保留未知灯效。请迁移这把键盘此前成功写入的完整记录，"
+                "或明确选择应用内首次配置（会替换未知设置）；应用导入只导入灯效。")
         if config:
             config = copy.deepcopy(config)
             config.pop("_provenance", None)
@@ -512,6 +723,11 @@ class Bridge:
         workspace = {"designs": copy.deepcopy(designs), "trash": copy.deepcopy(trash), "pending": copy.deepcopy(pending),
                      "selectedId": selected, "targetSlot": target, "brief": brief, "palette": copy.deepcopy(palette),
                      "brightness": brightness, "speedMs": speed_ms, "exportFormat": export_format}
+        if "previewAppearanceId" in payload:
+            appearance = payload["previewAppearanceId"]
+            require(isinstance(appearance, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", appearance),
+                    "invalid_workspace", "预览外观编号无效。")
+            workspace["previewAppearanceId"] = appearance
         try:
             encoded = json.dumps(workspace, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
         except (TypeError, ValueError, OverflowError) as error:
@@ -547,15 +763,57 @@ class Bridge:
         ports = device.candidate_ports()
         require(not named or named in ports, "invalid_port", "所选 USB 设备已断开，请重新检测。")
         identities = []
+        failures = []
+        identity_query_failed = False
+        unknown_query_failed = False
+        diagnostic_probe = getattr(device, "probe_with_diagnostics", None)
         for port in ([named] if named else ports):
-            info = device.probe(port, full=True)
+            failure = None
+            try:
+                if callable(diagnostic_probe):
+                    info, failure = diagnostic_probe(port, full=True)
+                    if failure:
+                        failures.append(failure)
+                else:
+                    # Older macOS CLI runtimes lack the optional diagnostics
+                    # API. Continue scanning after their I/O failures, but do
+                    # not assume an exception happened before identity was
+                    # verified: it could conceal a second connected keyboard.
+                    info = device.probe(port, full=True)
+            except OSError as error:
+                unknown_query_failed = True
+                failures.append({"port": port, "stage": "unknown",
+                                 "kind": "timeout" if "timeout" in str(error).lower() else "serial_error",
+                                 "reason": str(error)[:500]})
+                continue
             if info is not None and recognized(info.product_id) and not info.is_dongle:
                 identities.append(info)
+                if failure:
+                    identity_query_failed = True
         require(len(identities) <= 1, "ambiguous_device", "检测到多把键盘，请只连接需要同步的一把。")
+        if failures and (not identities or identity_query_failed or unknown_query_failed):
+            failed_ports = list(dict.fromkeys(str(item.get("port", "?")) for item in failures))
+            stage_names = {"open": "打开端口", "identity": "设备识别", "firmware": "固件信息查询", "pages": "槽位信息查询"}
+            failed_checks = list(dict.fromkeys(
+                f"{item.get('port', '?')}（{stage_names.get(item.get('stage'), '通信检测')}）" for item in failures))
+            label = "、".join(failed_checks[:8])
+            timed_out = any(item.get("kind") == "timeout" for item in failures)
+            issue = "通信超时" if timed_out else "无法完成通信"
+            raise BridgeError("serial_probe_failed",
+                              f"USB 串口 {label} {issue}，尚未确认键盘连接。请关闭 AM_Master 等配置软件，重插 USB 数据线后再检查。",
+                              stage="discovery", probeFailures=failures[:16], ports=failed_ports)
         return identities[0] if identities else None
 
     def read_live(self, port):
-        frames = self.cli["cb_read"]._drain(port, (6, 9), timeout=1.5)
+        try:
+            frames = self.cli["cb_read"]._drain(port, (6, 9), timeout=1.5)
+        except OSError as error:
+            timed_out = "timeout" in str(error).lower()
+            issue = "通信超时" if timed_out else "通信失败"
+            raise BridgeError("serial_keymap_failed",
+                              f"{port} 键位查询{issue}。请关闭其他键盘配置软件，重新连接后再检查。",
+                              port=port, stage="keymap", kind="timeout" if timed_out else "serial_error",
+                              reason=str(error)[:500]) from error
         require(len(frames) == 94 and all(len(frame) == 64 and frame[:2] == b"\x06\x09" and
                                         self.cli["cb_protocol"].crc_ok(frame) for frame in frames),
                 "incomplete_keymap", "USB 键位读取不完整，请重新连接后检测。")
@@ -623,6 +881,65 @@ class Bridge:
     def keymap(self, payload):
         return self.detect(payload)
 
+    def built_in_defaults(self):
+        path = self.resource_dir / "web" / "assets" / "builtin-default-pages.json"
+        require(path.is_file(), "builtin_defaults_missing", "应用缺少官网标准内置模式资源，请安装完整版本。")
+        require(path.stat().st_size <= 1024 * 1024, "builtin_defaults_invalid", "官网标准内置模式资源过大。")
+        try:
+            data = load_json(path)
+        except (OSError, ValueError, TypeError) as error:
+            raise BridgeError("builtin_defaults_invalid", "官网标准内置模式资源无法读取。") from error
+        require(isinstance(data, dict) and data.get("kind") == "cyberboard-standard-builtin-pages" and
+                data.get("schema_version") == 1 and isinstance(data.get("source"), dict),
+                "builtin_defaults_invalid", "官网标准内置模式资源格式无效。")
+        source = data["source"]
+        require(isinstance(source.get("url"), str) and source["url"].startswith("https://diy.angrymiao.com/") and
+                isinstance(source.get("sha256"), str) and re.fullmatch(r"[a-f0-9]{64}", source["sha256"]) and
+                source.get("pages_sha256") == digest(data.get("pages")),
+                "builtin_defaults_invalid", "官网标准内置模式资源来源或页面校验无效。")
+        validate_builtin_pages(data.get("pages"))
+        return copy.deepcopy(data)
+
+    def builtin_summary(self, config, indices=None):
+        indices = range(5) if indices is None else indices
+        return [{"pageIndex": index, "name": BUILTIN_NAMES[index], "enabled": nonzero(page_at(config, index).get("valid")),
+                 "brightness": page_at(config, index).get("lightness"), "speedMs": page_at(config, index).get("speed_ms")}
+                for index in indices]
+
+    def readConfiguration(self, payload):
+        identity = self.discover(payload)
+        require(identity is not None, "device_missing", "请通过 USB 连接键盘后重新检测。")
+        live, _ = self.read_live(identity.port)
+        stored = self.stored_config(identity.product_id)
+        if stored is None:
+            return {"sourceHash": None, "config": None, "device": self.device_dict(identity),
+                    "keymap": self.keymap_view(live), "builtInModes": [], "canWrite": False, "unsupportedPaths": [],
+                    "configurationSource": "none", "ledSource": "unknown"}
+        config = copy.deepcopy(stored)
+        # Keep all non-matrix JSON fields; this overlay is a device read only
+        # for the complete 1400 keycodes, never for LED pixels or other tables.
+        config["key_layer"]["valid"] = 1
+        for index, layer in enumerate(live["layer_data"]):
+            config["key_layer"]["layer_data"][index]["layer"] = copy.deepcopy(layer["layer"])
+        paths, write_error = unsupported_write_paths(config), None
+        try:
+            validate_config(stored, self.cli)
+            self.require_current_led_baseline(identity.product_id, stored)
+            validate_config(config, self.cli)
+        except (BridgeError, OSError, ValueError, TypeError, KeyError) as error:
+            write_error = error
+            if isinstance(error, BridgeError):
+                paths = sorted(set(paths + error.details.get("unsupportedPaths", [])))
+        result = {"sourceHash": digest(stored), "config": self.provenance(config, "live"),
+                  "device": self.device_dict(identity), "keymap": self.keymap_view(live),
+                  "builtInModes": self.builtin_summary(config), "canWrite": write_error is None,
+                  "unsupportedPaths": paths, "configurationSource": "local-last-written-json+live-keymap",
+                  "ledSource": "last-written"}
+        if write_error is not None:
+            result["writeError"] = {"code": write_error.code if isinstance(write_error, BridgeError) else "invalid_config",
+                                    "message": str(write_error)}
+        return result
+
     def history_items(self, pid):
         if not pid:
             return []
@@ -665,7 +982,8 @@ class Bridge:
                     "键盘上的键位与本机记录不同，已停止同步以保留当前键位。请先核对完整配置。")
         return identity, config, live, raw
 
-    def prepare(self, payload, baseline_context=None, restore_source=None, restore_pages=None):
+    def prepare(self, payload, baseline_context=None, restore_source=None, restore_pages=None, *,
+                built_in_pages=None, builtin_source=None, builtin_defaults=None):
         assignments = payload.get("assignments", [])
         changes = payload.get("keyChanges", [])
         preserve_current_keymap = payload.get("preserveCurrentKeymap", False)
@@ -676,7 +994,13 @@ class Bridge:
                 all(type(slot) is int and 1 <= slot <= 3 and isinstance(page, dict) and page.get("page_index") == slot + 4
                     for slot, page in restore_pages.items()), "invalid_snapshot", "历史灯效页格式无效。")
         require(restore_pages is None or not assignments and not changes, "invalid_snapshot", "历史恢复不能混入其他配置修改。")
-        require(isinstance(assignments, list) and isinstance(changes, list) and (assignments or changes or restore_pages),
+        require(built_in_pages is None or isinstance(built_in_pages, dict) and 1 <= len(built_in_pages) <= 5 and
+                all(type(index) is int and 0 <= index <= 4 and isinstance(page, dict) and page.get("page_index") == index
+                    for index, page in built_in_pages.items()), "invalid_builtin_pages", "内置模式页面计划无效。")
+        require(built_in_pages is None or not assignments and not changes and restore_pages is None and preserve_current_keymap,
+                "invalid_builtin_pages", "内置模式恢复只能修改所选内置页面，并必须保留当前键码。")
+        require(isinstance(assignments, list) and isinstance(changes, list) and
+                (assignments or changes or restore_pages or built_in_pages),
                 "empty_plan", "请先选择灯效槽或需要修改的键位。")
         require(len(assignments) <= 3, "invalid_slots", "最多同步 3 个灯效槽。")
         slots = [integer(item.get("slot"), 1, 3, "自定义槽") for item in assignments if isinstance(item, dict)]
@@ -718,6 +1042,9 @@ class Bridge:
                         "differentInternalKeycodes": len(differences) - physical_differences,
                         "refreshApplied": bool(differences)}
         target = copy.deepcopy(before)
+        if built_in_pages is not None:
+            for index, standard_page in built_in_pages.items():
+                overlay_fields(page_at(target, index), standard_page)
         if restore_pages is not None:
             for slot, historical_page in restore_pages.items():
                 page = page_for(target, slot)
@@ -743,6 +1070,11 @@ class Bridge:
             target["key_layer"]["layer_data"][pair[0]]["layer"][pair[1]] = change["code"].upper()
         fp = validate_config(target, self.cli)
         unchanged = copy.deepcopy(target)
+        if built_in_pages is not None:
+            for index in built_in_pages:
+                page = page_at(unchanged, index)
+                page.clear()
+                page.update(copy.deepcopy(page_at(before, index)))
         for slot in slots:
             page, old = page_for(unchanged, slot), page_for(before, slot)
             if restore_pages is not None:
@@ -772,6 +1104,22 @@ class Bridge:
                     "liveKeymapHash": hashlib.sha256(matrix(live)).hexdigest(), "backupPath": str(backup),
                     "changedSlots": sorted(slots), "keyChangeCount": len(changes), "totalFrames": fp.total,
                     "restoreSource": restore_source, "keymapPreservation": preservation}
+        extra = {}
+        if built_in_pages is not None:
+            indices = sorted(built_in_pages)
+            require(isinstance(builtin_defaults, dict) and builtin_defaults.get("source") == builtin_source,
+                    "builtin_defaults_invalid", "内置模式恢复缺少可核对的官网标准配置来源。")
+            atomic_json(folder / "builtin-defaults.json", builtin_defaults)
+            explicit_diff = []
+            for index in indices:
+                position = next(i for i, page in enumerate(before["page_data"]) if page["page_index"] == index)
+                explicit_diff.extend(configuration_diff(page_at(before, index), page_at(target, index),
+                                                        f"/page_data/{position}"))
+            extra = {"kind": "builtin-modes", "changedBuiltinPages": indices, "appliedSlots": [],
+                     "builtinSummary": self.builtin_summary(target, indices), "explicitDiff": explicit_diff,
+                     "builtinSource": copy.deepcopy(builtin_source)}
+            metadata.update(extra)
+            metadata["builtinDefaultsHash"] = digest(builtin_defaults)
         atomic_json(folder / "plan.json", metadata)
         summary = [{"slot": item["slot"], "name": item["design"].get("name", f"自定义 {item['slot']}"),
                     "topFrames": len(item["design"]["frames"]), "keyFrames": len(item["design"]["keyframes"]),
@@ -783,7 +1131,7 @@ class Bridge:
                         "brightness": page["lightness"], "speedMs": page["speed_ms"],
                         "enabled": bool(page["valid"]), "wordEnabled": bool(page.get("word_page", {}).get("valid"))}
                        for slot, page in sorted(restore_pages.items())]
-        return {"token": token, "changedSlots": sorted(slots), "totalFrames": fp.total,
+        return {**extra, "token": token, "changedSlots": sorted(slots), "totalFrames": fp.total,
                 "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
                 "backupPath": str(backup), "summary": summary, "keyChangeCount": len(changes),
                 "config": self.provenance(target, "prepared"), "device": self.device_dict(identity),
@@ -793,6 +1141,134 @@ class Bridge:
 
     def plan(self, payload):
         return self.prepare(payload)
+
+    def builtInPlan(self, payload):
+        source_hash = payload.get("sourceHash")
+        require(isinstance(source_hash, str) and re.fullmatch(r"[a-f0-9]{64}", source_hash),
+                "configuration_changed", "请先读取这把键盘的当前 JSON，再准备内置模式恢复。")
+        indices = payload.get("pageIndices")
+        require(isinstance(indices, list) and 1 <= len(indices) <= 5 and
+                all(type(index) is int and 0 <= index <= 4 for index in indices) and len(set(indices)) == len(indices),
+                "invalid_builtin_pages", "请选择不重复的内置模式页面 0–4。")
+        require(payload.get("assignments", []) == [] and payload.get("keyChanges", []) == [] and
+                payload.get("preserveCurrentKeymap", True) is True,
+                "invalid_builtin_pages", "内置模式恢复不能混入作品、键位或任意 JSON 修改。")
+        defaults = self.built_in_defaults()
+        context = self.fresh_baseline(payload, preserve_current_keymap=True)
+        require(digest(context[1]) == source_hash, "configuration_changed", "当前 JSON 已变化，请重新读取后再准备恢复。")
+        pages = {index: copy.deepcopy(defaults["pages"][index]) for index in indices}
+        return self.prepare({"preserveCurrentKeymap": True}, context,
+                            built_in_pages=pages, builtin_source=defaults["source"], builtin_defaults=defaults)
+
+    def require_no_current_record(self, pid):
+        # A null/invalid record, directory, or dangling symlink is still an
+        # existing record. Never reinterpret parse failure as a first setup.
+        path = Path(self.cli["cb_store"].current_path(pid))
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            return
+        except OSError as error:
+            raise BridgeError("initialization_store_unknown", "无法确认本机配置记录是否存在，已停止首次配置。",
+                              reason=str(error)) from error
+        raise BridgeError("initialization_record_exists", "本机已有这款键盘的配置记录，请使用普通同步；无效记录也不能自动覆盖。")
+
+    def initialization_marker(self, pid):
+        # cb_store validates product IDs before constructing their path. Reuse
+        # its directory name so no product ID can escape application state.
+        key = Path(self.cli["cb_store"].current_path(pid)).parent.name
+        return self.state_dir / "initialization-state" / f"{key}.json"
+
+    def require_unstarted_initialization(self, pid):
+        marker = self.initialization_marker(pid)
+        try:
+            marker.lstat()
+        except FileNotFoundError:
+            return
+        except OSError as error:
+            raise BridgeError("initialization_unresolved", "无法核对此前首次配置的结果，不能再次初始化。",
+                              reason=str(error)) from error
+        raise BridgeError("initialization_unresolved",
+                          "此前首次配置已经开始，当前缺少可核对的完整记录。请保留键位快照与目标配置，"
+                          "通过可信 CLI 修复完整配置记录后再同步；不能把现在的键位当作首次配置前的可信状态。")
+
+    def initializePlan(self, payload):
+        require(payload.get("preserveCurrentKeymap") is True and payload.get("keyChanges", []) == [],
+                "invalid_keymap_policy", "首次配置必须原样保留当前 1400 个键码，不能包含键位修改。")
+        assignments = payload.get("assignments")
+        require(isinstance(assignments, list) and 1 <= len(assignments) <= 3,
+                "invalid_slots", "首次配置需要选择 1–3 个自定义灯效槽。")
+        slots = [integer(item.get("slot"), 1, 3, "自定义槽") for item in assignments if isinstance(item, dict)]
+        require(len(slots) == len(assignments) and len(set(slots)) == len(slots),
+                "invalid_slots", "同一个灯效槽不能重复选择。")
+        for item in assignments:
+            design = item.get("design")
+            require(isinstance(design, dict), "invalid_animation", "缺少灯效数据。")
+            validate_animation(design.get("frames"), 200, "顶屏")
+            validate_animation(design.get("keyframes"), 90, "轴灯")
+            integer(item.get("brightness", 100), 0, 100, "亮度")
+            integer(item.get("speedMs", design.get("speed_ms", 40)), 1, 32767, "播放间隔")
+        identity = self.discover()
+        require(identity is not None, "device_missing", "请通过 USB 连接键盘后重新检测。")
+        require(not payload.get("port") or identity.port == payload["port"],
+                "device_changed", "所选 USB 键盘已变化，请重新检测。")
+        self.require_no_current_record(identity.product_id)
+        self.require_unstarted_initialization(identity.product_id)
+        live, raw = self.read_live(identity.port)
+        defaults = self.built_in_defaults()
+        target = initial_configuration(identity.product_id, live, defaults["pages"])
+        names = {}
+        for item in assignments:
+            design = item["design"]
+            page = page_for(target, item["slot"])
+            for field in ("frames", "keyframes"):
+                frames = design[field]
+                page[field] = {"valid": 1, "frame_num": len(frames),
+                               "frame_data": [{"frame_index": i, "frame_RGB": copy.deepcopy(frame)}
+                                              for i, frame in enumerate(frames)]}
+            page.update(valid=True, lightness=item.get("brightness", 100),
+                        speed_ms=item.get("speedMs", design.get("speed_ms", 40)))
+            names[item["slot"]] = str(design.get("name", f"自定义 {item['slot']}"))[:256]
+        applied_slots = sorted(slots)
+        fp = validate_initial_configuration(target, live, applied_slots, self.cli, defaults["pages"])
+        self.require_no_current_record(identity.product_id)
+        token = uuid.uuid4().hex
+        folder = self.state_dir / "plans" / token
+        folder.mkdir(parents=True, exist_ok=False)
+        snapshot_path = folder / "live-keymap.json"
+        snapshot = {"scope": "live-keymap-only", "productId": identity.product_id,
+                    "firmware": identity.version, "port": identity.port, "capturedAt": now_iso(),
+                    "key_layer": live, "ledSource": "unknown-before-initialization"}
+        atomic_json(snapshot_path, snapshot)
+        (folder / "live-keymap.raw").write_bytes(raw)
+        atomic_json(folder / "target.json", target)
+        atomic_json(folder / "builtin-defaults.json", defaults)
+        preservation = {"source": "live", "comparedKeycodes": 1400, "preservedKeycodes": 1400,
+                        "storedComparisonAvailable": False, "refreshApplied": False}
+        summary = [{"slot": slot, "name": names.get(slot, f"自定义 {slot}（停用 / 黑色）"),
+                    "topFrames": page_for(target, slot)["frames"]["frame_num"],
+                    "keyFrames": page_for(target, slot)["keyframes"]["frame_num"],
+                    "brightness": page_for(target, slot)["lightness"],
+                    "speedMs": page_for(target, slot)["speed_ms"],
+                    "enabled": slot in slots, "applied": slot in slots, "wordEnabled": False}
+                   for slot in (1, 2, 3)]
+        details = {"initialization": True, "backupScope": "live-keymap-only", "appliedSlots": applied_slots,
+                   "changedSlots": [1, 2, 3], "keyChangeCount": 0, "backupPath": str(snapshot_path),
+                   "ledSource": "unknown-before-initialization", "limitations": list(INITIALIZATION_LIMITATIONS),
+                   "keymapPreservation": preservation, "summary": summary,
+                   "builtinSummary": self.builtin_summary(target), "builtinSource": copy.deepcopy(defaults["source"])}
+        metadata = {**details, "planVersion": 3, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
+                    "status": "prepared", "productId": identity.product_id, "firmware": identity.version,
+                    "port": identity.port, "targetHash": digest(target), "liveSnapshotHash": digest(snapshot),
+                    "builtinDefaultsHash": digest(defaults),
+                    "liveRawHash": hashlib.sha256(raw).hexdigest(),
+                    "liveKeymapHash": hashlib.sha256(matrix(live)).hexdigest(), "totalFrames": fp.total}
+        atomic_json(folder / "plan.json", metadata)
+        config = copy.deepcopy(target)
+        config["_provenance"] = {"led": "unknown-before-initialization", "keymap": "live"}
+        return {**details, "token": token, "totalFrames": fp.total, "status": "prepared",
+                "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
+                "config": config, "device": self.device_dict(identity), "keymap": self.keymap_view(live)}
 
     def snapshot_path(self, snapshot_id, pid):
         require(isinstance(snapshot_id, str) and ":" in snapshot_id, "invalid_snapshot", "请选择有效的历史记录。")
@@ -824,7 +1300,7 @@ class Bridge:
         # current baseline, and final target validation precedes any write.
         return self.prepare({"preserveCurrentKeymap": True}, context, restore_source=snapshot_id, restore_pages=pages)
 
-    def send_config(self, port, fp):
+    def send_config(self, port, fp, pre_start=None):
         """CLI-equivalent serial write, with CRC/header checks and real frame progress."""
         writer, protocol = self.cli["cb_write"], self.cli["cb_protocol"]
         ser = writer.serial.Serial(port, baudrate=self.cli["cb_device"].BAUD, timeout=10,
@@ -833,6 +1309,8 @@ class Bridge:
             time.sleep(0.1)
             ser.reset_input_buffer()
             self.event("starting", 0, fp.total)
+            if pre_start is not None:
+                pre_start()
             ser.write(protocol.build_frame(*writer.CMD_JSON_START))
             ser.flush()
             reply = ser.read(64)
@@ -872,12 +1350,14 @@ class Bridge:
         folder = self.state_dir / "plans" / token
         require((folder / "plan.json").is_file(), "plan_missing", "同步计划已不存在，请重新准备。")
         metadata = load_json(folder / "plan.json")
-        require(metadata.get("planVersion") == 2, "plan_version_unsupported",
+        require(metadata.get("planVersion") in (2, 3), "plan_version_unsupported",
                 "这个同步计划来自旧版本，请重新准备后再同步。")
         require(metadata.get("status") == "prepared" and metadata.get("token") == token,
                 "plan_consumed", "这个同步计划已经执行或失效，请重新准备。")
         require(0 <= time.time() - metadata.get("createdTimestamp", 0) <= PLAN_LIFETIME_SECONDS,
                 "plan_expired", "同步计划已过期，请重新准备。")
+        if metadata["planVersion"] == 3:
+            return self.execute_initialization(payload, folder, metadata)
         require(all((folder / name).is_file() for name in ("stored-before.json", "before.json", "target.json")),
                 "plan_tampered", "同步计划文件不完整，请重新准备。")
         stored_before = load_json(folder / "stored-before.json")
@@ -885,6 +1365,30 @@ class Bridge:
         require(digest(stored_before) == metadata.get("storedBaselineHash") and
                 digest(before) == metadata.get("beforeHash") and digest(target) == metadata.get("targetHash"),
                 "plan_tampered", "同步计划内容发生变化，请重新准备。")
+        builtin_artifact = folder / "builtin-defaults.json"
+        if builtin_artifact.exists() or metadata.get("kind") == "builtin-modes" or "changedBuiltinPages" in metadata or "builtinDefaultsHash" in metadata:
+            indices = metadata.get("changedBuiltinPages")
+            require(metadata.get("kind") == "builtin-modes" and builtin_artifact.is_file() and
+                    isinstance(indices, list) and 1 <= len(indices) <= 5 and
+                    all(type(index) is int and 0 <= index <= 4 for index in indices) and len(set(indices)) == len(indices) and
+                    metadata.get("changedSlots") == [] and metadata.get("appliedSlots") == [] and
+                    metadata.get("keyChangeCount") == 0 and isinstance(metadata.get("builtinSource"), dict),
+                    "plan_tampered", "内置模式同步计划标记发生变化，请重新准备。")
+            defaults = load_json(builtin_artifact)
+            require(digest(defaults) == metadata.get("builtinDefaultsHash") and defaults == self.built_in_defaults() and
+                    metadata["builtinSource"] == defaults["source"],
+                    "plan_tampered", "内置模式计划的官网标准配置来源发生变化，请重新准备。")
+            unchanged, expected, explicit_diff = copy.deepcopy(target), copy.deepcopy(before), []
+            for index in indices:
+                position = next(i for i, page in enumerate(before["page_data"]) if page["page_index"] == index)
+                explicit_diff.extend(configuration_diff(page_at(before, index), page_at(target, index), f"/page_data/{position}"))
+                page = page_at(unchanged, index)
+                page.clear()
+                page.update(copy.deepcopy(page_at(before, index)))
+                overlay_fields(page_at(expected, index), defaults["pages"][index])
+            require(target == expected and unchanged == before and metadata.get("explicitDiff") == explicit_diff and
+                    metadata.get("builtinSummary") == self.builtin_summary(target, indices),
+                    "plan_tampered", "内置模式计划包含未授权的 JSON 修改或差异报告发生变化。")
         current = self.stored_config(metadata["productId"], required=True)
         require(digest(current) == metadata["storedBaselineHash"], "baseline_changed", "本机配置已更新，请重新准备同步。")
         self.require_current_led_baseline(metadata["productId"], current)
@@ -904,8 +1408,65 @@ class Bridge:
         metadata.update(status="executing", startedAt=now_iso(), startedTimestamp=time.time(),
                         currentRecordMtimeNs=self.current_record_mtime_ns(identity.product_id))
         atomic_json(folder / "plan.json", metadata)
+        return self._execute_configuration(folder, metadata, identity, target, fp)
+
+    def execute_initialization(self, payload, folder, metadata):
+        require(payload.get("confirmInitialization") is True, "initialization_confirmation_required",
+                "首次配置会替换未知原灯效与其他模式，请先阅读限制并明确确认。")
+        require(metadata.get("initialization") is True and metadata.get("backupScope") == "live-keymap-only" and
+                metadata.get("changedSlots") == [1, 2, 3] and metadata.get("keyChangeCount") == 0 and
+                metadata.get("ledSource") == "unknown-before-initialization" and
+                metadata.get("limitations") == list(INITIALIZATION_LIMITATIONS) and
+                metadata.get("backupPath") == str(folder / "live-keymap.json"),
+                "plan_tampered", "首次配置计划标记发生变化，请重新准备。")
+        require(all((folder / name).is_file() for name in ("target.json", "live-keymap.json", "live-keymap.raw", "builtin-defaults.json")),
+                "plan_tampered", "首次配置计划文件不完整，请重新准备。")
+        target, snapshot = load_json(folder / "target.json"), load_json(folder / "live-keymap.json")
+        defaults = load_json(folder / "builtin-defaults.json")
+        raw = (folder / "live-keymap.raw").read_bytes()
+        require(digest(target) == metadata.get("targetHash") and digest(snapshot) == metadata.get("liveSnapshotHash") and
+                digest(defaults) == metadata.get("builtinDefaultsHash") and
+                defaults == self.built_in_defaults() and metadata.get("builtinSource") == defaults["source"] and
+                hashlib.sha256(raw).hexdigest() == metadata.get("liveRawHash") and
+                snapshot.get("scope") == "live-keymap-only" and snapshot.get("productId") == metadata["productId"] and
+                snapshot.get("firmware") == metadata["firmware"] and snapshot.get("port") == metadata["port"] and
+                target.get("product_info", {}).get("product_id") == metadata["productId"],
+                "plan_tampered", "首次配置内容或键位快照发生变化，请重新准备。")
+        live_before = snapshot.get("key_layer")
+        require(hashlib.sha256(matrix(live_before)).hexdigest() == metadata.get("liveKeymapHash"),
+                "plan_tampered", "首次配置键位快照校验失败，请重新准备。")
+        self.require_no_current_record(metadata["productId"])
+        self.require_unstarted_initialization(metadata["productId"])
+        # Scan every candidate again: selecting the original port must not hide
+        # a second keyboard that was attached after review.
+        identity = self.discover()
+        require(identity is not None and identity.product_id == metadata["productId"] and
+                identity.version == metadata["firmware"] and identity.port == metadata["port"],
+                "device_changed", "连接的键盘、USB 端口或固件发生变化，请重新检测。")
+        fp = validate_initial_configuration(target, live_before, metadata.get("appliedSlots"), self.cli, defaults["pages"])
+        require(fp.total == metadata["totalFrames"], "plan_tampered", "首次配置数据量发生变化，请重新准备。")
+        live, _ = self.read_live(identity.port)
+        require(hashlib.sha256(matrix(live)).hexdigest() == metadata["liveKeymapHash"] and
+                matrix(live) == matrix(target["key_layer"]),
+                "keymap_changed", "键盘上的键位已变化，请重新准备首次配置。")
+        self.require_no_current_record(identity.product_id)
+        # This durable, separate marker precedes JSON_START. Even if completion
+        # and failure reports cannot be saved, another init cannot trust the
+        # potentially reset matrix as the original device state.
+        atomic_json(self.initialization_marker(identity.product_id),
+                    {"initialization": True, "productId": identity.product_id, "token": metadata["token"],
+                     "startedAt": now_iso(), "targetHash": metadata["targetHash"], "scope": "live-keymap-only"})
+        metadata.update(status="executing", startedAt=now_iso(), startedTimestamp=time.time())
+        atomic_json(folder / "plan.json", metadata)
+        return self._execute_configuration(folder, metadata, identity, target, fp)
+
+    def _execute_configuration(self, folder, metadata, identity, target, fp):
         try:
-            ack = self.send_config(identity.port, fp)
+            if metadata.get("initialization") is True:
+                ack = self.send_config(identity.port, fp,
+                                       pre_start=lambda: self.require_no_current_record(identity.product_id))
+            else:
+                ack = self.send_config(identity.port, fp)
             self.event("verifying", fp.total, fp.total)
             time.sleep(self.cli["cb_write"].SETTLE_SECONDS)
             attempts, archive_warnings, matched = [], [], False
@@ -929,14 +1490,14 @@ class Bridge:
                     break
                 if attempt < 2:
                     time.sleep(5)
-            require(matched, "verification_failed", "键盘已接收数据，但完整键位核对未通过。请保留备份并重新检测。",
+            require(matched, "verification_failed", "键盘已接收数据，但完整键位核对未通过。请保留同步快照并重新检测。",
                     deviceMayHaveChanged=True, deviceAck=True, backupPath=metadata["backupPath"], attempts=attempts)
         except Exception as error:
             metadata.update(status="failed", failedAt=now_iso(), error=str(error))
             atomic_json(folder / "plan.json", metadata)
             if isinstance(error, BridgeError):
                 raise
-            raise BridgeError("write_interrupted", "同步中断，键盘可能已经接收部分数据。请保留备份并重新检测。",
+            raise BridgeError("write_interrupted", "同步中断，键盘可能已经接收部分数据。请保留同步快照并重新检测。",
                               deviceMayHaveChanged=True, backupPath=metadata["backupPath"], reason=str(error)) from error
         # Device success is now established by an ACK and a complete readback.
         # A later local bookkeeping failure cannot turn it into a USB failure.
@@ -970,10 +1531,17 @@ class Bridge:
                   "completedTimestamp": time.time(), "verifiedTargetHash": metadata["targetHash"],
                   "ledVerification": "protocol-ack-only", "ledSource": "last-written",
                   "ackHex": ack.hex(), "cliLog": captured_out.getvalue().strip()}
+        if metadata.get("initialization") is True:
+            report.update(initialization=True, backupScope="live-keymap-only", appliedSlots=metadata["appliedSlots"],
+                          ledBeforeSource="unknown-before-initialization", limitations=metadata["limitations"])
+        if metadata.get("kind") == "builtin-modes":
+            report.update(kind="builtin-modes", changedBuiltinPages=metadata["changedBuiltinPages"], appliedSlots=[],
+                          builtinSummary=metadata["builtinSummary"], explicitDiff=metadata["explicitDiff"],
+                          builtinSource=metadata["builtinSource"])
 
         def warnings():
             if store_warnings or not state_stored or report_warnings:
-                report["warning"] = "键盘已同步，本机记录或同步报告未能完整保存，请保留备份。"
+                report["warning"] = "键盘已同步，本机记录或同步报告未能完整保存，请保留同步快照。"
             if store_warnings:
                 report["storeWarning"] = "\n".join(store_warnings)
             if report_warnings:
@@ -1030,7 +1598,7 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "history", "plan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()
@@ -1043,7 +1611,7 @@ def main():
         bridge = Bridge(args.state_dir, args.resource_dir)
         # Native serializes actions; the lock also prevents a second app process
         # from interleaving a plan or write with this one.
-        if args.action in ("plan", "execute", "setTime", "restorePlan", "detect", "keymap"):
+        if args.action in ("plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "detect", "keymap", "readConfiguration"):
             with operation_lock(bridge.state_dir / ".operation.lock"):
                 result = getattr(bridge, args.action)(payload)
         else:

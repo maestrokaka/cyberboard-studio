@@ -4,6 +4,37 @@ using System.Text.Json;
 
 namespace CyberboardStudio;
 
+// Keep the backend's structured failure separate from its user-facing message.
+// The caller may forward this cloned, already-redacted payload after the parser
+// document has been disposed; raw JSON must never become an exception message.
+internal sealed class BackendReplyException : IOException
+{
+    private const string FallbackMessage = "后台操作未完成，请重试。";
+    public JsonElement Error { get; }
+
+    public BackendReplyException(JsonElement error) : base(MessageFor(error))
+    {
+        if (error.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(error.GetString()))
+            Error = error.Clone();
+        else if (error.ValueKind == JsonValueKind.Object)
+        {
+            var fields = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            foreach (var property in error.EnumerateObject()) fields[property.Name] = property.Value.Clone();
+            fields["message"] = JsonSerializer.SerializeToElement(Message);
+            Error = JsonSerializer.SerializeToElement(fields);
+        }
+        else Error = JsonSerializer.SerializeToElement(new { message = Message });
+    }
+
+    private static string MessageFor(JsonElement error)
+    {
+        var message = error.ValueKind == JsonValueKind.String ? error.GetString()
+            : error.ValueKind == JsonValueKind.Object && error.TryGetProperty("message", out var value)
+                && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        return string.IsNullOrWhiteSpace(message) ? FallbackMessage : message;
+    }
+}
+
 // One request starts one Python process. No payload is interpolated into a shell command.
 internal sealed class BackendClient : IDisposable
 {
@@ -95,7 +126,7 @@ internal sealed class BackendClient : IDisposable
                 if (final is null) throw new IOException($"后台没有返回操作结果（{process.ExitCode}）。");
                 var safeFinal = secret is null ? final.Value : AISettings.Redact(final.Value, secret);
                 if (safeFinal.TryGetProperty("error", out var error))
-                    throw new IOException(error.ValueKind == JsonValueKind.String ? error.GetString() : error.GetRawText());
+                    throw new BackendReplyException(error);
                 if (process.ExitCode != 0) throw new IOException($"后台操作未成功完成（{process.ExitCode}）。");
                 return safeFinal.GetProperty("result").Clone();
             }

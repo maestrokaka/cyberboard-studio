@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "default_appearance_id": "user-vision",
+  "appearances": [
+    {
+      "id": "user-vision",
+      "name": "CYBERBOARD R6「Vision」",
+      "model": "CYBERBOARD R6",
+      "type": "user-photo",
+      "viewIds": [
+        "front"
+      ],
+      "defaultViewId": "front",
+      "source": "用户实拍",
+      "sourceUrl": null,
+      "note": "透明键帽实拍；顶部灯屏与轴灯按照片位置预览。",
+      "modelVerificationUrl": "https://www.angrymiao.com/cn/products/"
+    },
+    {
+      "id": "r4-fluo-free",
+      "name": "CYBERBOARD R4「Fluo Free」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-fluo-front"
+      ],
+      "defaultViewId": "r4-fluo-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "note": "透明键帽；顶部灯屏与轴灯按产品图的透光区域预览。"
+    },
+    {
+      "id": "r4-bebop",
+      "name": "CYBERBOARD R4「Bebop」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-bebop-front"
+      ],
+      "defaultViewId": "r4-bebop-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti",
+      "note": "透明键帽；顶部灯屏与轴灯按产品图的透光区域预览。"
+    },
+    {
+      "id": "r4-gangstar",
+      "name": "CYBERBOARD R4「Gangstar」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-gangstar-front"
+      ],
+      "defaultViewId": "r4-gangstar-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "note": "透明键帽；顶部灯屏与轴灯按产品图的透光区域预览。"
+    },
+    {
+      "id": "r4-cloud-white",
+      "name": "CYBERBOARD R4「Cloud White V2」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-cloud-front"
+      ],
+      "defaultViewId": "r4-cloud-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "note": "不透光键帽；轴灯以键缝反射近似呈现。"
+    },
+    {
+      "id": "r4-stone-face",
+      "name": "CYBERBOARD R4「Stone Face」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-stone-front"
+      ],
+      "defaultViewId": "r4-stone-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4",
+      "note": "透明键帽；顶部灯屏与轴灯按产品图的透光区域预览。"
+    },
+    {
+      "id": "r4-paisley",
+      "name": "CYBERBOARD R4「Paisley」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-paisley-front"
+      ],
+      "defaultViewId": "r4-paisley-front",
+      "source": "Angry Miao 官方商城",
+      "sourceUrl": "https://store.angrymiao.com/products/am-cyberboard-r4-graffiti",
+      "note": "透明键帽；顶部灯屏与轴灯按产品图的透光区域预览。"
+    },
+    {
+      "id": "r4-vision",
+      "name": "CYBERBOARD R4「Vision」",
+      "model": "CYBERBOARD R4",
+      "type": "official-photo",
+      "viewIds": [
+        "r4-vision-front"
+      ],
+      "defaultViewId": "r4-vision-front",
+      "source": "Angry Miao 官网",
+      "sourceUrl": "https://www.angrymiao.com/cn/cyberboard-r4/",
+      "note": "透明键帽实拍；顶部灯屏与轴灯按照片位置预览。"
+    }
+  ],
+  "galleryAllowedAngles": [
+    "front"
+  ]
+}

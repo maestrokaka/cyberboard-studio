@@ -67,38 +67,69 @@ def _query(ser: serial.Serial, command: tuple[int, int]) -> bytes:
     return ser.read(64)
 
 
-def probe(port: str, *, full: bool = False, timeout: float = 1.5) -> DeviceInfo | None:
-    """Identify the device on `port`. Returns None if it isn't a CyberBoard.
+def probe_with_diagnostics(
+    port: str, *, full: bool = False, timeout: float = 1.5
+) -> tuple[DeviceInfo | None, dict[str, str] | None]:
+    """Identify one candidate without letting its I/O failure stop discovery.
 
-    `full=True` additionally fetches firmware version and page count.
+    Unknown devices and invalid replies are ordinary non-matches, not transport
+    errors. Diagnostics cover only an actual serial I/O exception and identify
+    which read-only query failed. A CRC-verified identity survives a later
+    metadata query failure so Apps can still reject ambiguous multi-board
+    connections. No retry or configuration write is performed.
     """
+    ser = None
+    stage = "open"
+    identified = None
     try:
         ser = serial.Serial(
             port, baudrate=BAUD, timeout=timeout, write_timeout=timeout, exclusive=True
         )
-    except (serial.SerialException, OSError):
-        return None
-    try:
         time.sleep(0.1)
+        stage = "identity"
         reply = _query(ser, CMD_PRODUCT_ID)
         if not crc_ok(reply):
-            return None
+            return None, None
         product_id = parse_string_reply(reply)
         if product_id is None:
-            return None
+            return None, None
         upper = product_id.upper()
         is_dongle = "DONGLE" in upper
         is_cyberboard = (upper.startswith("CB") or upper == "AM01R6") and not is_dongle
         version: str | None = None
         pages: int | None = None
+        identified = DeviceInfo(port, product_id, version, pages, is_cyberboard, is_dongle)
         if full and is_cyberboard:
+            stage = "firmware"
             info = _query(ser, CMD_PRODUCT_INFO)
             version = parse_string_reply(info) if crc_ok(info) else None
+            identified = DeviceInfo(port, product_id, version, pages, is_cyberboard, is_dongle)
+            stage = "pages"
             checked = _query(ser, CMD_CHECK_PAGES)
             pages = checked[2] if crc_ok(checked) else None
-        return DeviceInfo(port, product_id, version, pages, is_cyberboard, is_dongle)
+        return DeviceInfo(port, product_id, version, pages, is_cyberboard, is_dongle), None
+    except (serial.SerialException, OSError) as error:
+        return identified, {"port": port, "stage": stage,
+                      "kind": "timeout" if isinstance(error, serial.SerialTimeoutException) else "serial_error",
+                      "reason": str(error)[:500]}
     finally:
-        ser.close()
+        if ser is not None:
+            try:
+                ser.close()
+            except (serial.SerialException, OSError):
+                # A disconnect during cleanup must not replace the query result
+                # or conceal the original stage/error on this candidate.
+                pass
+
+
+def probe(port: str, *, full: bool = False, timeout: float = 1.5) -> DeviceInfo | None:
+    """Identify the device on `port`, returning None for a non-match or I/O error.
+
+    `full=True` additionally fetches firmware version and page count. Existing
+    CLI callers retain the simple result; Apps may request detailed diagnostics.
+    """
+    info, failure = probe_with_diagnostics(port, full=full, timeout=timeout)
+    return None if failure else info
 
 
 def list_devices(*, full: bool = False) -> list[DeviceInfo]:

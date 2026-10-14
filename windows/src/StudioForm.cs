@@ -23,7 +23,7 @@ internal sealed class StudioForm : Form
     private bool deviceWritePending;
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
-    { "bootstrap", "detect", "plan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace" };
+    { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace" };
     private static readonly HashSet<string> DeviceWriteActions = new(StringComparer.Ordinal) { "execute", "setTime" };
     private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true, MaxDepth = 256 };
 
@@ -126,7 +126,7 @@ internal sealed class StudioForm : Form
                     return;
                 }
                 loading.Visible = false;
-                SendEvent(new { @event = "nativeReady", app = "Cyberboard Studio", version = "0.1.0", platform = "windows" });
+                SendEvent(new { @event = "nativeReady", app = "Cyberboard Studio", version = "0.3.0", platform = "windows" });
             };
             core.ProcessFailed += (_, args) =>
             {
@@ -189,7 +189,7 @@ internal sealed class StudioForm : Form
         view.DropDownItems.Add(MenuItem("重新载入", Keys.Control | Keys.R, ReloadWorkbench));
         var help = new ToolStripMenuItem("帮助");
         help.DropDownItems.Add(MenuItem("关于 Cyberboard Studio", Keys.None, () => MessageBox.Show(this,
-            "Cyberboard Studio 0.2.2\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
+            "Cyberboard Studio 0.3.0\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
             "关于 Cyberboard Studio", MessageBoxButtons.OK, MessageBoxIcon.Information)));
         menu.Items.AddRange([file, edit, view, help]);
         return menu;
@@ -255,6 +255,8 @@ internal sealed class StudioForm : Form
                 case "importAIImages": await ImportAIImagesAsync(id, generation); return;
                 case "getAISettings":
                     Reply(id, await Task.Run(aiSettings.Get), generation); return;
+                case "revealAIKey":
+                    Reply(id, await Task.Run(() => aiSettings.RevealAIKey(payload)), generation); return;
                 case "saveAISettings":
                     if (activeAIRequestId is not null) throw new IOException("AI 请求正在进行，请先取消或等待完成再修改模型配置。");
                     Reply(id, await Task.Run(() => aiSettings.Save(payload)), generation); return;
@@ -289,10 +291,10 @@ internal sealed class StudioForm : Form
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (action is "getAISettings" or "saveAISettings" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
+            if (action is "getAISettings" or "saveAISettings" or "revealAIKey" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
                 HostLog.Write("AI request", exception.GetType().Name);
             else HostLog.Write("request " + action, exception.ToString());
-            ReplyError(id, exception.Message, generation);
+            ReplyError(id, exception is BackendReplyException backendError ? backendError.Error : exception.Message, generation);
         }
     }
 
@@ -330,7 +332,7 @@ internal sealed class StudioForm : Form
         aiCancellation = cancellation;
         try
         {
-            var injected = await Task.Run(() => aiSettings.Inject(payload), cancellation.Token);
+            var injected = await Task.Run(() => aiSettings.Inject(payload, allowInactive: action == "testAIConnection"), cancellation.Token);
             var result = await Task.Run(() => aiBackend.RunAsync(action, injected.Payload, record =>
             {
                 var values = record.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
@@ -343,6 +345,13 @@ internal sealed class StudioForm : Form
         catch (OperationCanceledException)
         {
             Reply(id, new { cancelled = true, requestId }, generation);
+        }
+        catch (BackendReplyException exception)
+        {
+            // BackendClient has already redacted the credential from every
+            // nested field. Keep AI failures structured without logging them.
+            HostLog.Write("AI request", exception.GetType().Name);
+            ReplyError(id, exception.Error, generation);
         }
         finally
         {
@@ -401,7 +410,7 @@ internal sealed class StudioForm : Form
     }
 
     private void Reply(JsonElement id, object result, int generation) => Send("receive", new { id, result }, generation);
-    private void ReplyError(JsonElement id, string error, int generation) => Send("receive", new { id, error }, generation);
+    private void ReplyError(JsonElement id, object error, int generation) => Send("receive", new { id, error }, generation);
     private void SendEvent(object value, int? generation = null) => Send("event", value, generation ?? navigationGeneration);
     private void Send(string method, object value, int generation)
     {

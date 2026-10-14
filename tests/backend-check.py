@@ -49,6 +49,10 @@ class BackendChecks(unittest.TestCase):
                  "bindings": [{"short": "A", "name": "A", "code": "#00070004"} for _ in range(7)]}
                 for i in range(81)]
         (resources / "web" / "assets" / "keymap-layout.json").write_text(json.dumps({"keys": keys}))
+        # Public official source only, in an isolated packaged-resource layout.
+        # It is not a stored device config or a replacement keymap fixture.
+        self.standard_builtins = bridge.load_json(ROOT / "data" / "builtin-default-pages.json")
+        (resources / "web" / "assets" / "builtin-default-pages.json").write_text(json.dumps(self.standard_builtins))
         self.baseline = self.fixture()
         self.live = copy.deepcopy(self.baseline["key_layer"])
         self.target = None
@@ -240,6 +244,14 @@ class BackendChecks(unittest.TestCase):
         self.assertNotIn("workspaceWarning", result)
         self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
 
+    def test_workspace_preview_appearance_is_optional_and_validated(self):
+        self.assertNotIn("previewAppearanceId", self.backend.validate_workspace({}))
+        self.backend.saveWorkspace({"previewAppearanceId": "r6-dark-red"})
+        self.assertEqual(self.backend.load_workspace()[0]["previewAppearanceId"], "r6-dark-red")
+        for value in (None, {}, "", "../secret", "https://example.com/a", "A", "a" * 81):
+            self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace({"previewAppearanceId": value}))
+        self.assertEqual(self.backend.load_workspace()[0]["previewAppearanceId"], "r6-dark-red")
+
     def test_workspace_trash_roundtrip_preserves_full_design_and_old_timestamps(self):
         design = self.design()
         design["origin"] = "kimi-ai"
@@ -384,6 +396,127 @@ class BackendChecks(unittest.TestCase):
         self.assertEqual(len(bridge.matrix(result["keymap"])), 5600)
         self.assertEqual(self.sent, [])
 
+    def test_discovery_skips_failed_com_before_and_after_real_r6(self):
+        self.identity.port = "COM12"
+        for ports in (["COM3", "COM12"], ["COM12", "COM3"]):
+            attempted = []
+            self.cli["cb_device"].candidate_ports = lambda: ports
+            def probe(port, **kwargs):
+                attempted.append(port)
+                if port == "COM3":
+                    return None, {"port": port, "stage": "identity", "kind": "timeout", "reason": "Write timeout"}
+                return self.identity, None
+            self.cli["cb_device"].probe_with_diagnostics = probe
+            result = self.backend.detect({})
+            self.assertTrue(result["connected"])
+            self.assertEqual(result["device"]["port"], "COM12")
+            self.assertEqual(attempted, ports)
+            self.assertEqual(self.sent, [])
+
+    def test_detailed_probe_failure_does_not_hide_other_valid_keyboard(self):
+        self.identity.port = "COM12"
+        self.cli["cb_device"].candidate_ports = lambda: ["COM3", "COM12"]
+        self.cli["cb_device"].probe = lambda *args, **kwargs: self.fail("legacy probe called despite diagnostics API")
+        self.cli["cb_device"].probe_with_diagnostics = lambda port, **kwargs: (
+            (None, {"port": port, "stage": "identity", "kind": "timeout", "reason": "Write timeout"})
+            if port == "COM3" else (self.identity, None))
+        self.assertTrue(self.backend.detect({})["connected"])
+        self.assertEqual(self.sent, [])
+
+    def test_two_verified_boards_remain_ambiguous_when_one_metadata_query_fails(self):
+        other = types.SimpleNamespace(product_id="CB04", version=None, pages=None,
+                                      port="COM3", is_dongle=False, is_cyberboard=True)
+        self.identity.port = "COM12"
+        for stage in ("firmware", "pages"):
+            for ports in (["COM3", "COM12"], ["COM12", "COM3"]):
+                with self.subTest(stage=stage, ports=ports):
+                    attempted = []
+                    self.cli["cb_device"].candidate_ports = lambda: ports
+                    def probe(port, **kwargs):
+                        attempted.append(port)
+                        return ((other, {"port": port, "stage": stage, "kind": "timeout", "reason": "Write timeout"})
+                                if port == "COM3" else (self.identity, None))
+                    self.cli["cb_device"].probe_with_diagnostics = probe
+                    with self.assertRaises(bridge.BridgeError) as caught:
+                        self.backend.detect({})
+                    self.assertEqual(caught.exception.code, "ambiguous_device")
+                    self.assertEqual(attempted, ports)
+                    self.assertEqual(self.reads, 0)
+                    self.assertEqual(self.sent, [])
+                    self.assertFalse((self.backend.state_dir / "last-device.json").exists())
+                    self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+
+    def test_unique_partial_identity_does_not_report_connected_or_query_keymap(self):
+        self.identity.port = "COM12"
+        for stage in ("firmware", "pages"):
+            with self.subTest(stage=stage):
+                self.cli["cb_device"].candidate_ports = lambda: ["COM12"]
+                self.cli["cb_device"].probe_with_diagnostics = lambda port, **kwargs: (
+                    self.identity, {"port": port, "stage": stage, "kind": "timeout", "reason": "Write timeout"})
+                with self.assertRaises(bridge.BridgeError) as caught:
+                    self.backend.detect({})
+                self.assertEqual(caught.exception.code, "serial_probe_failed")
+                self.assertEqual(caught.exception.details["probeFailures"][0]["stage"], stage)
+                self.assertEqual(self.reads, 0)
+                self.assertEqual(self.sent, [])
+                self.assertFalse((self.backend.state_dir / "last-device.json").exists())
+                self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+
+    def test_legacy_probe_unknown_failure_does_not_conceal_another_board(self):
+        self.identity.port = "COM12"
+        for ports in (["COM3", "COM12"], ["COM12", "COM3"]):
+            with self.subTest(ports=ports):
+                attempted = []
+                self.cli["cb_device"].candidate_ports = lambda: ports
+                def probe(port, **kwargs):
+                    attempted.append(port)
+                    if port == "COM3":
+                        raise OSError("Write timeout")
+                    return self.identity
+                self.cli["cb_device"].probe = probe
+                with self.assertRaises(bridge.BridgeError) as caught:
+                    self.backend.detect({})
+                self.assertEqual(caught.exception.code, "serial_probe_failed")
+                self.assertEqual(caught.exception.details["probeFailures"][0]["stage"], "unknown")
+                self.assertEqual(attempted, ports)
+                self.assertEqual(self.reads, 0)
+                self.assertEqual(self.sent, [])
+                self.assertFalse((self.backend.state_dir / "last-device.json").exists())
+
+    def test_all_probe_failures_return_stage_and_preserve_original_records(self):
+        self.cli["cb_device"].candidate_ports = lambda: ["COM3", "COM12"]
+        self.cli["cb_device"].probe = lambda *args, **kwargs: (_ for _ in ()).throw(OSError("Write timeout"))
+        workspace = self.backend.state_dir / "workspace.json"
+        workspace.parent.mkdir(parents=True)
+        workspace.write_text('{"draft":"preserve"}')
+        with self.assertRaises(bridge.BridgeError) as caught:
+            self.backend.detect({})
+        error = caught.exception
+        self.assertEqual(error.code, "serial_probe_failed")
+        self.assertEqual(error.details["stage"], "discovery")
+        self.assertEqual(error.details["ports"], ["COM3", "COM12"])
+        self.assertIn("通信超时", error.message)
+        self.assertIn("COM3（通信检测）", error.message)
+        self.assertIn("COM12（通信检测）", error.message)
+        self.assertEqual(workspace.read_text(), '{"draft":"preserve"}')
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        self.assertFalse((self.backend.state_dir / "last-device.json").exists())
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_query_transport_failure_is_not_connected_or_configuration_write(self):
+        self.identity.port = "COM12"
+        self.cli["cb_read"]._drain = lambda *args, **kwargs: (_ for _ in ()).throw(OSError("Write timeout"))
+        with self.assertRaises(bridge.BridgeError) as caught:
+            self.backend.detect({})
+        error = caught.exception
+        self.assertEqual(error.code, "serial_keymap_failed")
+        self.assertEqual(error.details["stage"], "keymap")
+        self.assertEqual(error.details["port"], "COM12")
+        self.assertIn("COM12", error.message)
+        self.assertFalse((self.backend.state_dir / "last-device.json").exists())
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.baseline)
+        self.assertEqual(self.sent, [])
+
     def test_plan_preserves_other_slots_keys_and_unknown_fields(self):
         result = self.prepared()
         self.assertEqual(result["changedSlots"], [2])
@@ -435,6 +568,601 @@ class BackendChecks(unittest.TestCase):
         self.live["layer_data"][0]["layer"][0] = "#00070005"
         self.expect_error("baseline_keymap_changed", lambda: self.backend.plan(self.payload()))
         self.assertEqual(self.sent, [])
+
+    def initialization_payload(self):
+        payload = {**self.payload(), "preserveCurrentKeymap": True}
+        payload["assignments"][0]["slot"] = 3
+        return payload
+
+    def initialization_prepared(self):
+        self.real_cli["cb_store"].current_path("AM01R6").unlink(missing_ok=True)
+        result = self.backend.initializePlan(self.initialization_payload())
+        self.target = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "target.json")
+        return result
+
+    def initialize_execute(self, result):
+        return self.backend.execute({"token": result["token"], "confirmInitialization": True})
+
+    def test_initialization_is_new_public_config_with_all_three_reviewed_slots(self):
+        # Every matrix position is distinct; no fixture/default keymap may be
+        # substituted even at unused, internal, or higher-layer positions.
+        for layer, group in enumerate(self.live["layer_data"]):
+            group["layer"] = [f"#0092{layer * 200 + index:04X}" for index in range(200)]
+        result = self.initialization_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        snapshot = bridge.load_json(folder / "live-keymap.json")
+        self.assertTrue(result["initialization"])
+        self.assertEqual(result["backupScope"], "live-keymap-only")
+        self.assertEqual(result["ledSource"], "unknown-before-initialization")
+        self.assertEqual(result["config"]["_provenance"]["led"], "unknown-before-initialization")
+        self.assertEqual(result["appliedSlots"], [3])
+        self.assertEqual(result["changedSlots"], [1, 2, 3])
+        self.assertEqual([item["slot"] for item in result["summary"]], [1, 2, 3])
+        self.assertEqual([item["enabled"] for item in result["summary"]], [False, False, True])
+        self.assertEqual(result["keyChangeCount"], 0)
+        self.assertEqual(result["keymapPreservation"]["preservedKeycodes"], 1400)
+        self.assertFalse(result["keymapPreservation"]["storedComparisonAvailable"])
+        self.assertEqual(bridge.matrix(self.target["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(self.target["key_layer"]["valid"], 1)
+        self.assertEqual(snapshot["key_layer"], self.live)
+        self.assertEqual(snapshot["scope"], "live-keymap-only")
+        self.assertNotIn("page_data", snapshot)
+        self.assertEqual(metadata["planVersion"], 3)
+        self.assertNotIn("storedBaselineHash", metadata)
+        self.assertNotIn("beforeHash", metadata)
+        self.assertEqual(Path(result["backupPath"]), folder / "live-keymap.json")
+        for filename in ("stored-before.json", "before.json", "before.raw"):
+            self.assertFalse((folder / filename).exists())
+        self.assertFalse((self.backend.state_dir / "backups").exists())
+        self.assertEqual(self.target["page_num"], 8)
+        self.assertEqual([page["page_index"] for page in self.target["page_data"]], list(range(8)))
+        self.assertEqual(self.target["page_data"][:5], self.standard_builtins["pages"])
+        self.assertEqual([bool(page["valid"]) for page in self.target["page_data"][:5]], [True, True, True, False, False])
+        self.assertTrue(all(page["lightness"] == 100 for page in self.target["page_data"][:5]))
+        self.assertEqual(self.target["page_data"][2]["color"]["rgb"], "#ffffff")
+        self.assertEqual(result["builtinSource"], self.standard_builtins["source"])
+        for page in self.target["page_data"][5:7]:
+            self.assertFalse(page["valid"])
+            self.assertTrue(all(color == "#000000" for field in ("frames", "keyframes")
+                                for frame in page[field]["frame_data"] for color in frame["frame_RGB"]))
+        chosen = bridge.page_for(self.target, 3)
+        self.assertTrue(chosen["valid"])
+        self.assertEqual([frame["frame_RGB"] for frame in chosen["frames"]["frame_data"]], self.design()["frames"])
+        self.assertEqual([frame["frame_RGB"] for frame in chosen["keyframes"]["frame_data"]], self.design()["keyframes"])
+        self.assertEqual(self.target["exchange_key"], [])
+        self.assertEqual(self.target["swap_key"], [])
+        for field in ("Fn_key", "MACRO_key", "macro_key", "extraPreserved"):
+            self.assertNotIn(field, self.target)
+        from jsonschema import Draft202012Validator
+        schema = bridge.load_json(VENDOR / "cyberboard" / "schemas" / "cyberboard-config.schema.json")
+        Draft202012Validator(schema).validate(self.target)
+        fp = self.real_cli["cb_write"].plan(self.target)
+        self.assertTrue(all(len(frame) == 64 and self.real_cli["cb_protocol"].crc_ok(frame) for frame in fp.frames))
+        self.assertEqual(dict(fp.sections)["key_layer"], 95)
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_requires_explicit_live_only_policy_before_usb(self):
+        for value in (False, None, 1, "true"):
+            self.expect_error("invalid_keymap_policy", lambda: self.backend.initializePlan(
+                {**self.initialization_payload(), "preserveCurrentKeymap": value}))
+        self.expect_error("invalid_keymap_policy", lambda: self.backend.initializePlan(
+            {**self.initialization_payload(), "keyChanges": [{"layer": 0, "matrixIndex": 0, "code": "#00070005"}]}))
+        self.expect_error("invalid_slots", lambda: self.backend.initializePlan({"assignments": [], "preserveCurrentKeymap": True}))
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_initialization_rejects_any_existing_record_including_invalid_null_and_symlink(self):
+        location = self.real_cli["cb_store"].current_path("AM01R6")
+        for content in ("null", "{}", "[]", "", "not JSON", json.dumps(self.baseline)):
+            with self.subTest(content=content[:20]):
+                location.write_text(content)
+                self.expect_error("initialization_record_exists", lambda: self.backend.initializePlan(self.initialization_payload()))
+                self.assertEqual(location.read_text(), content)
+        location.unlink()
+        location.mkdir()
+        self.expect_error("initialization_record_exists", lambda: self.backend.initializePlan(self.initialization_payload()))
+        location.rmdir()
+        try:
+            location.symlink_to(location.with_name("absent.json"))
+        except (OSError, NotImplementedError):
+            # Windows may not grant ordinary users symlink creation. The
+            # mandatory null/invalid/file/directory cases above still run.
+            pass
+        else:
+            self.expect_error("initialization_record_exists", lambda: self.backend.initializePlan(self.initialization_payload()))
+        self.assertEqual(self.reads + self.serial_opens, 0)
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_without_confirmation_never_reads_or_sends_again(self):
+        result = self.initialization_prepared()
+        before = (self.probes, self.reads)
+        for value in (None, False, 0, 1, "true", []):
+            self.expect_error("initialization_confirmation_required", lambda: self.backend.execute(
+                {"token": result["token"], "confirmInitialization": value}))
+        self.assertEqual((self.probes, self.reads), before)
+        self.assertEqual(self.sent, [])
+        self.assertFalse(self.backend.initialization_marker("AM01R6").exists())
+
+    def test_initialization_current_record_appearing_after_plan_prevents_send(self):
+        result = self.initialization_prepared()
+        self.real_cli["cb_store"].current_path("AM01R6").write_text("invalid new record")
+        self.expect_error("initialization_record_exists", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_final_store_check_rejects_record_created_during_live_read(self):
+        result = self.initialization_prepared()
+        original = self.cli["cb_read"]._drain
+
+        def appearing_record(*args, **kwargs):
+            data = original(*args, **kwargs)
+            self.real_cli["cb_store"].current_path("AM01R6").write_text("null")
+            return data
+
+        with patch.object(self.cli["cb_read"], "_drain", appearing_record):
+            self.expect_error("initialization_record_exists", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_store_check_immediately_before_start_rejects_late_record(self):
+        result = self.initialization_prepared()
+        original = self.backend.event
+
+        def appearing_record(stage, *args, **kwargs):
+            original(stage, *args, **kwargs)
+            if stage == "starting":
+                self.real_cli["cb_store"].current_path("AM01R6").write_text("null")
+
+        with patch.object(self.backend, "event", appearing_record):
+            self.expect_error("initialization_record_exists", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_rejects_changed_internal_key_firmware_and_identity(self):
+        result = self.initialization_prepared()
+        self.live["layer_data"][6]["layer"][199] = "#00070006"
+        self.expect_error("keymap_changed", lambda: self.initialize_execute(result))
+        self.live = copy.deepcopy(self.target["key_layer"])
+        self.identity.version = "changed-firmware"
+        self.expect_error("device_changed", lambda: self.initialize_execute(result))
+        self.identity.version = "test-r6"
+        self.identity.product_id = "CB04"
+        self.expect_error("device_changed", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_execution_scans_all_ports_for_ambiguity(self):
+        result = self.initialization_prepared()
+        other = types.SimpleNamespace(product_id="CB04", version="test-r4", port="other-mock", is_dongle=False)
+        self.cli["cb_device"].candidate_ports = lambda: [self.identity.port, other.port]
+        self.cli["cb_device"].probe = lambda port, **kwargs: self.identity if port == self.identity.port else other
+        self.expect_error("ambiguous_device", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_rejects_target_or_snapshot_tampering_and_expired_plan(self):
+        result = self.initialization_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        target = copy.deepcopy(self.target)
+        target["key_layer"]["valid"] = 0
+        bridge.atomic_json(folder / "target.json", target)
+        self.expect_error("plan_tampered", lambda: self.initialize_execute(result))
+        # Even rewriting a public hash cannot opt out of the key/mode policy.
+        metadata = bridge.load_json(folder / "plan.json")
+        metadata["targetHash"] = bridge.digest(target)
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("plan_tampered", lambda: self.initialize_execute(result))
+        bridge.atomic_json(folder / "target.json", self.target)
+        metadata["targetHash"] = bridge.digest(self.target)
+        metadata["createdTimestamp"] -= bridge.PLAN_LIFETIME_SECONDS + 1
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("plan_expired", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_missing_or_changed_reporting_fields_rejected_before_write(self):
+        result = self.initialization_prepared()
+        path = self.backend.state_dir / "plans" / result["token"] / "plan.json"
+        original = bridge.load_json(path)
+        for field in ("limitations", "backupPath"):
+            for replacement in (None, "changed"):
+                with self.subTest(field=field, replacement=replacement):
+                    metadata = copy.deepcopy(original)
+                    if replacement is None:
+                        metadata.pop(field)
+                    else:
+                        metadata[field] = replacement
+                    bridge.atomic_json(path, metadata)
+                    self.expect_error("plan_tampered", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+
+    def test_initialization_corrupt_unknown_or_failed_live_read_never_creates_record(self):
+        self.real_cli["cb_store"].current_path("AM01R6").unlink()
+        original = self.cli["cb_read"]._drain
+        for corruption in ("missing", "duplicate", "crc", "header"):
+            def corrupted(*args, **kwargs):
+                frames = original(*args, **kwargs)
+                if corruption == "missing":
+                    return frames[:-1]
+                if corruption == "duplicate":
+                    frames[-1] = frames[0]
+                elif corruption == "crc":
+                    frames[0] = frames[0][:-1] + bytes([frames[0][-1] ^ 1])
+                else:
+                    frames[0] = self.real_cli["cb_protocol"].build_frame(6, 8, frames[0][2:63])
+                return frames
+            with self.subTest(corruption=corruption), patch.object(self.cli["cb_read"], "_drain", corrupted):
+                self.expect_error("incomplete_keymap", lambda: self.backend.initializePlan(self.initialization_payload()))
+        with patch.object(self.cli["cb_read"], "_drain", side_effect=OSError("isolated timeout")):
+            self.expect_error("serial_keymap_failed", lambda: self.backend.initializePlan(self.initialization_payload()))
+        with patch.object(self.cli["cb_device"], "probe", return_value=None):
+            self.expect_error("device_missing", lambda: self.backend.initializePlan(self.initialization_payload()))
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.assertFalse((self.backend.state_dir / "plans").exists())
+        self.assertEqual(self.sent, [])
+
+    def test_initialization_records_only_after_ack_and_complete_readback_then_normal_plan_works(self):
+        self.live_internal_keys()
+        result = self.initialization_prepared()
+        original_record = self.cli["cb_write"]._record_write
+
+        def verified_before_record(pid, config, version):
+            self.assertIsNone(self.real_cli["cb_store"].load_current(pid))
+            self.assertTrue(self.after_write)
+            self.assertGreaterEqual(self.after_reads, 1)
+            return original_record(pid, config, version)
+
+        with patch.object(self.cli["cb_write"], "_record_write", verified_before_record):
+            report = self.initialize_execute(result)
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"] and report["stateStored"])
+        self.assertEqual(report["backupScope"], "live-keymap-only")
+        self.assertEqual(report["appliedSlots"], [3])
+        self.assertEqual(report["changedSlots"], [1, 2, 3])
+        self.assertEqual(report["readbackAttempts"], [{"attempt": 1, "keymapMatch": True, "completeKeycodes": 1400}])
+        self.assertEqual(self.recorded, [self.target])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.target)
+        self.assertTrue(self.backend.initialization_marker("AM01R6").is_file())
+        self.expect_error("plan_consumed", lambda: self.initialize_execute(result))
+        ordinary = self.backend.plan({**self.payload(), "preserveCurrentKeymap": True})
+        self.assertNotIn("initialization", ordinary)
+        self.assertEqual(ordinary["changedSlots"], [2])
+
+    def test_initialization_start_or_end_failure_consumes_token_blocks_retry_without_fake_baseline(self):
+        result = self.initialization_prepared()
+        self.bad_start_crc = True
+        self.expect_error("start_ack_failed", lambda: self.initialize_execute(result))
+        self.assertEqual(self.recorded, [])
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.expect_error("plan_consumed", lambda: self.initialize_execute(result))
+        self.expect_error("initialization_unresolved", lambda: self.backend.initializePlan(self.initialization_payload()))
+        self.expect_error("baseline_missing", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": True}))
+        self.assertFalse((self.backend.state_dir / "backups").exists())
+
+    def test_initialization_readback_mismatch_has_no_current_and_blocks_retry(self):
+        result = self.initialization_prepared()
+        self.retry_mismatches = 99
+        self.expect_error("verification_failed", lambda: self.initialize_execute(result))
+        self.assertEqual(self.after_reads, 3)
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.assertEqual(self.recorded, [])
+        self.expect_error("initialization_unresolved", lambda: self.backend.initializePlan(self.initialization_payload()))
+
+    def test_initialization_store_and_both_completion_failures_leave_durable_retry_guard(self):
+        result = self.initialization_prepared()
+        original = bridge.atomic_json
+
+        def failed_completion(path, value, **kwargs):
+            if Path(path).name == "result.json" or Path(path).name == "plan.json" and value.get("status") == "complete":
+                raise OSError("isolated completion failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(self.cli["cb_write"], "_record_write", side_effect=OSError("isolated store failure")), \
+                patch.object(bridge, "atomic_json", failed_completion):
+            report = self.initialize_execute(result)
+        self.assertTrue(report["success"] and report["deviceAck"] and report["keymapMatch"])
+        self.assertFalse(report["stateStored"] or report["reportStored"])
+        self.assertIn("warning", report)
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.assertEqual(bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")["status"], "executing")
+        self.expect_error("initialization_unresolved", lambda: self.backend.initializePlan(self.initialization_payload()))
+
+    def test_initialization_failure_status_save_failure_cannot_unlock_retry(self):
+        result = self.initialization_prepared()
+        self.bad_end_header = True
+        original = bridge.atomic_json
+
+        def failed_status(path, value, **kwargs):
+            if Path(path).name == "plan.json" and value.get("status") == "failed":
+                raise OSError("isolated failure report failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(bridge, "atomic_json", failed_status), self.assertRaises(OSError):
+            self.initialize_execute(result)
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.expect_error("initialization_unresolved", lambda: self.backend.initializePlan(self.initialization_payload()))
+
+    def test_initialization_marker_save_failure_sends_nothing(self):
+        result = self.initialization_prepared()
+        original = bridge.atomic_json
+
+        def failed_marker(path, value, **kwargs):
+            if Path(path) == self.backend.initialization_marker("AM01R6"):
+                raise OSError("isolated durable marker failure")
+            return original(path, value, **kwargs)
+
+        with patch.object(bridge, "atomic_json", failed_marker), self.assertRaises(OSError):
+            self.initialize_execute(result)
+        self.assertEqual(self.sent, [])
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        metadata = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")
+        self.assertEqual(metadata["status"], "prepared")
+
+    def builtin_prepared(self, indices=None):
+        source = self.backend.readConfiguration({})
+        result = self.backend.builtInPlan({"sourceHash": source["sourceHash"], "pageIndices": [0, 1, 2] if indices is None else indices})
+        self.target = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "target.json")
+        return result
+
+    def test_read_configuration_is_truthful_hybrid_and_never_changes_current(self):
+        self.live_internal_keys()
+        path = self.real_cli["cb_store"].current_path("AM01R6")
+        original = path.read_bytes()
+        source = self.backend.readConfiguration({})
+        self.assertEqual(source["sourceHash"], bridge.digest(self.baseline))
+        self.assertEqual(source["configurationSource"], "local-last-written-json+live-keymap")
+        self.assertEqual(source["ledSource"], "last-written")
+        self.assertEqual(source["config"]["_provenance"], {"led": "last-written", "keymap": "live"})
+        self.assertTrue(source["canWrite"])
+        self.assertEqual(source["unsupportedPaths"], [])
+        self.assertEqual(source["config"]["page_data"], self.baseline["page_data"])
+        self.assertEqual(source["config"]["extraPreserved"], self.baseline["extraPreserved"])
+        self.assertEqual(bridge.matrix(source["config"]["key_layer"]), bridge.matrix(self.live))
+        self.assertNotEqual(source["sourceHash"], bridge.digest({key: value for key, value in source["config"].items() if key != "_provenance"}))
+        self.assertEqual([mode["pageIndex"] for mode in source["builtInModes"]], list(range(5)))
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(self.serial_opens, 0)
+        self.assertFalse((self.backend.state_dir / "plans").exists())
+
+    def test_read_configuration_without_full_record_never_invents_led_or_defaults(self):
+        self.real_cli["cb_store"].current_path("AM01R6").unlink()
+        result = self.backend.readConfiguration({})
+        self.assertIsNone(result["config"])
+        self.assertIsNone(result["sourceHash"])
+        self.assertEqual(result["configurationSource"], "none")
+        self.assertEqual(result["ledSource"], "unknown")
+        self.assertEqual(result["builtInModes"], [])
+        self.assertFalse(result["canWrite"])
+        self.assertEqual(bridge.matrix(result["keymap"]), bridge.matrix(self.live))
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
+        self.assertEqual(self.sent, [])
+
+    def test_builtin_plan_only_overlays_selected_public_pages_and_live_matrix(self):
+        for index in (0, 1, 2):
+            page = self.baseline["page_data"][index]
+            page.update(valid=False, lightness=0, speed_ms=0)
+            page["frames"] = {"valid": 0, "frame_num": 0, "frame_data": []}
+            page["keyframes"] = {"valid": 0, "frame_num": 0, "frame_data": []}
+        self.baseline["page_data"][0]["historicalExtension"] = {"opaque": ["keep", 17]}
+        self.baseline["page_data"][0]["color"]["annotation"] = "keep nested metadata"
+        self.baseline["page_data"][4]["word_page"] = {"valid": 1, "word_len": 1, "unicode": ["#0041"]}
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        original = self.real_cli["cb_store"].current_path("AM01R6").read_bytes()
+        self.live_internal_keys()
+        result = self.builtin_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        before = bridge.load_json(folder / "before.json")
+        metadata = bridge.load_json(folder / "plan.json")
+        self.assertEqual(result["kind"], "builtin-modes")
+        self.assertEqual(result["changedBuiltinPages"], [0, 1, 2])
+        self.assertEqual(result["changedSlots"], [])
+        self.assertEqual(result["appliedSlots"], [])
+        self.assertEqual(result["summary"], [])
+        self.assertEqual(result["keyChangeCount"], 0)
+        self.assertEqual([mode["pageIndex"] for mode in result["builtinSummary"]], [0, 1, 2])
+        self.assertTrue(all(mode["enabled"] and mode["brightness"] == 100 and mode["speedMs"] == 50
+                            for mode in result["builtinSummary"]))
+        self.assertEqual(self.target["page_data"][2]["color"]["rgb"], "#ffffff")
+        for index in (0, 1, 2):
+            expected = copy.deepcopy(before["page_data"][index])
+            bridge.overlay_fields(expected, self.standard_builtins["pages"][index])
+            self.assertEqual(self.target["page_data"][index], expected)
+        for index in (3, 4, 5, 6, 7):
+            self.assertEqual(self.target["page_data"][index], self.baseline["page_data"][index])
+        self.assertEqual(self.target["page_data"][0]["historicalExtension"], {"opaque": ["keep", 17]})
+        self.assertEqual(self.target["page_data"][0]["color"]["annotation"], "keep nested metadata")
+        self.assertEqual(self.target["extraPreserved"], self.baseline["extraPreserved"])
+        self.assertEqual(bridge.matrix(self.target["key_layer"]), bridge.matrix(self.live))
+        self.assertEqual(bridge.load_json(folder / "stored-before.json"), self.baseline)
+        self.assertEqual(metadata["planVersion"], 2)
+        self.assertTrue(result["explicitDiff"])
+        self.assertTrue(all(any(change["path"].startswith(f"/page_data/{index}/") for index in (0, 1, 2))
+                            for change in result["explicitDiff"]))
+        self.assertEqual(metadata["explicitDiff"], result["explicitDiff"])
+        self.assertEqual(self.real_cli["cb_store"].current_path("AM01R6").read_bytes(), original)
+        self.assertEqual(self.sent, [])
+
+    def test_builtin_source_hash_is_required_and_stale_json_rejected(self):
+        for value in (None, "", "bad", "a" * 64):
+            self.expect_error("configuration_changed", lambda: self.backend.builtInPlan({"sourceHash": value, "pageIndices": [0]}))
+        source = self.backend.readConfiguration({})
+        changed = copy.deepcopy(self.baseline)
+        changed["page_data"][7]["lightness"] = 21
+        self.real_cli["cb_store"].save_current("AM01R6", changed)
+        self.expect_error("configuration_changed", lambda: self.backend.builtInPlan({"sourceHash": source["sourceHash"], "pageIndices": [0, 1, 2]}))
+        self.assertEqual(self.sent, [])
+        self.assertFalse((self.backend.state_dir / "plans").exists())
+
+    def test_builtin_scope_and_public_resource_are_validated_before_plan(self):
+        source = bridge.digest(self.baseline)
+        for indices in ([], [5], [0, 0], [True], ["0"], list(range(6))):
+            self.expect_error("invalid_builtin_pages", lambda: self.backend.builtInPlan({"sourceHash": source, "pageIndices": indices}))
+        for extra in ({"assignments": self.payload()["assignments"]}, {"keyChanges": [{"layer": 0}]}, {"preserveCurrentKeymap": False}):
+            self.expect_error("invalid_builtin_pages", lambda: self.backend.builtInPlan({"sourceHash": source, "pageIndices": [0], **extra}))
+        path = self.backend.resource_dir / "web" / "assets" / "builtin-default-pages.json"
+        path.unlink()
+        self.expect_error("builtin_defaults_missing", lambda: self.backend.builtInPlan({"sourceHash": source, "pageIndices": [0]}))
+        self.assertEqual(self.sent, [])
+        self.assertFalse((self.backend.state_dir / "plans").exists())
+
+    def test_builtin_execute_still_rejects_new_source_firmware_and_internal_key_changes(self):
+        result = self.builtin_prepared()
+        changed = copy.deepcopy(self.baseline)
+        changed["extraPreserved"]["opaque"].append("changed source")
+        self.real_cli["cb_store"].save_current("AM01R6", changed)
+        self.expect_error("baseline_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        self.identity.version = "different-firmware"
+        self.expect_error("device_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.identity.version = "test-r6"
+        self.live["layer_data"][6]["layer"][199] = "#00070006"
+        self.expect_error("keymap_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_builtin_execute_records_after_verified_write_and_reports_no_applied_custom_slots(self):
+        result = self.builtin_prepared()
+        report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["keymapMatch"] and report["stateStored"])
+        self.assertEqual(report["kind"], "builtin-modes")
+        self.assertEqual(report["changedBuiltinPages"], [0, 1, 2])
+        self.assertEqual(report["appliedSlots"], [])
+        self.assertEqual(report["changedSlots"], [])
+        self.assertEqual(report["builtinSummary"], result["builtinSummary"])
+        self.assertEqual(self.real_cli["cb_store"].load_current("AM01R6"), self.target)
+        self.assertEqual(self.recorded, [self.target])
+
+    def test_builtin_report_tampering_or_unselected_mutation_stops_before_send(self):
+        result = self.builtin_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        original = bridge.load_json(folder / "plan.json")
+        for field in ("kind", "changedBuiltinPages", "appliedSlots", "builtinSummary", "explicitDiff", "builtinSource", "builtinDefaultsHash"):
+            metadata = copy.deepcopy(original)
+            metadata.pop(field)
+            bridge.atomic_json(folder / "plan.json", metadata)
+            self.expect_error("plan_tampered", lambda: self.backend.execute({"token": result["token"]}))
+        target = copy.deepcopy(self.target)
+        target["page_data"][7]["lightness"] = 23
+        bridge.atomic_json(folder / "target.json", target)
+        original["targetHash"] = bridge.digest(target)
+        bridge.atomic_json(folder / "plan.json", original)
+        self.expect_error("plan_tampered", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+
+    def test_builtin_arbitrary_selected_values_even_with_updated_reports_are_not_authorized(self):
+        result = self.builtin_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        before = bridge.load_json(folder / "before.json")
+        target = copy.deepcopy(self.target)
+        target["page_data"][0]["lightness"] = 23
+        metadata["targetHash"] = bridge.digest(target)
+        metadata["builtinSummary"] = self.backend.builtin_summary(target, [0, 1, 2])
+        metadata["explicitDiff"] = [change for index in (0, 1, 2)
+                                    for change in bridge.configuration_diff(before["page_data"][index], target["page_data"][index],
+                                                                            f"/page_data/{index}")]
+        bridge.atomic_json(folder / "target.json", target)
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("plan_tampered", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+
+    def test_builtin_missing_kind_cannot_bypass_scope_checks(self):
+        result = self.builtin_prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        target = copy.deepcopy(self.target)
+        target["page_data"][7]["lightness"] = 23
+        metadata["targetHash"] = bridge.digest(target)
+        metadata.pop("kind")
+        bridge.atomic_json(folder / "target.json", target)
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("plan_tampered", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+
+    def test_known_unsupported_tables_or_counts_block_all_plans_without_losing_readable_json(self):
+        for field in ("Fn_key", "MACRO_key", "tab_key", "macro_key", "ph_key"):
+            for table, count in ([{"input_key": "#00070004", "out_key": "#00070005"}], 0), ([], 1):
+                with self.subTest(field=field, table=table, count=count):
+                    stored = copy.deepcopy(self.baseline)
+                    stored[field], stored[f"{field}_num"] = table, count
+                    self.real_cli["cb_store"].save_current("AM01R6", stored)
+                    source = self.backend.readConfiguration({})
+                    self.assertFalse(source["canWrite"])
+                    self.assertEqual(source["config"][field], table)
+                    self.assertTrue(any(path.startswith(f"/{field}") for path in source["unsupportedPaths"]))
+                    self.expect_error("unsupported_config_features", lambda: self.backend.plan({**self.payload(), "preserveCurrentKeymap": True}))
+                    self.expect_error("unsupported_config_features", lambda: self.backend.builtInPlan({"sourceHash": source["sourceHash"], "pageIndices": [0]}))
+        self.assertEqual(self.sent, [])
+
+    def test_empty_unencoded_tables_and_benign_extensions_are_preserved(self):
+        for field in ("Fn_key", "MACRO_key", "tab_key", "macro_key", "ph_key"):
+            self.baseline[field], self.baseline[f"{field}_num"] = [], 0
+        self.baseline["spotlight_frames"] = {"valid": "0", "frame_num": 0, "frame_data": [], "//": "inactive"}
+        self.baseline["HATSU"] = {"valid": 0, "page_data": [], "//": "inactive"}
+        self.baseline["hatsu"] = {}
+        self.baseline["page_data"][7]["historicalExtension"] = {"valid": 1, "opaque": ["metadata"]}
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline)
+        result = self.prepared({**self.payload(), "preserveCurrentKeymap": True})
+        self.assertEqual(self.target["spotlight_frames"], self.baseline["spotlight_frames"])
+        self.assertEqual(self.target["HATSU"], self.baseline["HATSU"])
+        self.assertEqual(self.target["page_data"][7], self.baseline["page_data"][7])
+        self.assertEqual(self.target["extraPreserved"], self.baseline["extraPreserved"])
+        self.assertTrue(result["token"])
+        self.assertEqual(self.sent, [])
+
+    def test_active_root_and_page_spotlights_and_hatsu_are_blocked(self):
+        for group in ({"valid": 1, "frame_num": 0, "frame_data": []},
+                      {"valid": "1", "frame_num": 0, "frame_data": []},
+                      {"valid": 0, "frame_num": 1, "frame_data": []},
+                      {"valid": 0, "frame_num": 0, "frame_data": [{"frame_light": [1]}]}):
+            for placement in ("root", "page"):
+                stored = copy.deepcopy(self.baseline)
+                container = stored if placement == "root" else stored["page_data"][0]
+                container["spotlight_frames"] = group
+                self.real_cli["cb_store"].save_current("AM01R6", stored)
+                self.expect_error("unsupported_config_features", lambda: self.backend.plan(self.payload()))
+        stored = copy.deepcopy(self.baseline)
+        stored["HATSU"] = {"page_data": [{"line_data": [1]}]}
+        self.real_cli["cb_store"].save_current("AM01R6", stored)
+        self.expect_error("unsupported_config_features", lambda: self.backend.plan(self.payload()))
+        self.assertEqual(self.sent, [])
+
+    def test_unsafe_supported_string_flags_cannot_be_silently_enabled(self):
+        for group, field in ((None, "valid"), ("color", "default"), ("word_page", "valid"), ("frames", "valid"), ("keyframes", "valid")):
+            stored = copy.deepcopy(self.baseline)
+            container = stored["page_data"][0] if group is None else stored["page_data"][0][group]
+            container[field] = "0"
+            self.real_cli["cb_store"].save_current("AM01R6", stored)
+            source = self.backend.readConfiguration({})
+            self.assertFalse(source["canWrite"])
+            self.expect_error("ambiguous_wire_flags", lambda: self.backend.plan(self.payload()))
+        self.assertEqual(self.sent, [])
+
+    def test_old_v2_plan_containing_unencoded_features_is_rechecked_on_execute(self):
+        result = self.prepared()
+        folder = self.backend.state_dir / "plans" / result["token"]
+        metadata = bridge.load_json(folder / "plan.json")
+        target = bridge.load_json(folder / "target.json")
+        target["MACRO_key"] = [{"input_key": "#00070004", "out_key": ["#00070005"], "intvel_ms": [10]}]
+        target["MACRO_key_num"] = 1
+        metadata["targetHash"] = bridge.digest(target)
+        bridge.atomic_json(folder / "target.json", target)
+        bridge.atomic_json(folder / "plan.json", metadata)
+        self.expect_error("unsupported_config_features", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_initialization_missing_or_changed_public_defaults_does_not_prepare_or_write(self):
+        self.real_cli["cb_store"].current_path("AM01R6").unlink()
+        path = self.backend.resource_dir / "web" / "assets" / "builtin-default-pages.json"
+        original = path.read_bytes()
+        path.unlink()
+        self.expect_error("builtin_defaults_missing", lambda: self.backend.initializePlan(self.initialization_payload()))
+        path.write_bytes(original)
+        result = self.initialization_prepared()
+        changed = copy.deepcopy(self.standard_builtins)
+        changed["pages"][0]["valid"] = 0
+        changed["source"]["pages_sha256"] = bridge.digest(changed["pages"])
+        path.write_text(json.dumps(changed))
+        self.expect_error("plan_tampered", lambda: self.initialize_execute(result))
+        self.assertEqual(self.sent, [])
+        self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
 
     def live_internal_keys(self):
         # R6-like readback: 103 internal non-physical codes per layer, while all

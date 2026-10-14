@@ -1,10 +1,33 @@
+using System.Runtime.CompilerServices;
+
 namespace CyberboardStudio;
 
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
     {
+        var diagnostic = args.Length == 1 && args[0] == "--diagnostic-startup";
+        try
+        {
+            // This branch loads only the managed runtime and reads fixed package
+            // file names. It never constructs the UI, credentials or CLI bridge.
+            if (diagnostic) return StartupDiagnostics.Run(AppContext.BaseDirectory);
+            StartupDiagnostics.Stage("main-entered");
+            return RunDesktop();
+        }
+        catch (Exception exception)
+        {
+            if (diagnostic) Console.Error.WriteLine("Managed startup probe failed: " + exception.GetType().Name + ": " + exception.Message);
+            else ShowFailure(exception);
+            return 1;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int RunDesktop()
+    {
+        StartupDiagnostics.Stage("winforms-initializing");
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -20,15 +43,18 @@ internal static class Program
         {
             MessageBox.Show("Cyberboard Studio 已经在运行。请使用已打开的窗口。", "Cyberboard Studio",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            return 0;
         }
-        try { Application.Run(new StudioForm()); }
-        catch (Exception exception) { ShowFailure(exception); }
+        using var form = new StudioForm();
+        StartupDiagnostics.Stage("window-created");
+        Application.Run(form);
+        return 0;
     }
 
     private static void ShowFailure(Exception exception)
     {
         HostLog.Write("host", exception.ToString());
+        Console.Error.WriteLine("Desktop startup/application failure: " + exception.GetType().Name + ": " + exception.Message);
         MessageBox.Show("应用遇到错误：\n" + exception.Message, "Cyberboard Studio",
             MessageBoxButtons.OK, MessageBoxIcon.Error);
     }

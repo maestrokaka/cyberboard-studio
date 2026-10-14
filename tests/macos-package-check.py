@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -84,7 +85,7 @@ def bundle_structure(app):
     contents = app / "Contents"
     resources = contents / "Resources"
     info = plistlib.loads((contents / "Info.plist").read_bytes())
-    require(info.get("CFBundleShortVersionString") == "0.2.2", "App version differs from this release")
+    require(info.get("CFBundleShortVersionString") == "0.3.0", "App version differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]
@@ -104,10 +105,33 @@ def bundle_structure(app):
     require(manifest.get("target") == "macos-arm64" and manifest.get("depends_on_system_python") is False,
             "Frozen backend manifest does not describe a portable arm64 runtime")
     require(manifest.get("private_device_state_bundled") is False, "Frozen backend includes private device state")
+    expected_sources = [*sorted((ROOT / "backend").glob("*.py")),
+                        ROOT / "vendor/cyberboard-cli/cyberboard/_tools/cb_device.py"]
+    expected_hashes = {path.relative_to(ROOT).as_posix(): sha256(path) for path in expected_sources}
+    require(manifest.get("source_hashes") == expected_hashes,
+            "Frozen backend source hashes differ from current Python modules or patched device discovery")
     require(not (resources / "backend/bridge.py").exists(), "Source/development backend is included in the release")
-    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "polish.css", "dialogs.js", "assets/support/wechat-pay.jpg"):
+    for removed in ("assets/desk.jpg", "assets/photos/r4-cloud-perspective.jpg", "assets/photos/r6-launch-front.png"):
+        require(not (resources / "web" / removed).exists(), "Excluded-angle photo remains in the package: " + removed)
+    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
                 "Packaged web source is missing or stale: " + name)
+    # --help exits before Bridge/CLI initialization. A fresh web tree alone must
+    # not conceal a stale frozen backend lacking the configuration fixes.
+    help_text = run([str(binary), "--help"]).stdout
+    action_list = re.search(r"--action\s+\{([^}]+)\}", help_text)
+    require(action_list is not None, "Frozen backend does not advertise its action contract")
+    advertised = set(action_list.group(1).split(","))
+    configuration_actions = {"readConfiguration", "builtInPlan", "initializePlan", "plan", "execute"}
+    require(configuration_actions <= advertised, "Frozen backend lacks the configuration/default-mode fixes")
+    native_source = (ROOT / "native/Studio.swift").read_text(encoding="utf-8")
+    transport = re.search(r"backendActions:\s*Set<String>\s*=\s*\[(.*?)\]", native_source, re.S)
+    require(transport and configuration_actions <= set(re.findall(r'"([^"\n]+)"', transport.group(1))),
+            "macOS native bridge cannot forward every configuration action")
+    defaults = json.loads((resources / "web/assets/builtin-default-pages.json").read_text(encoding="utf-8"))
+    require([page["page_index"] for page in defaults["pages"]] == list(range(5)) and
+            [bool(page["valid"]) for page in defaults["pages"]] == [True, True, True, False, False],
+            "Bundled standard modes must enable battery, mosaic and clock")
     require(any((backend / "_internal").rglob("_imagingcms*.so")), "Color conversion native module is missing")
     forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "pyvenv.cfg", ".operation.lock"}
     forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "test-fixtures"}
