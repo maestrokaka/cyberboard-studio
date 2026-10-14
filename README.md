@@ -49,19 +49,7 @@
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
 
-v0.2.2 改善工作台的独立滚动和固定槽位操作区，修复导入校验、槽位草稿恢复、历史恢复与同步结果提示；参考图片先转换为 sRGB，新增「支持作者」页面。[本次更新说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)
-
-## 支持作者
-
-**为下一束光，留一点能量。**
-
-如果 Cyberboard Studio 让你的键盘多了一点个性，欢迎请作者喝杯咖啡。支持完全自愿，金额随心，不影响任何功能的使用。
-
-[![支持作者 · 微信收款码](docs/screenshots/support-author.png)](docs/screenshots/support-author.png)
-
-用微信扫描图中的收款码（收款人 **Kakà**），也可以点击图片查看清晰大图。
-
-建议、问题反馈或合作，请联系 [maestrokaka@gmail.com](mailto:maestrokaka@gmail.com)。**请不要使用付款留言反馈问题**，方便及时跟进。
+v0.2.2 改善工作台的独立滚动和固定槽位操作区，修复导入校验、槽位草稿恢复、历史恢复与同步结果提示；参考图片先转换为 sRGB。[本次更新说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)
 
 ## 当前功能
 
@@ -176,3 +164,23 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 ## 在 GitHub 更新
 
 改好的代码提交并推送到 `main`。可下载软件放在 Releases，使用新的版本号保存更新说明、macOS / Windows 软件包及校验文件；无需把编译缓存或运行库加入 Git 历史。[GitHub Releases 说明](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
+
+---
+
+## 支持作者
+
+**键盘已经亮了，咖啡杯还空着。☕**
+
+如果 Cyberboard Studio 帮你点亮了喜欢的灯效，欢迎请 **Kakà** 喝杯咖啡，给下一次灵感补一点咖啡因。金额随心，心意满格；支持完全自愿，不影响任何功能的使用。
+
+<p align="center">
+  <a href="docs/assets/wechat-support.svg"><img src="docs/assets/wechat-support.svg" width="280" alt="Kakà 的微信收款二维码" /></a>
+  <br />
+  <strong>微信扫一扫 · Kakà</strong>
+  <br />
+  <sub>点击二维码可查看大图</sub>
+</p>
+
+有 Bug、有脑洞，或者想聊聊你的键盘，欢迎写信给 [maestrokaka@gmail.com](mailto:maestrokaka@gmail.com)。
+
+**咖啡可以扫码，问题请走邮件。** 付款留言不方便跟进，别让你的好点子迷路了。
