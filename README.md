@@ -1,5 +1,7 @@
 # Cyberboard Studio
 
+**简体中文** · [English](README.en.md)
+
 **第三方怒喵（Angry Miao）键盘工具，支持 CYBERBOARD R4 / CYBERBOARD R6，适用于 macOS / Windows。**
 
 用 Kimi、MiniMax 或 DeepSeek，结合文字与参考图制作顶部与轴灯动画，在真实键盘照片上预览，再通过本机 CLI 同步到键盘。
@@ -223,3 +225,5 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 有 Bug、有脑洞，或者想聊聊你的键盘，欢迎写信给 [maestrokaka@gmail.com](mailto:maestrokaka@gmail.com)。
 
 **咖啡可以扫码，问题请走邮件。** 付款留言不方便跟进，别让你的好点子迷路了。
+
+如果你需要英文界面的 App，欢迎联系我：[maestrokaka@gmail.com](mailto:maestrokaka@gmail.com)。
