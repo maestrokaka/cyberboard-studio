@@ -16,7 +16,7 @@
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)
+[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.1)
 
 ## 应用截图
 
@@ -69,17 +69,19 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.3.0-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
-| `Cyberboard-Studio-0.3.0-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
-| `Cyberboard-Studio-0.3.0-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
+| `Cyberboard-Studio-0.3.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
+| `Cyberboard-Studio-0.3.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
+| `Cyberboard-Studio-0.3.1-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
 
 软件包均带 CLI 和运行环境，无需自己安装 Python。Windows 缺少 WebView2 时，运行包内 `Dependencies/MicrosoftEdgeWebview2Setup.exe`，联网安装后重新打开应用。
 
-当前版本为 [v0.3.0 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
+当前版本为 [v0.3.1 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.1)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、系统密钥保护和真实 USB 通信尚待 Windows 实机验证。
 
 Windows 优先使用普通包。遇到「Unknown Hard Error」时，先运行包内「诊断启动.cmd」，不要仅凭弹框换包；只有退出码与日志明确指向 CET 兼容问题时，才考虑兼容包。优先安装系统累计更新后继续使用普通包，具体见[启动故障处理](docs/USER_GUIDE.md#faq)。
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
+
+v0.3.1 优化简短描述与参考图创作：有图时提炼主体、特征色与像素轮廓，无图时按主题编排动作。默认独立配色，不再继承上一作品的预览速度；可直接写「4秒循环」。生成后检查实际像素的可见性、意外静止与明显接缝，必要时最多修正一次，仍需预览确认效果。
 
 v0.3.0 新增 MiniMax、DeepSeek 模型连接与按模型区分的参考图支持；增加 7 款官网 R4 配色，连同最早实拍的 R6「Vision」共 8 款参考外观，通过左侧键盘缩略图切换。AI 创作、预览、参数与槽位操作整合到工作台，并加入首次配置、指定内置模式恢复及 Windows 启动诊断与端口异常处理。
 
@@ -102,9 +104,16 @@ v0.3.0 新增 MiniMax、DeepSeek 模型连接与按模型区分的参考图支�
 
 v0.2.0 已接入 Kimi，同时保留本地模板变体、外部 AI 创作规格导出与作品 JSON 导入。当前 CLI 不支持固件升级。
 
-v0.2.1 将创作提示词扩展为 12 类设计方向与 8 种运动语言，按主题选择角色微动作、渐变、自然、文字、游戏或光轨等组合，不套用固定场景模板。内部 AI 输出有界配方，由本地编译完整帧；外部提示词要求完整 Studio 作品 JSON。顶部每帧 200 色、轴灯每帧 90 色，不能把顶部数组复制成轴灯。App 当前仍请求 192 帧和当前 `10–100 ms / 帧`，3–8 秒只是设计目标。[提示词与格式说明](docs/USER_GUIDE.md#creative)
+创作提示词提供角色微动作、渐变、自然、文字、游戏、光轨等方向，按本次主题组合，不套用固定场景模板。App 自动编排新作品的节奏与时长，也可在描述里直接写「4 秒循环」；当前预览作品的播放速度不会限制新创作。内部 AI 输出由本地编译成完整灯效，外部提示词则要求完整 Studio 作品 JSON。[提示词与格式说明](docs/USER_GUIDE.md#creative)
 
-在左侧「模型配置」选择服务、区域和模型，输入自己的 API Key 并保存；回到工作台常驻的 AI 创作区填写描述或添加参考图，点击制作按钮（显示当前服务名称）。默认优先遵循描述和图片，当前作品只提供配色建议；需要参考当前作品的主题和风格时，在「更多工具」中勾选「使用当前作品风格」。图片只保留在当前会话，不发送设备配置、键位或整份草稿。生成不会自动放入槽位或写入 USB。完整步骤见[AI 创作说明](docs/USER_GUIDE.md#creative)。
+在左侧「模型配置」选择服务、区域和模型，输入自己的 API Key 并保存；回到工作台常驻的 AI 创作区，点击制作按钮（显示当前服务名称）：
+
+- **没有参考图：** 直接写想看到的效果，例如「橙红火焰从底部窜起，轴灯像余烬，4 秒循环」。不必手写像素、帧数或运动参数。
+- **有参考图：** 添加 1–3 张图片，补一句希望保留和怎样动，例如「让图中的猫眨眼，保留橙白配色，轴灯柔和呼吸」。需要支持图片的模型，也可只上传图片开始制作。
+
+默认不沿用上个作品的名称、描述或配色。需要借用其风格时，在「更多工具」中主动勾选「使用当前作品风格」；本次描述与参考图仍优先。图片只保留在当前会话，不发送设备配置、键位或整份草稿。
+
+生成后会检查灯光可见性和动画数据；格式或明显可见性问题最多触发一次修复请求，通过后入库预览。这些检查不评价审美，也不能保证还原参考图，仍需看完顶部与轴灯的整个循环，再决定是否同步。制作不会自动放入槽位或写入 USB；修复是额外模型调用，失败或取消也可能产生费用。完整步骤见[AI 创作说明](docs/USER_GUIDE.md#creative)。
 
 默认 Code 模型为 `k3`，下拉可选择 `k3`、`k3-256k`、`kimi-for-coding` 或 `kimi-for-coding-highspeed`；开放平台默认 `kimi-k3`。两种服务都可选择「自定义模型…」填写有权限使用的官方模型 ID，使用不同密钥和额度。MiniMax 与 DeepSeek 使用各自的 API Key，不能混用 Kimi 密钥。[Kimi 模型配置](https://www.kimi.com/code/docs/kimi-code/models.html)
 

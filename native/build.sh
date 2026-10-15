@@ -77,7 +77,7 @@ if [[ -x "$backend_dir/CyberboardBackend" ]]; then
   /usr/bin/ditto "$backend_dir" "$contents_dir/Resources/backend/CyberboardBackend"
 fi
 if [[ -n "$dev_python" ]]; then
-  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py; do
+  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py ai_quality.py; do
     /bin/cp "$project_dir/backend/$module_name" "$contents_dir/Resources/backend/$module_name"
   done
 fi

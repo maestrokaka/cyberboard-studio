@@ -777,7 +777,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.3.0"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.3.1"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

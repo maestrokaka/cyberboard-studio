@@ -355,6 +355,136 @@ class RecipeChecks(unittest.TestCase):
             validator.validate(recipe)
             compiler.compile_recipe(recipe)
 
+    def test_compact_model_schema_is_substantially_smaller_and_keeps_defaults(self):
+        full = compiler.recipe_schema()
+        compact = compiler.model_recipe_schema()
+        packed = lambda value: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        self.assertLess(len(packed(compact)), len(packed(full)) * 0.5)
+        self.assertEqual(compact["required"], full["required"])
+        self.assertEqual(compact["additionalProperties"], full["additionalProperties"])
+        self.assertEqual(compact["properties"], full["properties"])
+        for kind in compiler.KINDS:
+            self.assertEqual(compact["$defs"][kind]["required"], full["$defs"][kind]["required"])
+            self.assertEqual(compact["$defs"][kind]["additionalProperties"], False)
+            for key, bounds in {**compiler.COMMON_NUMBERS, **compiler.KINDS[kind]["numbers"]}.items():
+                field = compact["$defs"][kind]["properties"][key]
+                self.assertEqual(field["default"], bounds[2])
+                self.assertIn("$ref", field)
+        # Both helpers return detached structures; callers cannot mutate the
+        # local contract or another request's prompt by editing one result.
+        compact["$defs"]["bitmap"]["required"].append("unsafe")
+        self.assertNotIn("unsafe", compiler.model_recipe_schema()["$defs"]["bitmap"]["required"])
+        self.assertEqual(compiler.recipe_schema(), full)
+
+    def test_compact_schema_equivalence_covers_every_motion_field_and_edge(self):
+        try:
+            import jsonschema
+        except ImportError:
+            self.skipTest("Optional schema-check dependency not present")
+        full = jsonschema.Draft202012Validator(compiler.recipe_schema())
+        compact_schema = compiler.model_recipe_schema()
+        jsonschema.Draft202012Validator.check_schema(compact_schema)
+        compact = jsonschema.Draft202012Validator(compact_schema)
+        checked = 0
+        for kind, table in compiler.KINDS.items():
+            for key, (minimum, maximum, default) in {**compiler.COMMON_NUMBERS, **table["numbers"]}.items():
+                values = [minimum, maximum, default, minimum - 1, maximum + 1, True, False, str(default), None, [],
+                          {"from": minimum, "to": maximum},
+                          {"from": minimum, "to": maximum, "ease": "smooth"},
+                          {"from": minimum, "to": maximum, "ease": "sine", "cycles": 8, "phase": 1},
+                          {"from": minimum, "to": maximum, "ease": "triangle", "cycles": 1, "phase": 0},
+                          {"from": minimum - 1, "to": maximum}, {"from": minimum, "to": maximum + 1},
+                          {"from": minimum}, {"to": maximum}, {},
+                          {"from": minimum, "to": maximum, "cycles": 1},
+                          {"from": minimum, "to": maximum, "phase": 0},
+                          {"from": minimum, "to": maximum, "ease": "linear", "cycles": 1},
+                          {"from": minimum, "to": maximum, "ease": "smooth", "phase": 0},
+                          {"from": minimum, "to": maximum, "ease": "sine", "cycles": 0},
+                          {"from": minimum, "to": maximum, "ease": "sine", "phase": 2},
+                          {"from": minimum, "to": maximum, "ease": "unknown"},
+                          {"from": minimum, "to": maximum, "expression": "user code"}]
+                for value in values:
+                    recipe = sample_recipe(1)
+                    layer = {"kind": kind, "color": "#FFFFFF"}
+                    if kind == "text":
+                        layer["text"] = "A"
+                    elif kind == "bitmap":
+                        layer = {"kind": kind, "rows": ["1"]}
+                    layer[key] = value
+                    recipe["scenes"][0]["top"] = [layer]
+                    with self.subTest(kind=kind, parameter=key, value=value):
+                        self.assertEqual(full.is_valid(recipe), compact.is_valid(recipe))
+                    checked += 1
+        self.assertGreater(checked, 1000)
+
+    def test_compact_schema_keeps_required_unknown_field_and_static_constraints(self):
+        try:
+            import jsonschema
+        except ImportError:
+            self.skipTest("Optional schema-check dependency not present")
+        full = jsonschema.Draft202012Validator(compiler.recipe_schema())
+        compact = jsonschema.Draft202012Validator(compiler.model_recipe_schema())
+        mutations = []
+        for required in compiler.recipe_schema()["required"]:
+            recipe = sample_recipe()
+            del recipe[required]
+            mutations.append(recipe)
+        for location in ("root", "scene", "layer"):
+            recipe = sample_recipe()
+            target = recipe if location == "root" else recipe["scenes"][0]
+            if location == "layer":
+                target = target["top"][0]
+            target["unsafe"] = "not supported"
+            mutations.append(recipe)
+        for kind, fields in (("solid", {}), ("bitmap", {}), ("bitmap", {"rows": ["G"]}),
+                             ("bitmap", {"rows": ["1"] * 33}), ("bitmap", {"rows": ["1" * 41]}),
+                             ("bitmap", {"rows": ["1"], "palette": []}),
+                             ("text", {"color": "#FFFFFF", "text": "lowercase"}),
+                             ("checker", {"color": "#FFFFFF", "cells_x": 41}),
+                             ("checker", {"color": "#FFFFFF", "invert": 1}),
+                             ("noise", {"color": "#FFFFFF", "seed": -1}),
+                             ("particles", {"color": "#FFFFFF", "count": 25})):
+            recipe = sample_recipe()
+            recipe["scenes"][0]["top"] = [{"kind": kind, **fields}]
+            mutations.append(recipe)
+        for recipe in mutations:
+            self.assertFalse(full.is_valid(recipe))
+            self.assertFalse(compact.is_valid(recipe))
+
+    def test_verified_grid_examples_compile_preserve_palette_and_loop(self):
+        examples = compiler.verified_recipe_examples()
+        self.assertEqual(len(examples), 2)
+        character, scan = [compiler.compile_recipe(recipe) for recipe in examples]
+        self.assertEqual((len(character["frames"]), len(scan["frames"])), (192, 192))
+        self.assertEqual(character["frames"][0], character["frames"][-1])
+        self.assertNotEqual(character["frames"][0], character["frames"][examples[0]["scenes"][1]["start"]])
+        self.assertTrue(all(frame == character["keyframes"][0] for frame in character["keyframes"]))
+        # Explicit local palette makes index 3 a true black pupil, replacing the
+        # nonblack background; transparent index 0 still leaves it untouched.
+        frame = character["frames"][0]
+        self.assertEqual(frame[2 * 40 + 19], "#000000")
+        self.assertEqual(frame[2 * 40 + 18], "#F8F4FF")
+        self.assertEqual(frame[0], "#04121B")
+        for field in ("frames", "keyframes"):
+            self.assertTrue(all(color == "#000000" for color in scan[field][0] + scan[field][-1]))
+            self.assertTrue(all(any(color != "#000000" for color in row) for row in scan[field][1:-1]))
+        for design in (character, scan):
+            self.assertTrue(all(frame[index] == "#000000" for frame in design["keyframes"]
+                                for index in compiler.RESERVED_LEDS))
+        # Examples are fresh values and use requested parameters even for tiny
+        # test timelines, instead of installing a fixed 192-frame template.
+        examples[0]["scenes"][0]["top"][1]["rows"][0] = "0000000"
+        self.assertNotEqual(examples, compiler.verified_recipe_examples())
+        for count, speed in ((1, 10), (2, 100), (3, 40), (12, 40), (255, 100)):
+            for recipe in compiler.verified_recipe_examples(frame_count=count, speed_ms=speed):
+                design = compiler.compile_recipe(recipe)
+                self.assertEqual((len(design["frames"]), len(design["keyframes"]), design["speed_ms"]),
+                                 (count, count, speed))
+                self.assertTrue(any(color != "#000000" for frame in design["frames"] for color in frame))
+        for changes in ({"frame_count": 0}, {"frame_count": True}, {"speed_ms": 101}):
+            with self.assertRaises(compiler.RecipeError):
+                compiler.verified_recipe_examples(**changes)
+
 
 if __name__ == "__main__":
     unittest.main()

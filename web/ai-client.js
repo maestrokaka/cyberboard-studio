@@ -48,7 +48,7 @@
    $('aiCredentialNote').textContent=credentialError?'此服务的 API Key 暂时无法读取，请重试。':'API Key 默认隐藏，点击「显示」可以查看。';
    $('aiModelCapability').textContent=capabilityNote();
    $('aiActiveConnection').textContent=loaded?'工作台当前使用：'+name+' · '+settings.model+'。服务和模型修改后，点击「保存并使用」生效。':'每个服务分别保存模型、接口与密钥，切换不会删除已有连接。';
-   $('aiSendHint').textContent='生成时会将描述'+(images.length?'和 '+images.length+' 张参考图':'，以及你选择添加的参考图')+'发送给 '+(loaded?name:'你保存的创作服务')+'。完成后先预览，再由你选择同步。';
+   $('aiSendHint').textContent='描述'+(images.length?'和 '+images.length+' 张参考图':'与所选参考图')+'发送给 '+(loaded?name:'已保存的创作服务')+'。节奏自动编排，可在描述里指定时长；预览后再同步。';
   }
   function setBusy(value){state.aiBusy=value;refresh();onBusy();}
   function renderImages(){
@@ -161,18 +161,16 @@
    if(state.executing||state.hardwareBusy||state.preparingSync){toast('设备操作完成后再制作灯效。');return;}
    if(!$('syncModal').hidden){toast('请先关闭同步计划，再开始 AI 制作。');return;}
    const brief=$('creativeBrief').value.trim();if(!brief&&!images.length){generationStatus('先写下你想要的灯效、配色和转场，或添加参考图。',true);$('creativeBrief').focus?.();return;}
-   if(!Number.isInteger(state.speedMs)||state.speedMs<10||state.speedMs>100){generationStatus('先把节奏调整到10–100 ms/帧，再制作AI灯效。',true);return;}
    if(state.designs.filter(d=>!options.builtInIds.has(d.id)).length>=30){generationStatus('自定义作品已达到 30 套，请先导出并整理作品库。',true);return;}
    const saved=await loadSettings();if(!saved?.hasKey){navigate('models');generationStatus('先在模型配置中保存 '+providerName(saved?.provider||'kimi-code')+' 连接，再回到工作台制作。',true);return;}
    if(images.length&&!supportsImages(saved)){generationStatus(providerName(saved.provider)+' · '+saved.model+' 未开放参考图创作。图片已保留，请换用支持图片的模型并保存，或移除图片后用文字制作。',true);return;}
    if(state.aiBusy||state.executing||state.hardwareBusy||state.preparingSync||!$('syncModal').hidden){toast('当前操作完成后再制作灯效。');return;}
-   // Send only the user's brief and a small public visual reference, never device or workspace data.
-   const reference={palette:(M.palettes[$('paletteSelect').value]||state.selected.palette||[]).filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(0,8)};
-   if($('aiUseCurrentStyle').checked){reference.name=String(state.selected.name||'').slice(0,256);reference.description=String(state.selected.description||'').slice(0,2000);}
+   // Existing work is a visual reference only when explicitly requested. Its playback settings belong to preview.
+   const reference=$('aiUseCurrentStyle').checked?{name:String(state.selected.name||'').slice(0,256),description:String(state.selected.description||'').slice(0,2000),palette:(M.palettes[$('paletteSelect').value]||state.selected.palette||[]).filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(0,8)}:null;
    const id='ai-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,10);
    const request={id,provider:saved.provider,cancelRequested:false};activeRequest=request;setBusy(true);renderImages();generationStatus('正在把你的灵感编排成动画…');status(providerName(saved.provider)+' 正在制作灯效');
    try{
-    const result=await api('generateAI',{provider:saved.provider,requestId:id,brief,reference,images:images.map(image=>({...image})),frameCount:192,speedMs:state.speedMs});
+    const result=await api('generateAI',{provider:saved.provider,requestId:id,brief,...(reference?{reference}:{}),images:images.map(image=>({...image})),timing:'auto'});
     if(request.cancelRequested||result.cancelled){generationStatus('制作已取消，原作品与槽位草稿保留。');return;}
     const design=M.copy(result.design);M.validate(design);
     if(typeof design.id!=='string'||!design.id||typeof design.name!=='string'||!design.name)throw Error(providerName(saved.provider)+' 返回的作品缺少名称或标识，请重新制作。');
@@ -186,7 +184,7 @@
    const request=activeRequest;if(!request||request.cancelRequested)return;request.cancelRequested=true;refresh();generationStatus('正在取消本次制作…');
    try{await api('cancelAI',{requestId:request.id});}catch(error){generationStatus('已停止接收本次作品，正在等待请求结束。');}
   }
-  function progress(event){if(!activeRequest||activeRequest.cancelRequested||event.requestId!==activeRequest.id)return;const name=providerName(activeRequest.provider),stages={ai_request:'正在向 '+name+' 提交创作描述…',ai_receiving:name+' 正在编排灯效和转场…',ai_compile:'正在生成帧并检查顶部与轴灯数据…'};if(stages[event.stage])generationStatus(stages[event.stage]);}
+  function progress(event){if(!activeRequest||activeRequest.cancelRequested||event.requestId!==activeRequest.id)return;const name=providerName(activeRequest.provider),stages={ai_request:'正在向 '+name+' 提交创作描述…',ai_receiving:name+' 正在编排灯效和转场…',ai_compile:'正在生成帧并检查顶部与轴灯数据…',ai_quality:'正在检查灯光可见性与循环衔接…'};if(stages[event.stage])generationStatus(stages[event.stage]);}
   function showCreation(design){const ai=isAIWork(design);$('aiCreationNote').hidden=!ai;if(ai)$('aiCreationNote').textContent=providerName(design.ai?.provider||(design.origin==='kimi-ai'?'kimi-open':design.origin.replace(/-ai$/,'')))+' 创作'+(design.ai?.model?' · '+design.ai.model:'')+'\n'+(design.description||'顶部与轴灯已编排，可以调整亮度和节奏后同步。');}
   $('aiSettingsLink').onclick=()=>navigate('models');$('generateAIBtn').onclick=generate;$('cancelAIBtn').onclick=cancel;
   $('addAIImagesBtn').onclick=addImages;

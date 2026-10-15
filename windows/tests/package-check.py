@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.3.0-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.3.1-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -42,6 +42,7 @@ class PackageChecks(unittest.TestCase):
                     "resources/python/python312.dll", "resources/python/python312.zip",
                     "resources/backend/bridge.py", "resources/backend/migrate-config.py",
                     "resources/backend/kimi_ai.py", "resources/backend/lighting_recipe.py", "resources/backend/ai_images.py",
+                    "resources/backend/ai_quality.py",
                     "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/library-client.js", "迁移原配置.cmd",
                     "检查运行环境.cmd", "诊断启动.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
         for name in required:
@@ -51,12 +52,15 @@ class PackageChecks(unittest.TestCase):
             self.assertFalse((PACKAGE / "resources/web" / removed).exists(), removed)
         config = json.loads((PACKAGE / "Cyberboard Studio.runtimeconfig.json").read_text())
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
-        self.assertTrue(json.loads((PACKAGE / "release-manifest.json").read_text())["diagnosticStartup"])
+        release = json.loads((PACKAGE / "release-manifest.json").read_text())
+        self.assertTrue(release["diagnosticStartup"])
+        self.assertEqual(release["version"], "0.3.1")
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.3.1"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
         self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
-        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py"):
+        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py"):
             self.assertEqual(digest(PACKAGE / "resources/backend" / name), digest(APP / "backend" / name), name)
 
     def test_executable_and_native_dependencies_are_windows_x64(self):

@@ -12,7 +12,7 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Authors>Cyberboard Studio</Authors>
     <Product>Cyberboard Studio</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>

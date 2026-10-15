@@ -41,7 +41,8 @@ def main():
         "--add-data", str(vendor / "cyberboard") + ":cyberboard",
         "--add-data", str(ROOT / "vendor/licenses") + ":licenses",
         "--copy-metadata", "cyberboard-cli", "--hidden-import", "serial.tools.list_ports_osx",
-        "--hidden-import", "kimi_ai", "--hidden-import", "lighting_recipe", "--hidden-import", "ai_images"]
+        "--hidden-import", "kimi_ai", "--hidden-import", "lighting_recipe", "--hidden-import", "ai_images",
+        "--hidden-import", "ai_quality"]
     for file in sorted(tools.glob("*.py")):
         if file.stem != "cb_keymap_tui":
             command += ["--hidden-import", file.stem]

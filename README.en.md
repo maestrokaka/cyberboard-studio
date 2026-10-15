@@ -65,13 +65,13 @@ Read the configuration JSON, choose the built-in modes you want to restore, revi
 
 ## Download and install
 
-The current release is [v0.3.0 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0). Find the packages and their SHA-256 files under **Assets**.
+The current release is [v0.3.1 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.1). Find the packages and their SHA-256 files under **Assets**.
 
 | Package | Platform | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.3.0-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
-| `Cyberboard-Studio-0.3.0-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
-| `Cyberboard-Studio-0.3.0-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
+| `Cyberboard-Studio-0.3.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
+| `Cyberboard-Studio-0.3.1-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
+| `Cyberboard-Studio-0.3.1-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
 
 All packages include the CLI and its runtime. You do not need to install Python separately. If Windows is missing WebView2, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` from the package with an internet connection.
 
@@ -81,9 +81,11 @@ The Mac app uses an ad-hoc signature and is not yet signed with an Apple Develop
 
 ## Quick start
 
+Version 0.3.1 improves short text and image-guided creation, keeps new designs independent of the previous preview's palette and timing, and accepts durations such as “4-second loop.” Compiled pixels receive conservative visibility and motion checks with at most one repair. These checks do not replace reviewing the animation.
+
 1. **Connect your keyboard by USB.** Use **Check connection（检查连接）** and verify the keyboard model before preparing a sync.
 2. **Set up a model.** Open **Model configuration（模型配置）**, choose the service, region and model, enter your own API key, then click **Save and use（保存并使用）**. Kimi Code defaults to `k3`.
-3. **Create a design.** Return to **Lighting workbench（灯效工作台）**. Describe the effect and optionally use **Add reference images（添加参考图）** to attach up to three images. Choose a model that supports images, then click the AI creation button. The button displays the selected provider.
+3. **Create a design.** Return to **Lighting workbench（灯效工作台）**. Describe the effect, or attach up to three images with **Add reference images（添加参考图）** and describe how they should move. Images require a model that supports them. Click the AI creation button, which displays the selected provider.
 4. **Preview and adjust.** Try different keyboard appearances, pause or scrub the animation, and adjust brightness and frame timing. To try another palette, choose a color scheme and use **More tools（更多工具） → Generate template variant（生成模板变体）** to create a new design. The preview simulates hardware colors; the physical keyboard may look different.
 5. **Choose the destination.** Select slot **01**, **02** or **03**, then use **Place in slot（放入槽位）** or update that slot's draft. Clicking a slot card only selects the target; its separate **Preview（预览）** button previews the assigned design.
 6. **Review and sync.** Click **Sync slot 03（同步槽位 03）**, or the equivalent button for your chosen slot. Review the plan and backup, then confirm **Sync to keyboard（同步到键盘）**. Keep USB connected until transfer and verification finish. Other pending slot drafts remain available.
@@ -91,6 +93,15 @@ The Mac app uses an ad-hoc signature and is not yet signed with an Apple Develop
 Creating or previewing a design does not automatically write to the keyboard. You can create, preview and export lighting without a device connected.
 
 Kimi Code and Kimi Open Platform use separate API keys and quotas. Code access is subject to the provider's client requirements; see the [official Kimi Code documentation](https://www.kimi.com/code/docs/).
+
+### Start with a simple description
+
+- **Without an image:** try “Orange-red flames rising from below, ember-like key lighting, a 4-second loop.” You do not need to specify pixels, frame counts or animation parameters.
+- **With images:** attach one to three references and add a short direction, such as “Make this cat blink, keep its orange and white colors, and let the key lighting breathe softly.” Image-only creation is also available.
+
+Timing is arranged automatically for the new design. You can request a total duration, such as “a 4-second loop”; the current preview's playback speed does not constrain the new creation. By default, the previous design's name, description and palette are not sent. Enable **Use current design style（使用当前作品风格）** under **More tools（更多工具）** only when you want that reference; your new description and images remain the priority.
+
+The app checks compiled lighting data and basic visibility, with at most one additional repair request for invalid or clearly invisible output. These checks do not judge aesthetics or guarantee image fidelity. Watch the entire top-matrix and key-lighting loop before syncing. Creation never assigns a slot or writes to USB automatically; repair is an additional model call, and submitted requests may use quota even if cancelled or unsuccessful.
 
 ### Existing configuration and first-time setup
 
@@ -126,7 +137,7 @@ The Windows packages are cross-compiled and pass offline checks. This release's 
 | Designs, drafts, trash, plans, backups and non-secret model settings | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
 | CLI device records | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
 
-API keys use macOS Keychain or Windows user-level DPAPI protection. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider, without sending device configuration or keymaps.
+API keys use macOS Keychain or Windows user-level DPAPI protection. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
 
 ## Building and contributing
 

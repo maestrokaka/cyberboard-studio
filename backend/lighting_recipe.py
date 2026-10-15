@@ -7,6 +7,7 @@ Only this module's fixed drawing primitives can be selected by a recipe.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -327,6 +328,108 @@ def recipe_schema():
                                                                "end": {"type": "integer", "minimum": 1, "maximum": 255},
                                                                "top": layers("top"), "keys": layers("keys")}}}},
             "$defs": definitions}
+
+
+def model_recipe_schema():
+    """Return the same JSON Schema validation contract with shared motion defs.
+
+    This is derived from recipe_schema(), not a separately maintained contract.
+    A motion's required fields, allowed properties and easing conditions stay in
+    one shared definition. Bounds remain on both scalar values and endpoints.
+    Annotation defaults remain alongside each field's $ref (draft 2020-12).
+    The local validate_recipe() still checks time coverage, palette indices and
+    render budgets that neither schema can express on its own.
+    """
+    schema = recipe_schema()
+    shared = {}
+    motion_definitions = {}
+    parameter_definitions = {}
+
+    def canonical(value):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+    def compact(value):
+        if isinstance(value, list):
+            return [compact(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        alternatives = value.get("anyOf")
+        if isinstance(alternatives, list) and len(alternatives) == 2:
+            number, motion = alternatives
+            if (isinstance(number, dict) and number.get("type") == "number"
+                    and isinstance(motion, dict) and motion.get("type") == "object"
+                    and motion.get("properties", {}).get("from") == number
+                    and motion.get("properties", {}).get("to") == number):
+                base_motion = copy.deepcopy(motion)
+                base_motion["properties"]["from"] = {"type": "number"}
+                base_motion["properties"]["to"] = {"type": "number"}
+                signature = canonical(base_motion)
+                if signature not in motion_definitions:
+                    name = "_motion" + str(len(motion_definitions))
+                    motion_definitions[signature] = name
+                    shared[name] = base_motion
+                motion_ref = motion_definitions[signature]
+                parameter = {"anyOf": [copy.deepcopy(number), {
+                    "allOf": [{"$ref": "#/$defs/" + motion_ref},
+                              {"properties": {"from": copy.deepcopy(number), "to": copy.deepcopy(number)}}]}]}
+                signature = canonical(parameter)
+                if signature not in parameter_definitions:
+                    name = "_parameter" + str(len(parameter_definitions))
+                    parameter_definitions[signature] = name
+                    shared[name] = parameter
+                # Preserve all siblings, including each parameter's own default.
+                result = {key: compact(item) for key, item in value.items() if key != "anyOf"}
+                result["$ref"] = "#/$defs/" + parameter_definitions[signature]
+                return result
+        return {key: compact(item) for key, item in value.items()}
+
+    result = compact(schema)
+    result["$defs"].update(shared)
+    return result
+
+
+def verified_recipe_examples(*, frame_count=192, speed_ms=40):
+    """Return fresh, public grid examples compiled by the offline test suite.
+
+    These demonstrate units and compositing, not preferred themes or a library
+    to select instead of designing a new work. No assets or device state are
+    read. Parameters follow the caller's requested frame count and speed.
+    """
+    _number(frame_count, 1, 255, "examples.frame_count", integer=True)
+    _number(speed_ms, 10, 100, "examples.speed_ms", integer=True)
+    open_rows = ["0100010", "1111111", "1231321", "1111111", "0111110"]
+    closed_rows = ["0100010", "1111111", "1331331", "1111111", "0111110"]
+
+    def pose(name, start, end, rows):
+        return {"name": name, "start": start, "end": end,
+                "top": [{"kind": "solid", "color": "#04121B"},
+                        {"kind": "bitmap", "rows": rows,
+                         "palette": ["#7B2FBE", "#F8F4FF", "#000000"],
+                         "x": 20 / 39, "y": 2 / 4, "scale": 1, "blend": "replace"}],
+                "keys": [{"kind": "solid", "color": "#7B2FBE", "opacity": 0.16}]}
+
+    poses = [pose("定格", 0, frame_count, open_rows)]
+    if frame_count >= 3:
+        close_start = max(1, min(frame_count - 2, frame_count * 3 // 4))
+        closed_count = max(1, min(frame_count // 8, round(120 / speed_ms)))
+        close_end = min(frame_count - 1, close_start + closed_count)
+        poses = [pose("睁眼", 0, close_start, open_rows),
+                 pose("轻眨", close_start, close_end, closed_rows),
+                 pose("回到睁眼", close_end, frame_count, open_rows)]
+    character = {"version": 1, "name": "猫眼微光", "description": "七列五行的网格示例；黑色瞳孔替换底色，轴灯在换姿态时保持稳定。",
+                 "frame_count": frame_count, "speed_ms": speed_ms,
+                 "palette": ["#7B2FBE", "#F8F4FF", "#04121B"], "scenes": poses}
+    position = {"from": 1.3, "to": -0.3} if frame_count >= 3 else 0.5
+    scan = {"version": 1, "name": "向上光带", "description": "五行视窗的宽光带由下向上通过，两端离屏；极短时间轴只示范中心光带。",
+            "frame_count": frame_count, "speed_ms": speed_ms, "palette": ["#24DDFC"], "scenes": [
+                {"name": "上行", "start": 0, "end": frame_count,
+                 "top": [{"kind": "scan", "color": "#24DDFC", "axis": "y", "width": 0.6,
+                          "position": copy.deepcopy(position)}],
+                 "keys": [{"kind": "scan", "color": "#24DDFC", "axis": "y", "width": 0.6,
+                           "position": copy.deepcopy(position), "opacity": 0.45}]}]}
+    for example in (character, scan):
+        validate_recipe(example)
+    return [character, scan]
 
 
 def _value(value, t):
