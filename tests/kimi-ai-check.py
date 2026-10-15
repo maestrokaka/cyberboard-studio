@@ -174,7 +174,7 @@ class KimiChecks(unittest.TestCase):
             r["scenes"].append({"name": name, "start": start, "end": end,
                                 "top": [{"kind": "bitmap", "rows": rows, "x": 0.5, "y": 0.5}],
                                 "keys": [{"kind": "solid", "color": "#7B2FBE", "opacity": {"from": 0.1, "to": 0.4, "ease": "sine"}}]})
-        payload = {**self.payload(), "frameCount": 50, "speedMs": 100, "brief": "小角色只眨一次眼"}
+        payload = {**self.payload(), "frameCount": 50, "speedMs": 100, "brief": "小角色只眨一次眼，轴灯低亮呼吸"}
         result = ai.generate(payload, opener=Opener(completion(json.dumps(r))))
         d = result["design"]
         self.assertEqual((len(d["frames"]), len(d["keyframes"]), d["speed_ms"]), (50, 50, 100))

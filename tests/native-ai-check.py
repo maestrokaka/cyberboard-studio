@@ -198,7 +198,127 @@ do {
     try check(secretReads == 0, "Failed presence lookup requested secret data")
     try rejects { _ = try presenceStore.revealAIKey(["provider": "kimi-code"]) }
     try check(secretReads == 1, "Explicit reveal bypassed ordinary secret-data authorization")
-    print("PASS macOS AI policies, recursive credential redaction and one-time model metadata migration; no Keychain or USB accessed.")
+    // Real file storage is exercised only under the generated temporary tree;
+    // every legacy read is injected, so no user's Keychain is accessed.
+    let legacyValues = ["kimi-code": "mock-legacy-kimi-key", "minimax": "mock-legacy-minimax-key"]
+    var legacyReads: [String: Int] = [:]
+    let localDirectory = directory.appendingPathComponent("local-key-files")
+    let local = AISettingsStore(stateDirectory: localDirectory, legacyCredentialRead: { provider in
+        legacyReads[provider, default: 0] += 1
+        return legacyValues[provider]
+    })
+    let migratedLocal = try local.get()
+    try check(migratedLocal["hasKey"] as? Bool == true && migratedLocal["credentialStore"] as? String == "本机文件", "Local migration did not report the actual store")
+    let keyDirectory = localDirectory.appendingPathComponent("ai-keys")
+    let kimiLocalPath = keyDirectory.appendingPathComponent("kimi-code.key")
+    let minimaxLocalPath = keyDirectory.appendingPathComponent("minimax.key")
+    let localKeyBytes = try Data(contentsOf: kimiLocalPath)
+    try check(String(decoding: localKeyBytes, as: UTF8.self) == legacyValues["kimi-code"], "Silent migration changed the old key")
+    try check(legacyValues["kimi-code"] == "mock-legacy-kimi-key" && legacyValues["minimax"] == "mock-legacy-minimax-key", "Migration deleted or changed a legacy item")
+    let permissions = try FileManager.default.attributesOfItem(atPath: kimiLocalPath.path)[.posixPermissions] as! NSNumber
+    try check(permissions.intValue & 0o777 == 0o600, "Local key file permissions")
+    _ = try local.save(["provider": "kimi-code", "model": "k3-256k", "apiKey": ""])
+    try check(try Data(contentsOf: kimiLocalPath) == localKeyBytes, "Blank input replaced the saved key")
+    _ = try local.save(["provider": "minimax", "apiKey": "mock-minimax-local-new"])
+    try check(try Data(contentsOf: kimiLocalPath) == localKeyBytes, "Saving another provider changed Kimi")
+    let localMetadataPath = localDirectory.appendingPathComponent("ai-settings.json")
+    let localMetadataBytes = try Data(contentsOf: localMetadataPath)
+    let localMetadataText = String(decoding: localMetadataBytes, as: UTF8.self)
+    try check(!localMetadataText.contains("mock-") && !localMetadataText.contains("apiKey"), "Local keys leaked into metadata")
+    var restartedLegacyReads: [String: Int] = [:]
+    let localRestart = AISettingsStore(stateDirectory: localDirectory, legacyCredentialRead: { provider in
+        restartedLegacyReads[provider, default: 0] += 1
+        throw NSError(domain: "MockLegacyUnavailable", code: 20)
+    })
+    let restartedSettings = try localRestart.get()
+    try check(restartedSettings["hasKey"] as? Bool == true && restartedSettings["credentialError"] == nil, "Restart lost the active local key")
+    try check(try localRestart.revealAIKey(["provider": "kimi-code"])["apiKey"] as? String == "mock-legacy-kimi-key", "Restart changed Kimi key")
+    try check(try localRestart.revealAIKey(["provider": "minimax"])["apiKey"] as? String == "mock-minimax-local-new", "Restart changed MiniMax key")
+    try check(restartedLegacyReads["kimi-code"] == nil && restartedLegacyReads["minimax"] == nil, "Local key access retried OS authorization")
+    let publicLocalText = String(decoding: try JSONSerialization.data(withJSONObject: localRestart.get()), as: UTF8.self)
+    try check(!publicLocalText.contains("mock-") && !publicLocalText.contains("apiKey"), "Normal settings disclosed local keys")
+
+    _ = try local.save(["provider": "minimax", "removeKey": true])
+    try check(try Data(contentsOf: minimaxLocalPath).isEmpty, "Explicit removal did not leave an empty suppression marker")
+    var deletionLegacyReads: [String: Int] = [:]
+    let afterDelete = AISettingsStore(stateDirectory: localDirectory, legacyCredentialRead: { provider in
+        deletionLegacyReads[provider, default: 0] += 1
+        return legacyValues[provider]
+    })
+    try check(try afterDelete.get()["hasKey"] as? Bool == false, "Deleted key reappeared after restart")
+    try check(try afterDelete.revealAIKey(["provider": "minimax"])["apiKey"] as? String == "", "Reveal resurrected a deleted legacy key")
+    try check(deletionLegacyReads["minimax"] == nil, "Deleted local key fell back to Keychain")
+    try check(legacyValues["minimax"] == "mock-legacy-minimax-key", "Removing a local key touched the legacy store")
+
+    let blockedDirectory = directory.appendingPathComponent("blocked-legacy")
+    try FileManager.default.createDirectory(at: blockedDirectory, withIntermediateDirectories: true)
+    let blockedMetadataPath = blockedDirectory.appendingPathComponent("ai-settings.json")
+    try JSONSerialization.data(withJSONObject: ["provider": "kimi-open", "model": "kimi-k3", "modelDefaultsVersion": 2])
+        .write(to: blockedMetadataPath, options: .atomic)
+    let blocked = AISettingsStore(stateDirectory: blockedDirectory, legacyCredentialRead: { provider in
+        if provider == "kimi-open" { throw NSError(domain: "MockNoInteractiveKeychain", code: 21) }
+        return nil
+    })
+    let blockedSettings = try blocked.get()
+    let blockedProfiles = blockedSettings["profiles"] as! [String: [String: Any]]
+    try check(blockedSettings["hasKey"] is NSNull && (blockedSettings["credentialError"] as? String)?.contains("重新输入") == true, "Unavailable legacy key was reported as absent")
+    try check(blockedProfiles["kimi-code"]?["credentialError"] == nil && blockedProfiles["deepseek"]?["credentialError"] == nil, "Legacy access failure blocked unrelated services")
+    _ = try blocked.save(["provider": "deepseek", "apiKey": "mock-local-deepseek"])
+    let recovered = try blocked.save(["provider": "kimi-open", "apiKey": "mock-open-replacement"])
+    try check(recovered["hasKey"] as? Bool == true && recovered["credentialError"] == nil, "New key could not recover an unavailable legacy account")
+    try check(try blocked.revealAIKey(["provider": "kimi-open"])["apiKey"] as? String == "mock-open-replacement", "Recovery saved the wrong key")
+    try check(try blocked.revealAIKey(["provider": "deepseek"])["apiKey"] as? String == "mock-local-deepseek", "Recovery changed another provider")
+
+    var failLocalMetadata = false
+    let fileTransactionDirectory = directory.appendingPathComponent("local-transactions")
+    let fileTransactions = AISettingsStore(stateDirectory: fileTransactionDirectory, legacyCredentialRead: { provider in
+        if provider == "kimi-open" { throw NSError(domain: "MockNoInteractiveKeychain", code: 22) }
+        return nil
+    }, beforeMetadataCommit: {
+        if failLocalMetadata { throw NSError(domain: "MockFileCommit", code: 23) }
+    })
+    _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-file-original"])
+    let fileTransactionMetadata = fileTransactionDirectory.appendingPathComponent("ai-settings.json")
+    let fileTransactionKey = fileTransactionDirectory.appendingPathComponent("ai-keys/kimi-code.key")
+    let fileTransactionOpenKey = fileTransactionDirectory.appendingPathComponent("ai-keys/kimi-open.key")
+    let fileMetadataBaseline = try Data(contentsOf: fileTransactionMetadata)
+    let fileKeyBaseline = try Data(contentsOf: fileTransactionKey)
+    failLocalMetadata = true
+    try rejects { _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-file-replacement"]) }
+    try check(try Data(contentsOf: fileTransactionMetadata) == fileMetadataBaseline && Data(contentsOf: fileTransactionKey) == fileKeyBaseline, "File transaction failed to restore an overwritten key")
+    try rejects { _ = try fileTransactions.save(["provider": "kimi-code", "removeKey": true]) }
+    try check(try Data(contentsOf: fileTransactionKey) == fileKeyBaseline, "File transaction failed to restore a removed key")
+    try rejects { _ = try fileTransactions.save(["provider": "kimi-open", "apiKey": "mock-file-recovery"]) }
+    try check(!FileManager.default.fileExists(atPath: fileTransactionOpenKey.path), "Failed recovery left a new key or removal marker")
+    try check(try Data(contentsOf: fileTransactionMetadata) == fileMetadataBaseline, "Failed recovery changed active metadata")
+    failLocalMetadata = false
+    _ = try fileTransactions.save(["provider": "kimi-open", "apiKey": "mock-file-recovery"])
+    try check(try fileTransactions.get()["hasKey"] as? Bool == true, "Recovery after metadata failure remained locked")
+    _ = try fileTransactions.save(["provider": "kimi-open", "removeKey": true])
+    let removedBaseline = try Data(contentsOf: fileTransactionOpenKey)
+    failLocalMetadata = true
+    try rejects { _ = try fileTransactions.save(["provider": "kimi-open", "apiKey": "mock-would-resurrect"]) }
+    try check(try Data(contentsOf: fileTransactionOpenKey) == removedBaseline && removedBaseline.isEmpty, "Rollback lost the removal marker")
+    failLocalMetadata = false
+    _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-before-malformed"])
+    failLocalMetadata = true
+    let malformedBytes = Data([0xff, 0xfe, 0x80])
+    try malformedBytes.write(to: fileTransactionKey, options: .atomic)
+    let malformedMetadata = try Data(contentsOf: fileTransactionMetadata)
+    try check(try fileTransactions.get()["hasKey"] is NSNull, "Malformed local key was reported as usable")
+    try rejects { _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-repair-malformed"]) }
+    try check(try Data(contentsOf: fileTransactionKey) == malformedBytes && Data(contentsOf: fileTransactionMetadata) == malformedMetadata, "Failed repair did not restore exact malformed bytes and metadata")
+    failLocalMetadata = false
+    _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-repair-malformed"])
+    try check(try fileTransactions.revealAIKey(["provider": "kimi-code"])["apiKey"] as? String == "mock-repair-malformed", "Malformed local key blocked a direct replacement")
+    try malformedBytes.write(to: fileTransactionKey, options: .atomic)
+    _ = try fileTransactions.save(["provider": "kimi-code", "removeKey": true])
+    try check(try Data(contentsOf: fileTransactionKey).isEmpty && fileTransactions.get()["hasKey"] as? Bool == false, "Malformed local key could not be removed")
+    try Data(repeating: 65, count: 4097).write(to: fileTransactionKey, options: .atomic)
+    _ = try fileTransactions.save(["provider": "kimi-code", "apiKey": "mock-repair-too-long"])
+    try check(try fileTransactions.revealAIKey(["provider": "kimi-code"])["apiKey"] as? String == "mock-repair-too-long", "Invalid-length local key blocked a direct replacement")
+    try check(try FileManager.default.contentsOfDirectory(atPath: fileTransactionKey.deletingLastPathComponent().path).allSatisfy({ !$0.hasSuffix(".tmp") }), "Key storage left temporary credential files")
+    print("PASS macOS AI policies, isolated local key files, silent read-only legacy migration and transaction rollback; no user Keychain or USB accessed.")
 } catch {
     fputs("FAIL \(error.localizedDescription)\n", stderr)
     exit(1)
@@ -206,9 +326,10 @@ do {
 '''
 # Allow throwing expressions in assertions while keeping the test helper small.
 checks = checks.replace("@autoclosure () -> Bool", "@autoclosure () throws -> Bool").replace("if !condition()", "if try !condition()")
-presence_query = policy.split("private func keyExists", 1)[1].split("private func writeKey", 1)[0]
-assert "kSecReturnAttributes" in presence_query and "kSecUseAuthenticationUIFail" in presence_query
-assert "kSecReturnData" not in presence_query
+legacy_query = policy.split("private func readLegacyKey", 1)[1].split("private func keyPath", 1)[0]
+assert "SecItemCopyMatching" in legacy_query and "kSecUseAuthenticationUIFail" in legacy_query
+assert "kSecReturnData" in legacy_query
+assert all(operation not in policy for operation in ("SecItemAdd", "SecItemUpdate", "SecItemDelete"))
 with tempfile.TemporaryDirectory(prefix="cyberboard-native-ai-") as directory:
     temporary = pathlib.Path(directory)
     swift = temporary / "main.swift"

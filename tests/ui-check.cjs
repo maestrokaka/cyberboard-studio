@@ -4,7 +4,8 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert/strict');
 const root = path.resolve(__dirname, '..');
-const read = name => fs.readFileSync(path.join(root, 'web', name), 'utf8');
+const webRoot = process.env.STUDIO_TEST_WEB_ROOT ? path.resolve(process.env.STUDIO_TEST_WEB_ROOT) : path.join(root, 'web');
+const read = name => fs.readFileSync(path.join(webRoot, name), 'utf8');
 const clone = value => JSON.parse(JSON.stringify(value));
 const syntheticConfig = require('../data/test-fixtures.cjs');
 const syntheticDevice = { productId: 'AM01R6', firmware: 'offline-test-r6', connected: false };
@@ -41,7 +42,7 @@ class Element {
   focus() { let root = this; while (root.parent) root = root.parent; if (root.ownerDocument) root.ownerDocument.activeElement = this; }
   scrollIntoView(options) { this.scrollOptions = options; }
   querySelectorAll(selector) { return descendants(this).filter(el => matches(el, selector)); }
-  getContext() { return this.context ||= { fillStyle: '', fillRect() {} }; }
+  getContext() { return this.context ||= { fillStyle: '', calls: [], fillRect(...args) { this.calls.push({ fillStyle: this.fillStyle, args }); } }; }
 }
 function serialize(el) {
   const attributes = Object.entries(el.attributes).map(([name, value]) => ` ${name}="${String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('');
@@ -100,7 +101,7 @@ function harness(options = {}) {
         case 'importJSON': result = control.importValue; break;
         case 'exportJSON': result = { fileName: payload.fileName, path: '/offline/export.json' }; break;
         case 'history': result = { history: [{ id: 'app:offline.json', snapshotId: 'app:offline.json', filename: 'offline.json', createdAt: '2026-10-12T03:00:00Z' }] }; break;
-        case 'plan': case 'restorePlan': { const assignments = payload.assignments || D.designs.map((design, i) => ({ slot: i + 1, design, brightness: 100, speedMs: design.speed_ms })); result = { token: 'offline-token', keyChangeCount:0, keymap:control.planKeymap?clone(control.planKeymap):null, keymapPreservation:clone(control.planPreservation), config: window.StudioModel.merge(fixture, assignments), changedSlots: assignments.map(a => a.slot), totalFrames: 9315, estimatedSeconds: 67, summary: assignments.map(a => ({ slot: a.slot, name: a.design.name, topFrames: a.design.frames.length, keyFrames: a.design.keyframes.length })) }; break; }
+        case 'plan': case 'restorePlan': { const assignments = payload.assignments || D.designs.slice(0, 3).map((design, i) => ({ slot: i + 1, design, brightness: 100, speedMs: design.speed_ms })); result = { token: 'offline-token', keyChangeCount:0, keymap:control.planKeymap?clone(control.planKeymap):null, keymapPreservation:clone(control.planPreservation), config: window.StudioModel.merge(fixture, assignments), changedSlots: assignments.map(a => a.slot), totalFrames: 9315, estimatedSeconds: 67, summary: assignments.map(a => ({ slot: a.slot, name: a.design.name, topFrames: a.design.frames.length, keyFrames: a.design.keyframes.length })) }; break; }
         default: throw Error('Unexpected mocked request: ' + action);
       }
       window.StudioBridge.receive({ id, result });
@@ -119,10 +120,10 @@ function harness(options = {}) {
 
 module.exports={harness,settle,clone,syntheticConfig,syntheticDevice};
 if(require.main===module)(async () => {
-  const h = harness({platform: process.env.STUDIO_UI_PLATFORM}); await settle(); const state = h.app.state;
+  const h = harness({platform: process.env.STUDIO_UI_PLATFORM}); await settle(); const state = h.app.state, builtinCount = h.window.STUDIO_DATA.designs.length;
   assert.equal(h.window.STUDIO_DATA.baseConfig, null, 'production data never includes the test fixture or a device baseline');
   assert.equal(state.config._fixture, true, 'the mocked backend alone supplies synthetic configuration');
-  assert.equal(state.workspaceLoaded, true); assert.equal(state.designs.length, 3); assert.equal(state.pending.size, 0);
+  assert.equal(state.workspaceLoaded, true); assert.equal(state.designs.length, builtinCount); assert.equal(state.pending.size, 0);
   assert.equal(h.calls.filter(c => c.action === 'execute').length, 0, 'startup must never write');
   const formalLogo = 'assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png';
   assert.equal(h.el('brandMark').querySelectorAll('img').length, 1, 'the approved PNG remains the sidebar mark');
@@ -158,10 +159,10 @@ if(require.main===module)(async () => {
   await h.app.exportJSON(); const exported = h.calls.filter(c => c.action === 'exportJSON').at(-1).payload.json;
   assert.equal(exported.preview_brightness, 64); assert.equal(exported.speed_ms, 53);
   h.control.importValue = { fileName: 'reimport.json', json: { ...exported, id: 'offline-import', name: '离线导入作品' } };
-  await h.app.importJSON(); assert.equal(state.selected.id, 'offline-import'); assert.equal(state.brightness, 64); assert.equal(state.speedMs, 53); assert.equal(state.designs.length, 4);assert.equal(h.document.querySelectorAll('.name-editor')[0].hidden,false,'imported works expose the existing validated name editor');
+  await h.app.importJSON(); assert.equal(state.selected.id, 'offline-import'); assert.equal(state.brightness, 64); assert.equal(state.speedMs, 53); assert.equal(state.designs.length, builtinCount + 1);assert.equal(h.document.querySelectorAll('.name-editor')[0].hidden,false,'imported works expose the existing validated name editor');
   await h.flushSave(); assert.equal(h.control.workspace.designs.length, 1);
   const restored = harness({ workspace: clone(h.control.workspace) }); await settle();
-  assert.equal(restored.app.state.designs.length, 4); assert.equal(restored.app.state.pending.get(2).brightness, 64); assert.equal(restored.app.state.selected.id, 'offline-import'); assert.equal(restored.app.state.brightness, 64);
+  assert.equal(restored.app.state.designs.length, builtinCount + 1); assert.equal(restored.app.state.pending.get(2).brightness, 64); assert.equal(restored.app.state.selected.id, 'offline-import'); assert.equal(restored.app.state.brightness, 64);
   h.app.navigate('keymap'); assert.equal(h.document.querySelectorAll('[data-key]').length, 81); assert.equal(h.document.querySelectorAll('[data-layer]').length, 7);
   for (const button of h.document.querySelectorAll('[data-layer]')) { await button.click(); assert.equal(h.document.querySelectorAll('[data-key]').length, 81); }
   await h.document.querySelectorAll('[data-key]')[0].click(); assert.match(h.el('bindingPanel').innerHTML, /矩阵/);

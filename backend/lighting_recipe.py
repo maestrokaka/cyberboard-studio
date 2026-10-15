@@ -16,6 +16,8 @@ import re
 RESERVED_LEDS = frozenset((57, 61, 74, 78, 82, 83, 84))
 MAX_WORK = 8_000_000
 MAX_LAYERS = 96
+MAX_BITMAP_ROWS = 64
+MAX_BITMAP_CELLS = 40 * MAX_BITMAP_ROWS
 HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 TEXT_CHARS = re.compile(r"^[A-Z0-9 .:+/\\=<>!?_-]{1,24}$")
 BITMAP_ROW = re.compile(r"^[0-9A-Fa-f]{1,40}$")
@@ -76,7 +78,7 @@ KINDS = {
                                "aspect": (0.25, 8, 1), "tail": (0, 0.5, 0)},
                   "integers": {"count": (1, 24, 8), "seed": (0, 65535, 0)}},
     "text": {"numbers": {**POSITION, "scale": (0.5, 4, 1)}, "strings": {"text": 24}},
-    # A bitmap keeps its source pixel height. A 32-row drawing can move past
+    # A bitmap keeps its source pixel height. A tall drawing can move past
     # the five-row viewport instead of being squeezed into five rows.
     "bitmap": {"numbers": {"x": (-2, 3, 0.5), "y": (-20, 20, 0.5), "scale": (0.5, 4, 1)}},
 }
@@ -151,8 +153,8 @@ def _validate_layer(layer, path, target, palette):
         if target != "top":
             _fail(path, "bitmap 只支持顶部 40×5 屏幕")
         rows = layer["rows"]
-        if type(rows) is not list or not 1 <= len(rows) <= 32:
-            _fail(path + ".rows", "必须包含 1–32 行像素图")
+        if type(rows) is not list or not 1 <= len(rows) <= MAX_BITMAP_ROWS:
+            _fail(path + ".rows", f"必须包含 1–{MAX_BITMAP_ROWS} 行像素图")
         width = None
         for i, row in enumerate(rows):
             if type(row) is not str or not BITMAP_ROW.fullmatch(row):
@@ -161,8 +163,8 @@ def _validate_layer(layer, path, target, palette):
                 width = len(row)
             elif len(row) != width:
                 _fail(path + ".rows", "像素图每行必须等宽")
-        if len(rows) * width > 1280:
-            _fail(path + ".rows", "单个像素图不得超过 1280 格")
+        if len(rows) * width > MAX_BITMAP_CELLS:
+            _fail(path + ".rows", f"单个像素图不得超过 {MAX_BITMAP_CELLS} 格")
         colors = layer.get("palette", palette)
         if type(colors) is not list or not 1 <= len(colors) <= 15:
             _fail(path + ".palette", "必须包含 1–15 个颜色；省略时使用配方 palette")
@@ -178,8 +180,8 @@ def _validate_layer(layer, path, target, palette):
         if "color_to" in layer:
             _color(layer["color_to"], path + ".color_to")
     blend = layer.get("blend", "add")
-    if type(blend) is not str or blend not in ("add", "max", "replace"):
-        _fail(path + ".blend", "必须为 add、max 或 replace")
+    if type(blend) is not str or blend not in ("add", "max", "replace", "dominant"):
+        _fail(path + ".blend", "必须为 add、max、replace 或 dominant")
     for key, bounds in numbers.items():
         if key in layer:
             _motion(layer[key], bounds, path + "." + key)
@@ -275,7 +277,7 @@ def recipe_schema():
     definitions = {}
     for kind, table in KINDS.items():
         properties = {"kind": {"const": kind},
-                      "blend": {"enum": ["add", "max", "replace"], "default": "add"}}
+                      "blend": {"enum": ["add", "max", "replace", "dominant"], "default": "add"}}
         if kind != "bitmap":
             properties.update({"color": dict(color), "color_to": dict(color)})
         properties.update({key: _numeric_schema(bounds) for key, bounds in
@@ -291,10 +293,10 @@ def recipe_schema():
             properties["text"] = {"type": "string", "pattern": TEXT_CHARS.pattern, "maxLength": 24}
             required.append("text")
         if kind == "bitmap":
-            properties["rows"] = {"type": "array", "minItems": 1, "maxItems": 32,
+            properties["rows"] = {"type": "array", "minItems": 1, "maxItems": MAX_BITMAP_ROWS,
                                   "items": {"type": "string", "pattern": BITMAP_ROW.pattern,
                                             "minLength": 1, "maxLength": 40},
-                                  "description": "Equal-width bitmap rows, at most 1280 cells. 0 is transparent; "
+                                  "description": f"Equal-width bitmap rows, at most {MAX_BITMAP_CELLS} cells. 0 is transparent; "
                                                  "1..F select palette[0]..palette[14]. Source pixels stay 1×scale display pixels."}
             properties["palette"] = {"type": "array", "minItems": 1, "maxItems": 15, "items": dict(color),
                                      "description": "Optional local colors; omitted palette inherits the recipe palette."}
@@ -308,9 +310,12 @@ def recipe_schema():
             "description": "Normalized coordinates: x left→right, y top→bottom. Scene intervals are contiguous and cover frame_count. "
                            "Numeric motion endpoints stay within bounds; linear/smooth run once, sine/triangle repeat. "
                            "color_to interpolates color through the scene. Layers composite in list order. "
+                           "add sums RGB channels; max selects each channel (both can mix hues). "
+                           "dominant keeps the complete RGB of the stronger effective light, using max channel after opacity; "
+                           "later layer wins ties. replace composites opacity and can paint black bitmap details. "
                            "Ring/line/particles aspect scales horizontal distance; top has 8:1 physical aspect. "
                            "Text is a 3×5 bitmap, x/y center, scale in display pixels; keys cannot render text. "
-                           "Bitmap is top-only, 1..32 equal-width rows of 1..40 hexadecimal cells; 0 transparent, "
+                           f"Bitmap is top-only, 1..{MAX_BITMAP_ROWS} equal-width rows of 1..40 hexadecimal cells; 0 transparent, "
                            "1..F select local or inherited palette. Bitmap x/y indicate center, each cell is scale display pixels; "
                            "its height is NOT resized to 5 rows. Move y to reveal a tall character through the viewport. "
                            "At most 96 total layers and 8,000,000 lamp×layer×particle evaluations plus bitmap source cells.",
@@ -406,7 +411,8 @@ def verified_recipe_examples(*, frame_count=192, speed_ms=40):
                         {"kind": "bitmap", "rows": rows,
                          "palette": ["#7B2FBE", "#F8F4FF", "#000000"],
                          "x": 20 / 39, "y": 2 / 4, "scale": 1, "blend": "replace"}],
-                "keys": [{"kind": "solid", "color": "#7B2FBE", "opacity": 0.16}]}
+                "keys": [{"kind": "scan", "color": "#7B2FFF", "axis": "x", "position": 0.5,
+                          "width": 0.75, "opacity": 0.95, "blend": "dominant"}]}
 
     poses = [pose("定格", 0, frame_count, open_rows)]
     if frame_count >= 3:
@@ -416,7 +422,7 @@ def verified_recipe_examples(*, frame_count=192, speed_ms=40):
         poses = [pose("睁眼", 0, close_start, open_rows),
                  pose("轻眨", close_start, close_end, closed_rows),
                  pose("回到睁眼", close_end, frame_count, open_rows)]
-    character = {"version": 1, "name": "猫眼微光", "description": "七列五行的网格示例；黑色瞳孔替换底色，轴灯在换姿态时保持稳定。",
+    character = {"version": 1, "name": "猫眼微动", "description": "七列五行的网格示例；黑色瞳孔替换底色，轴灯亮区在换姿态时保持稳定。",
                  "frame_count": frame_count, "speed_ms": speed_ms,
                  "palette": ["#7B2FBE", "#F8F4FF", "#04121B"], "scenes": poses}
     position = {"from": 1.3, "to": -0.3} if frame_count >= 3 else 0.5
@@ -426,7 +432,7 @@ def verified_recipe_examples(*, frame_count=192, speed_ms=40):
                  "top": [{"kind": "scan", "color": "#24DDFC", "axis": "y", "width": 0.6,
                           "position": copy.deepcopy(position)}],
                  "keys": [{"kind": "scan", "color": "#24DDFC", "axis": "y", "width": 0.6,
-                           "position": copy.deepcopy(position), "opacity": 0.45}]}]}
+                           "position": copy.deepcopy(position), "opacity": 0.95, "blend": "dominant"}]}]}
     for example in (character, scan):
         validate_recipe(example)
     return [character, scan]
@@ -603,6 +609,12 @@ def _render(coordinates, layers):
                 rgb = [a * (1 - alpha) + b * alpha for a, b in zip(rgb, color)]
             elif layer["blend"] == "max":
                 rgb = [max(a, b * alpha) for a, b in zip(rgb, color)]
+            elif layer["blend"] == "dominant":
+                candidate = [b * alpha for b in color]
+                # Keep a light's complete hue. A channel-wise maximum of red,
+                # green and blue becomes white, even without additive blending.
+                if max(candidate) >= max(rgb):
+                    rgb = candidate
             else:
                 rgb = [min(255, a + b * alpha) for a, b in zip(rgb, color)]
         frame.append("#" + "".join(f"{max(0, min(255, round(c))):02X}" for c in rgb))

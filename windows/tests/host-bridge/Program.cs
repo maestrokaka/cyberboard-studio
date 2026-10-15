@@ -282,6 +282,138 @@ internal static class Program
                 await Fails(() => { settings.Save(Payload(new { apiKey = "key\r\nheader" })); return Task.CompletedTask; }, "单行密钥");
                 await Fails(() => { settings.Save(Payload(new { apiKey = new string('a', 4097) })); return Task.CompletedTask; }, "单行密钥");
             });
+            await Run("default AI storage uses independent UTF-8 key files without DPAPI or public key metadata", () =>
+            {
+                var directory = Path.Combine(temp, "plain provider keys");
+                var settings = new AISettings(directory);
+                settings.Save(Payload(new { provider = "kimi-code", apiKey = "plain-kimi-test-key" }));
+                settings.Save(Payload(new { provider = "minimax", apiKey = "plain-minimax-test-key" }));
+                var keyDirectory = Path.Combine(directory, "ai-keys");
+                Check(File.ReadAllText(Path.Combine(keyDirectory, "kimi-code.key")) == "plain-kimi-test-key", "Default Kimi key is not a plain separate file.");
+                Check(File.ReadAllBytes(Path.Combine(keyDirectory, "minimax.key")).SequenceEqual(System.Text.Encoding.UTF8.GetBytes("plain-minimax-test-key")), "Key file is not exact BOM-free UTF-8.");
+                Check(!Directory.Exists(Path.Combine(directory, "credentials")), "New storage created legacy DPAPI files.");
+                var reopened = new AISettings(directory);
+                var normal = JsonSerializer.SerializeToElement(reopened.Get());
+                Check(normal.GetProperty("credentialStore").GetString() == "本机独立密钥文件", "Storage label is stale.");
+                Check(!normal.GetRawText().Contains("test-key") && !normal.GetRawText().Contains("apiKey"), "Public settings returned secrets.");
+                Check(!File.ReadAllText(Path.Combine(directory, "ai-settings.json")).Contains("test-key"), "Public metadata contains key text.");
+                Check(reopened.Inject(Payload(new { provider = "minimax" })).Secret == "plain-minimax-test-key", "Restart did not retain the independent service key.");
+                Check(JsonSerializer.SerializeToElement(reopened.RevealAIKey(Payload(new { provider = "kimi-code" }))).GetProperty("apiKey").GetString() == "plain-kimi-test-key", "Explicit reveal used another provider.");
+                return Task.CompletedTask;
+            });
+            await Run("legacy migration retains old data and empty key tombstones prevent removed key resurrection", async () =>
+            {
+                var directory = Path.Combine(temp, "legacy to files");
+                var keyDirectory = Path.Combine(directory, "ai-keys");
+                var legacy = new MemoryVault();
+                legacy.Keys["kimi-code"] = "legacy-kimi-test-key";
+                legacy.Keys["minimax"] = "legacy-minimax-test-key";
+                var files = new LocalFileCredentialVault(keyDirectory, legacy);
+                Check(files.Read("kimi-code") == "legacy-kimi-test-key", "Legacy key was not read.");
+                Check(File.ReadAllText(Path.Combine(keyDirectory, "kimi-code.key")) == "legacy-kimi-test-key", "Legacy key was not migrated.");
+                Check(legacy.Keys["kimi-code"] == "legacy-kimi-test-key", "Migration deleted or changed legacy key.");
+                legacy.DeniedProvider = "kimi-code";
+                files.Write("kimi-code", "new-kimi-test-key");
+                Check(files.Read("kimi-code") == "new-kimi-test-key", "Local key unnecessarily depended on legacy access.");
+                files.Delete("kimi-code");
+                Check(File.Exists(Path.Combine(keyDirectory, "kimi-code.key")) && new FileInfo(Path.Combine(keyDirectory, "kimi-code.key")).Length == 0, "Removal marker missing.");
+                Check(new LocalFileCredentialVault(keyDirectory, legacy).Read("kimi-code") is null, "Removed key resurrected from legacy storage.");
+                Check(files.Read("minimax") == "legacy-minimax-test-key" && legacy.Keys.Count == 2, "Migration/removal crossed providers.");
+                foreach (var provider in new[] { "../kimi-code", "other", "", "KIMI-CODE" })
+                    await Fails(() => { files.Write(provider, "test-key"); return Task.CompletedTask; }, "未知");
+                foreach (var key in new[] { "line\nbreak", "has space", "中文", new string('a', 4097) })
+                    await Fails(() => { files.Write("deepseek", key); return Task.CompletedTask; }, "格式");
+            });
+            await Run("unreadable active legacy key stays service scoped and explicit replacement restores normal use", async () =>
+            {
+                var directory = Path.Combine(temp, "unreadable legacy replacement");
+                var legacy = new MemoryVault { DeniedProvider = "kimi-code" };
+                legacy.Keys["minimax"] = "other-service-test-key";
+                var files = new LocalFileCredentialVault(Path.Combine(directory, "ai-keys"), legacy);
+                var settings = new AISettings(directory, files);
+                var normal = JsonSerializer.SerializeToElement(settings.Get());
+                Check(normal.GetProperty("hasKey").ValueKind == JsonValueKind.Null && normal.GetProperty("profiles").GetProperty("kimi-code").GetProperty("credentialError").GetString()!.Contains("重新输入"), "Unreadable active key blocked settings or became a false absence.");
+                Check(normal.GetProperty("profiles").GetProperty("minimax").GetProperty("hasKey").GetBoolean(), "One unreadable legacy service blocked another service.");
+                await Fails(() => { settings.Save(Payload(new { provider = "kimi-code" })); return Task.CompletedTask; }, "重新输入");
+                var saved = JsonSerializer.SerializeToElement(settings.Save(Payload(new { provider = "kimi-code", apiKey = "reentered-test-key" })));
+                Check(saved.GetProperty("hasKey").GetBoolean() && settings.Inject(Payload(new { })).Secret == "reentered-test-key", "User could not replace an undecryptable old key.");
+                Check(files.Read("minimax") == "other-service-test-key", "Recovery overwrote another service.");
+                settings.Save(Payload(new { provider = "kimi-code", removeKey = true }));
+                Check(files.Read("kimi-code") is null, "Explicit removal fell back to unreadable legacy storage.");
+            });
+            await Run("file key transactions restore exact old files and absence when metadata commit fails", async () =>
+            {
+                var directory = Path.Combine(temp, "file rollback settings");
+                var keyDirectory = Path.Combine(directory, "ai-keys");
+                var legacy = new MemoryVault();
+                var files = new LocalFileCredentialVault(keyDirectory, legacy);
+                var failMetadata = false;
+                var settings = new AISettings(directory, files, beforeMetadataCommit: () => { if (failMetadata) throw new IOException("Mock metadata failure"); });
+                settings.Save(Payload(new { provider = "kimi-code", apiKey = "original-file-test-key" }));
+                var keyPath = Path.Combine(keyDirectory, "kimi-code.key");
+                var originalKey = File.ReadAllBytes(keyPath);
+                var metadataPath = Path.Combine(directory, "ai-settings.json");
+                var originalMetadata = File.ReadAllText(metadataPath);
+                failMetadata = true;
+                await Fails(() => { settings.Save(Payload(new { apiKey = "replacement-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(File.ReadAllBytes(keyPath).SequenceEqual(originalKey), "Replacement did not restore the old file.");
+                await Fails(() => { settings.Save(Payload(new { removeKey = true })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(File.ReadAllBytes(keyPath).SequenceEqual(originalKey), "Removal did not restore the old file.");
+                await Fails(() => { settings.Save(Payload(new { provider = "kimi-open", apiKey = "new-provider-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(!File.Exists(Path.Combine(keyDirectory, "kimi-open.key")), "Failed new key retained a file or removal marker.");
+                legacy.DeniedProvider = "minimax";
+                await Fails(() => { settings.Save(Payload(new { provider = "minimax", apiKey = "recover-legacy-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(!File.Exists(Path.Combine(keyDirectory, "minimax.key")), "Failed legacy replacement did not restore absence.");
+                Check(File.ReadAllText(metadataPath) == originalMetadata, "Failed key change switched public metadata.");
+                Check(!Directory.EnumerateFiles(directory, "*.tmp", SearchOption.AllDirectories).Any(), "Failed transaction left staging files.");
+            });
+            await Run("failed key file commit leaves original key and active metadata intact", async () =>
+            {
+                var directory = Path.Combine(temp, "key file commit failure");
+                var failKeyCommit = false;
+                var files = new LocalFileCredentialVault(Path.Combine(directory, "ai-keys"), beforeCommit: () => { if (failKeyCommit) throw new IOException("Mock key commit failure"); });
+                var settings = new AISettings(directory, files);
+                settings.Save(Payload(new { apiKey = "original-commit-test-key" }));
+                var metadata = File.ReadAllText(Path.Combine(directory, "ai-settings.json"));
+                failKeyCommit = true;
+                await Fails(() => { settings.Save(Payload(new { apiKey = "rejected-commit-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(files.Read("kimi-code") == "original-commit-test-key", "Failed file commit changed original key.");
+                Check(File.ReadAllText(Path.Combine(directory, "ai-settings.json")) == metadata, "Failed file commit switched metadata.");
+                Check(!Directory.EnumerateFiles(directory, "*.tmp", SearchOption.AllDirectories).Any(), "Failed file commit left staging files.");
+            });
+            await Run("invalid local key bytes are recoverable and failed recovery restores the exact invalid bytes", async () =>
+            {
+                var directory = Path.Combine(temp, "invalid file recovery");
+                var keyDirectory = Path.Combine(directory, "ai-keys");
+                Directory.CreateDirectory(keyDirectory);
+                var path = Path.Combine(keyDirectory, "kimi-code.key");
+                byte[] invalid = [0xFF, 0xFE, 0x00];
+                File.WriteAllBytes(path, invalid);
+                var failMetadata = true;
+                var settings = new AISettings(directory, new LocalFileCredentialVault(keyDirectory), beforeMetadataCommit: () => { if (failMetadata) throw new IOException("Mock recovery commit failure"); });
+                Check(JsonSerializer.SerializeToElement(settings.Get()).GetProperty("hasKey").ValueKind == JsonValueKind.Null, "Invalid key became a confirmed missing key.");
+                await Fails(() => { settings.Save(Payload(new { apiKey = "valid-recovery-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(File.ReadAllBytes(path).SequenceEqual(invalid), "Failed recovery erased original bytes.");
+                failMetadata = false;
+                settings.Save(Payload(new { apiKey = "valid-recovery-test-key" }));
+                Check(settings.Inject(Payload(new { })).Secret == "valid-recovery-test-key", "Malformed local key could not be explicitly replaced.");
+                Check(!JsonSerializer.Serialize(settings.Get()).Contains("valid-recovery-test-key"), "Recovered key leaked through public settings.");
+            });
+            await Run("legacy DPAPI files are read-only compatibility data and are never rewritten or deleted", () =>
+            {
+                var directory = Path.Combine(temp, "retained DPAPI compatibility");
+                Directory.CreateDirectory(directory);
+                var path = Path.Combine(directory, "kimi-code.dpapi");
+                byte[] original = [1, 2, 3, 4, 5];
+                File.WriteAllBytes(path, original);
+                var old = new DPAPICredentialVault(directory);
+                try { old.Write("kimi-code", "new-test-key"); throw new Exception("Legacy write remained enabled."); }
+                catch (NotSupportedException) { }
+                try { old.Delete("kimi-code"); throw new Exception("Legacy delete remained enabled."); }
+                catch (NotSupportedException) { }
+                Check(File.ReadAllBytes(path).SequenceEqual(original), "Legacy compatibility modified the old encrypted bytes.");
+                return Task.CompletedTask;
+            });
             await Run("legacy Code default migrates once while explicit and open models remain selected", () =>
             {
                 var directory = Path.Combine(temp, "模型迁移 isolated");

@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -45,7 +44,8 @@ internal sealed class AISettings
     public AISettings(string state, ICredentialVault? vault = null, Action? beforeMetadataCommit = null)
     {
         this.state = state;
-        this.vault = vault ?? new DPAPICredentialVault(Path.Combine(state, "credentials"));
+        this.vault = vault ?? new LocalFileCredentialVault(Path.Combine(state, "ai-keys"),
+            new DPAPICredentialVault(Path.Combine(state, "credentials")));
         this.beforeMetadataCommit = beforeMetadataCommit;
     }
 
@@ -128,20 +128,26 @@ internal sealed class AISettings
         catch { throw new IOException("模型配置文件无法读取，请在模型配置中重新保存服务配置。"); }
     }
 
-    private object Public(AIConfiguration config, bool hasKey) => new
+    private const string KeyReadError = "此服务的密钥无法读取，请重新输入并保存；其他服务可继续使用。";
+
+    private object Public(AIConfiguration config, bool? hasKey, string? credentialError = null) => new
     {
         provider = config.Provider, baseUrl = config.BaseUrl, model = config.Model,
-        hasKey, credentialStore = "Windows DPAPI（当前用户）", modelDefaultsVersion = 2, modelMigrated = lastModelMigration,
+        hasKey, credentialError, credentialStore = "本机独立密钥文件", modelDefaultsVersion = 2, modelMigrated = lastModelMigration,
         supportsImages = SupportsImages(config), profiles = Endpoints.Keys.ToDictionary(provider => provider, provider =>
         {
             var profile = profiles.GetValueOrDefault(provider) ?? Validate(JsonSerializer.SerializeToElement(new { provider }));
             var item = new Dictionary<string, object?>
             { ["provider"] = provider, ["baseUrl"] = profile.BaseUrl, ["model"] = profile.Model, ["supportsImages"] = SupportsImages(profile) };
-            if (provider == config.Provider) item["hasKey"] = hasKey;
+            if (provider == config.Provider)
+            {
+                item["hasKey"] = hasKey;
+                if (credentialError is not null) item["credentialError"] = credentialError;
+            }
             else
             {
                 try { item["hasKey"] = !string.IsNullOrEmpty(vault.Read(provider)); }
-                catch { item["hasKey"] = null; item["credentialError"] = "此服务的密钥暂时无法读取，请检查系统凭据访问权限后重试。"; }
+                catch { item["hasKey"] = null; item["credentialError"] = KeyReadError; }
             }
             return item;
         })
@@ -152,7 +158,8 @@ internal sealed class AISettings
         lock (gate)
         {
             var config = LoadConfiguration();
-            return Public(config, !string.IsNullOrEmpty(vault.Read(config.Provider)));
+            try { return Public(config, !string.IsNullOrEmpty(vault.Read(config.Provider))); }
+            catch { return Public(config, null, KeyReadError); }
         }
     }
 
@@ -162,10 +169,10 @@ internal sealed class AISettings
         {
             var provider = Text(payload, "provider");
             if (provider is null || !Endpoints.ContainsKey(provider)) throw new IOException("请选择受支持的模型服务。");
-            // Explicit local viewing is the only ordinary UI action returning a
-            // saved secret. It never writes or switches the active configuration.
+            // Explicit local viewing returns only this provider's key. A legacy
+            // read may migrate its file, but never switches active configuration.
             try { return new { apiKey = vault.Read(provider) ?? "" }; }
-            catch { throw new IOException("无法读取已保存的 API Key，请检查系统凭据访问权限后重试。"); }
+            catch { throw new IOException("无法读取已保存的 API Key，请重新输入并保存该服务。"); }
         }
     }
 
@@ -183,13 +190,22 @@ internal sealed class AISettings
             if (key.Any(c => c < 33 || c > 126)) throw new IOException("API Key 只能包含可打印的单行字符，不包含空格。");
             var remove = payload.TryGetProperty("removeKey", out var removeValue) && removeValue.ValueKind == JsonValueKind.True;
             if (remove && key.Length > 0) throw new IOException("删除密钥与设置新密钥不能同时进行。");
-            // Read the target's prior key and construct the response before side
-            // effects. No credential read can turn a committed save into a failure.
-            var previousKey = vault.Read(config.Provider);
+            // A file snapshot also preserves an unreadable legacy key's local
+            // state, so an explicit replacement can be rolled back atomically.
+            var files = vault as LocalFileCredentialVault;
+            var snapshot = files?.Capture(config.Provider);
+            string? previousKey;
+            var unreadable = false;
+            try { previousKey = vault.Read(config.Provider); }
+            catch when (files is not null && (remove || key.Length > 0))
+            {
+                previousKey = null;
+                unreadable = true;
+            }
             var nextKey = remove ? null : (key.Length == 0 ? previousKey : key);
             profiles[config.Provider] = config;
             var prepared = Public(config, !string.IsNullOrEmpty(nextKey));
-            var changesKey = nextKey != previousKey;
+            var changesKey = unreadable || nextKey != previousKey;
             try
             {
                 if (changesKey)
@@ -201,16 +217,17 @@ internal sealed class AISettings
             }
             catch
             {
-                if (changesKey)
+                if (changesKey || files is not null)
                 {
                     try
                     {
-                        if (previousKey is not null) vault.Write(config.Provider, previousKey);
+                        if (files is not null && snapshot is not null) files.Restore(config.Provider, snapshot);
+                        else if (previousKey is not null) vault.Write(config.Provider, previousKey);
                         else vault.Delete(config.Provider);
                     }
-                    catch { throw new IOException("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请检查系统凭据权限后重新保存该服务。"); }
+                    catch { throw new IOException("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请检查本机存储后重新保存该服务。"); }
                 }
-                throw new IOException("模型配置未保存，原配置和密钥已保留。请检查本机存储与凭据访问权限后重试。");
+                throw new IOException("模型配置未保存，原配置和密钥已保留。请检查本机存储后重试。");
             }
             return prepared;
         }
@@ -225,7 +242,9 @@ internal sealed class AISettings
             if (!Endpoints.ContainsKey(provider)) throw new IOException("请选择受支持的模型服务。");
             if (!allowInactive && provider != active.Provider) throw new IOException("当前模型配置已切换，请刷新后重新制作。");
             var config = provider == active.Provider ? active : profiles.GetValueOrDefault(provider) ?? Validate(JsonSerializer.SerializeToElement(new { provider }));
-            var secret = vault.Read(config.Provider);
+            string? secret;
+            try { secret = vault.Read(config.Provider); }
+            catch { throw new IOException(KeyReadError); }
             if (string.IsNullOrEmpty(secret)) throw new IOException("请先在模型配置中保存 API Key。");
             var values = payload.EnumerateObject().Where(p => p.Name != "ai")
                 .ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
@@ -249,23 +268,97 @@ internal sealed class AISettings
     }
 }
 
+internal sealed record LocalKeySnapshot(bool Exists, byte[] Bytes);
+
+internal sealed class LocalFileCredentialVault(string directory, ICredentialVault? legacy = null,
+    Action? beforeCommit = null) : ICredentialVault
+{
+    private static readonly UTF8Encoding Utf8 = new(false, true);
+
+    private string PathFor(string provider)
+    {
+        if (provider is not ("kimi-code" or "kimi-open" or "minimax" or "deepseek")) throw new IOException("未知密钥服务。");
+        return Path.Combine(directory, provider + ".key");
+    }
+
+    internal LocalKeySnapshot Capture(string provider)
+    {
+        var path = PathFor(provider);
+        try
+        {
+            if (new FileInfo(path).Length > 65536) throw new IOException("密钥文件过大，请检查本机文件后重新保存。");
+            return new(true, File.ReadAllBytes(path));
+        }
+        catch (FileNotFoundException) { return new(false, []); }
+        catch (DirectoryNotFoundException) { return new(false, []); }
+    }
+
+    private void Commit(string provider, byte[] bytes)
+    {
+        var path = PathFor(provider);
+        Directory.CreateDirectory(directory);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllBytes(temporary, bytes);
+            beforeCommit?.Invoke();
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    internal void Restore(string provider, LocalKeySnapshot snapshot)
+    {
+        var current = Capture(provider);
+        if (current.Exists == snapshot.Exists && current.Bytes.SequenceEqual(snapshot.Bytes)) return;
+        if (snapshot.Exists) Commit(provider, snapshot.Bytes);
+        else File.Delete(PathFor(provider));
+    }
+
+    private static string? Key(string value)
+    {
+        if (value.Length == 0) return null;
+        if (value.Length > 4096 || value.Any(c => c < 33 || c > 126)) throw new IOException("密钥文件格式无效，请重新输入并保存该服务。");
+        return value;
+    }
+
+    public string? Read(string provider)
+    {
+        var snapshot = Capture(provider);
+        if (snapshot.Exists)
+        {
+            if (snapshot.Bytes.Length > 4096) throw new IOException("密钥文件格式无效，请重新输入并保存该服务。");
+            try { return Key(Utf8.GetString(snapshot.Bytes)); }
+            catch (DecoderFallbackException) { throw new IOException("密钥文件格式无效，请重新输入并保存该服务。"); }
+        }
+        string? previous;
+        try { previous = legacy?.Read(provider); }
+        catch { throw new IOException("旧版 API Key 无法读取，请重新输入并保存该服务。"); }
+        if (string.IsNullOrEmpty(previous)) return null;
+        Key(previous);
+        Write(provider, previous);
+        return previous;
+    }
+
+    public void Write(string provider, string key)
+    {
+        if (Key(key) is null) throw new IOException("API Key 不能为空。");
+        Commit(provider, Utf8.GetBytes(key));
+    }
+
+    // Empty files are explicit removals. Keeping that marker prevents a retained
+    // legacy DPAPI file from resurrecting the key after an application restart.
+    public void Delete(string provider) => Commit(provider, []);
+}
+
 internal sealed class DPAPICredentialVault(string directory) : ICredentialVault
 {
     [StructLayout(LayoutKind.Sequential)]
     private struct Blob { public int Length; public IntPtr Data; }
-    [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CryptProtectData(ref Blob input, string? description, IntPtr entropy, IntPtr reserved, IntPtr prompt, int flags, out Blob output);
     [DllImport("crypt32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CryptUnprotectData(ref Blob input, IntPtr description, IntPtr entropy, IntPtr reserved, IntPtr prompt, int flags, out Blob output);
     [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr pointer);
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(string descriptor, uint revision, out IntPtr security, out uint size);
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetFileSecurity(string path, uint information, IntPtr security);
 
     private string PathFor(string provider)
     {
@@ -273,17 +366,15 @@ internal sealed class DPAPICredentialVault(string directory) : ICredentialVault
         return Path.Combine(directory, provider + ".dpapi");
     }
 
-    private static byte[] Transform(byte[] bytes, bool protect)
+    private static byte[] Decrypt(byte[] bytes)
     {
         var input = new Blob { Length = bytes.Length, Data = Marshal.AllocHGlobal(bytes.Length) };
         Blob output = default;
         try
         {
             Marshal.Copy(bytes, 0, input.Data, bytes.Length);
-            // CRYPTPROTECT_UI_FORBIDDEN; no machine scope flag: bound to this Windows user.
-            var success = protect
-                ? CryptProtectData(ref input, "Cyberboard Studio.Kimi", IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 1, out output)
-                : CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 1, out output);
+            // Legacy read only. New keys never invoke DPAPI or request UI.
+            var success = CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 1, out output);
             if (!success || output.Length < 1 || output.Length > 65536) throw new IOException("Windows 无法访问加密凭据，请重新保存 API Key。");
             var result = new byte[output.Length];
             Marshal.Copy(output.Data, result, 0, result.Length);
@@ -301,46 +392,16 @@ internal sealed class DPAPICredentialVault(string directory) : ICredentialVault
         }
     }
 
-    private static void RestrictToCurrentUser(string path)
-    {
-        if (!OperatingSystem.IsWindows()) throw new IOException("加密凭据仅可在 Windows 当前用户中保存。");
-        var sid = WindowsIdentity.GetCurrent().User?.Value ?? throw new IOException("无法确定 Windows 当前用户。");
-        if (!ConvertStringSecurityDescriptorToSecurityDescriptor($"D:P(A;;FA;;;{sid})", 1, out var descriptor, out _))
-            throw new IOException("无法保护凭据文件访问权限。");
-        try
-        {
-            if (!SetFileSecurity(path, 0x00000004, descriptor)) throw new IOException("无法保护凭据文件访问权限。");
-        }
-        finally { LocalFree(descriptor); }
-    }
-
     public string? Read(string provider)
     {
         var path = PathFor(provider);
         if (!File.Exists(path)) return null;
         if (new FileInfo(path).Length > 65536) throw new IOException("加密凭据文件无效，请重新保存 API Key。");
-        var plain = Transform(File.ReadAllBytes(path), protect: false);
+        var plain = Decrypt(File.ReadAllBytes(path));
         try { return Encoding.UTF8.GetString(plain); }
         finally { CryptographicOperations.ZeroMemory(plain); }
     }
 
-    public void Write(string provider, string key)
-    {
-        var plain = Encoding.UTF8.GetBytes(key);
-        byte[] encrypted;
-        try { encrypted = Transform(plain, protect: true); }
-        finally { CryptographicOperations.ZeroMemory(plain); }
-        Directory.CreateDirectory(directory);
-        var path = PathFor(provider);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            File.WriteAllBytes(temporary, encrypted);
-            RestrictToCurrentUser(temporary);
-            File.Move(temporary, path, overwrite: true);
-        }
-        finally { if (File.Exists(temporary)) File.Delete(temporary); }
-    }
-
-    public void Delete(string provider) => File.Delete(PathFor(provider));
+    public void Write(string provider, string key) => throw new NotSupportedException("旧版凭据仅供读取迁移。");
+    public void Delete(string provider) => throw new NotSupportedException("旧版凭据仅供读取迁移。");
 }

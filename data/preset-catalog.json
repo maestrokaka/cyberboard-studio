@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "works": [
+    {
+      "file": "neon-rift.design.json",
+      "preview_frame": 48
+    },
+    {
+      "file": "data-storm.design.json",
+      "preview_frame": 48
+    },
+    {
+      "file": "redline-rush.design.json",
+      "preview_frame": 48
+    },
+    {
+      "file": "kaka-rossonero.design.json",
+      "preview_frame": 204
+    },
+    {
+      "file": "kaka-breakaway.design.json",
+      "preview_frame": 92
+    },
+    {
+      "file": "kaka-san-siro.design.json",
+      "preview_frame": 151
+    },
+    {
+      "file": "eva-unit01.design.json",
+      "preview_frame": 61
+    },
+    {
+      "file": "glitch-override.design.json",
+      "preview_frame": 112
+    }
+  ]
+}

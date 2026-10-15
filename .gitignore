@@ -27,6 +27,7 @@
 **/history/
 **/ai-settings.json
 **/credentials/
+**/ai-keys/
 .env
 .env.*
 !.env.example

@@ -551,12 +551,12 @@
           tx.fillStyle = 'rgb(' + [r, g, b].join(',') + ')';
           tx.beginPath(); tx.roundRect(5 + (i % 40) * 40, 5 + Math.floor(i / 40) * 40, 35, 35, 9); tx.fill();
         } else {
-          // Official CLedStrip display: 60% base and 110% radial center, black glass.
+          // Keep the same-color glow within the design RGB; this is a visual material, not hardware calibration.
           const x = (i % 40) * 40 + 20, y = Math.floor(i / 40) * 40 + 20;
           const size = 35.2, radius = size * .2;
           tx.beginPath(); tx.roundRect(x - size / 2, y - size / 2, size, size, radius);
           tx.fillStyle = 'rgb(' + [r, g, b].map(c => Math.round(c * .6)).join(',') + ')'; tx.fill();
-          const center = [r, g, b].map(c => Math.min(255, Math.round(c * 1.1)));
+          const center = [r, g, b];
           const grad = tx.createRadialGradient(x, y, 0, x, y, Math.hypot(size / 2, size / 2));
           grad.addColorStop(0, 'rgb(' + center.join(',') + ')');
           grad.addColorStop(.25, 'rgb(' + center.join(',') + ')');

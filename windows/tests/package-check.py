@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.3.1-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.0-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -54,8 +54,12 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "0.3.1")
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.3.1"))
+        self.assertEqual(release["version"], "0.4.0")
+        self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
+        self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
+        self.assertIs(release["includesDeviceBaseline"], False)
+        self.assertIs(release["startupAccessesUSB"], False)
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.0"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
@@ -70,6 +74,22 @@ class PackageChecks(unittest.TestCase):
             self.assertEqual(struct.unpack_from("<H", data, offset + 4)[0], 0x8664, name)
         data, offset = pe_header(PACKAGE / "Cyberboard Studio.exe")
         self.assertEqual(struct.unpack_from("<H", data, offset + 24 + 68)[0], 2, "Native app has GUI subsystem")
+        certificate_offset, certificate_size = struct.unpack_from("<II", data, offset + 24 + 112 + 4 * 8)
+        self.assertEqual((certificate_offset, certificate_size), (0, 0), "This release must remain accurately described as unsigned, with no inherited Authenticode certificate")
+
+    def test_complete_web_python_and_migration_sources_match_the_release(self):
+        def files(directory):
+            return {path.relative_to(directory).as_posix(): path for path in directory.rglob("*")
+                    if path.is_file() and not any(part == "__pycache__" or part == ".DS_Store" or part.endswith(".pyc")
+                                                  for part in path.relative_to(directory).parts)}
+
+        for source, shipped, rewritten in ((APP / "web", PACKAGE / "resources/web", {"data.js", "assets/keymap-layout.json"}),
+                                            (APP / "windows/runtime/python", PACKAGE / "resources/python", set())):
+            expected, actual = files(source), files(shipped)
+            self.assertEqual(set(actual), set(expected), "Complete resource inventory must match " + str(source))
+            for relative in sorted(set(expected) - rewritten):
+                self.assertEqual(digest(actual[relative]), digest(expected[relative]), relative)
+        self.assertEqual(digest(PACKAGE / "resources/backend/migrate-config.py"), digest(APP / "windows/migrate-config.py"))
 
     def test_apphost_cet_bit_matches_the_selected_package(self):
         sys.path.insert(0, str(APP / "windows"))
@@ -102,15 +122,20 @@ class PackageChecks(unittest.TestCase):
         data = json.loads(source[len("window.STUDIO_DATA="):].strip().removesuffix(";"))
         self.assertIsNone(data["baseConfig"])
         self.assertEqual(data["snapshot"], {"productId": None, "firmware": None, "connected": False})
-        self.assertEqual(len(data["designs"]), 3)
+        canonical_source = (APP / "web/data.js").read_text(encoding="utf-8")
+        original = json.loads(canonical_source[len("window.STUDIO_DATA="):].strip().removesuffix(";"))
+        self.assertGreaterEqual(len(original["designs"]), 3, "Release must retain the original built-in works")
+        self.assertEqual(data["designs"], original["designs"], "Every released work must match the current prepared data, including new presets")
         self.assertEqual(len(data["keyLayout"]), 81)
         self.assertTrue(all(len(key["bindings"]) == 1 for key in data["keyLayout"]))
         layout = json.loads((PACKAGE / "resources/web/assets/keymap-layout.json").read_text())
         self.assertEqual(set(layout), {"kind", "keys"})
+        self.assertEqual(layout["keys"], data["keyLayout"])
         for path in PACKAGE.rglob("*"):
             if path.is_file():
                 self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json"})
                 self.assertNotIn("/credentials/", path.relative_to(PACKAGE).as_posix())
+                self.assertNotIn("/ai-keys/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/history/", path.relative_to(PACKAGE).as_posix())
         self.assertNotIn("/Users/sheva", source)
         self.assertFalse((PACKAGE / "resources/python/pyvenv.cfg").exists())

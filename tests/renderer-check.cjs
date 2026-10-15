@@ -23,7 +23,7 @@ const source = fs.readFileSync(path.join(__dirname, '../web/preview-engine.js'),
 assert.ok(!/\b(fetch|XMLHttpRequest|WebSocket)\s*\(|window\.openai/.test(source));
 
 function harness(reduced = false, tainted = false, sourceRGB = [100, 160, 220]) {
-  const log = { photos: [], photoClips: [], clips: [], top: [], axes: [], warps: [], neutral: [] };
+  const log = { photos: [], photoClips: [], clips: [], top: [], axes: [], gradients: [], warps: [], neutral: [] };
   const callbacks = new Map();
   let nextRAF = 1;
   const styles = new Map();
@@ -44,7 +44,11 @@ function harness(reduced = false, tainted = false, sourceRGB = [100, 160, 220]) 
       };
       if (prop === 'save') return () => { stack.push(clipping.map(points => points.map(point => [...point]))); };
       if (prop === 'restore') return () => { clipping = stack.pop() || []; };
-      if (prop === 'createRadialGradient') return () => ({ stops: [], addColorStop(...stop) { this.stops.push(stop); } });
+      if (prop === 'createRadialGradient') return (...geometry) => {
+        const gradient = { geometry, stops: [], addColorStop(...stop) { this.stops.push(stop); } };
+        log.gradients.push(gradient);
+        return gradient;
+      };
       if (prop === 'createImageData') return (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
       if (prop === 'getImageData') return (x, y, w, h) => {
         if (tainted) {
@@ -213,6 +217,42 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
     assert.equal(digest(design), before, 'preview controls must not mutate stored design RGB or speed');
   }
   assert.equal(new Set(distinct).size, 3, 'all three real designs render distinct frames');
+
+  const materialColors = ['#FF0000', '#FFFF00', '#F0DCC8', '#E8D1A7', '#102030'];
+  const reserved = new Set([57, 61, 74, 78, 82, 83, 84]);
+  const materialDesign = { id: 'renderer-material-check', name: '同色光晕', speed_ms: 30,
+    frames: [Array.from({ length: 200 }, (_, i) => materialColors[i % materialColors.length])],
+    keyframes: [Array.from({ length: 90 }, (_, i) => reserved.has(i) ? '#000000' : materialColors[i % materialColors.length])] };
+  const materialBefore = digest(materialDesign);
+  preview.setDesign(materialDesign).setRenderer('editor').seek(0);
+  for (const brightness of [100, 50, 0]) {
+    h.log.gradients.length = h.log.top.length = h.log.axes.length = 0;
+    preview.setBrightness(brightness);
+    const factor = brightness / 100;
+    assert.equal(h.log.gradients.length, 200, 'editor keeps one radial glow per top LED');
+    for (let lamp = 0; lamp < 200; lamp++) {
+      const expected = color(materialDesign.frames[0][lamp], factor);
+      const gradient = h.log.gradients[lamp];
+      assert.deepEqual(gradient.stops, [[0, expected], [.25, expected], [1, expected.replace('rgb(', 'rgba(').replace(')', ',0)')]],
+        'pure red/yellow and mixed colors keep exact brightness-scaled RGB at the glow center, without clipping or an added white core');
+      assert.equal(gradient.geometry[2], 0);
+      assert.equal(gradient.geometry[5], Math.hypot(35.2 / 2, 35.2 / 2), 'glow geometry stays unchanged');
+    }
+    const expectedAxes = views.front.keyZones.map(zone => materialDesign.keyframes[0][zone.index])
+      .map(hex => color(hex, factor)).filter(value => value !== 'rgb(0,0,0)');
+    assert.deepEqual(h.log.axes, expectedAxes, 'editor glow changes do not boost or recolor key lighting');
+    assert.equal(digest(materialDesign), materialBefore, 'drawing cannot mutate original work or its exported RGB');
+  }
+  const modelContext = { window: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(workspace, 'web/studio-model.js'), 'utf8'), modelContext);
+  const exported = modelContext.window.StudioModel.merge(require('../data/test-fixtures.cjs')(),
+    [{ slot: 2, design: materialDesign, brightness: 50, speedMs: 30 }]);
+  const exportedPage = exported.page_data.find(page => page.page_index === 6);
+  assert.equal(exportedPage.lightness, 50);
+  for (const field of ['frames', 'keyframes']) assert.deepEqual(JSON.parse(JSON.stringify(exportedPage[field].frame_data.map(frame => frame.frame_RGB))),
+    materialDesign[field], 'configuration export preserves exact RGB and keeps brightness separate after editor rendering');
+  assert.equal(digest(materialDesign), materialBefore);
+  preview.setDesign(designs[0]).setRenderer('library').seek(80);
   preview.setBrightness(0);
   assert.ok(h.log.top.slice(-200).every(value => value === 'rgb(0,0,0)'));
   preview.setBrightness(110); assert.equal(preview.brightness, 100);
@@ -413,5 +453,5 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   broken.setKeyMode('json');
   assert.equal(broken.diagnostic.name, 'SecurityError'); assert.equal(errors.length, 2);
   broken.destroy(); assert.equal(tainted.container.children.length, 0);
-  console.log('PASS: eight formally named front-only gallery appearances, merged duplicate R6, source-specific glass/opaque material, unchanged source/archive bytes, forbidden-angle filtering, real 192-frame designs, exact RGB and brightness, 128 perspective triangles, 83 lamp zones, independent space lamps, loop/seek/play/pause, shared transparent enclosure clip, internal full-view reset, visibility, responsive width, reduced motion, cleanup and persistent canvas SecurityError diagnostics.');
+  console.log('PASS: eight formally named front-only gallery appearances, merged duplicate R6, source-specific glass/opaque material, unchanged source/archive bytes, forbidden-angle filtering, real 192-frame designs, exact RGB and brightness, RGB-bounded editor glow at 100/50/0% without white-core clipping, unchanged key RGB and config exports, 128 perspective triangles, 83 lamp zones, independent space lamps, loop/seek/play/pause, shared transparent enclosure clip, internal full-view reset, visibility, responsive width, reduced motion, cleanup and persistent canvas SecurityError diagnostics.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

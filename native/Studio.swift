@@ -17,6 +17,9 @@ final class AISettingsStore {
     private var lastModelMigration = false
     private var profiles: [String: [String: String]] = [:]
     private let credentialAccess: AICredentialAccess?
+    private let legacyCredentialRead: ((String) throws -> String?)?
+    private var legacyChecked: Set<String> = []
+    private var legacyUnavailable: Set<String> = []
     private let beforeMetadataCommit: (() throws -> Void)?
     private static let endpoints: [String: [String]] = [
         "kimi-code": ["https://api.kimi.com/coding/v1", "https://api.kimi.ai/coding/v1"],
@@ -25,9 +28,11 @@ final class AISettingsStore {
         "deepseek": ["https://api.deepseek.com", "https://api.deepseek.com/v1"]
     ]
 
-    init(stateDirectory: URL, credentialAccess: AICredentialAccess? = nil, beforeMetadataCommit: (() throws -> Void)? = nil) {
+    init(stateDirectory: URL, credentialAccess: AICredentialAccess? = nil,
+         legacyCredentialRead: ((String) throws -> String?)? = nil, beforeMetadataCommit: (() throws -> Void)? = nil) {
         self.stateDirectory = stateDirectory
         self.credentialAccess = credentialAccess
+        self.legacyCredentialRead = legacyCredentialRead
         self.beforeMetadataCommit = beforeMetadataCommit
     }
     private static let defaultModels = ["kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3", "deepseek": "deepseek-flash"]
@@ -63,53 +68,96 @@ final class AISettingsStore {
     private func query(_ provider: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider]
     }
-    private func readKey(_ provider: String) throws -> String? {
-        if let credentialAccess { return try credentialAccess.read(provider) }
+    private func readLegacyKey(_ provider: String) throws -> String? {
+        if let legacyCredentialRead { return try legacyCredentialRead(provider) }
+        // Migration is read-only and must never display a Keychain authorization
+        // dialog, including after an ad-hoc signature changes during an update.
         var request = query(provider)
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
+        request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
         var item: CFTypeRef?
         let status = SecItemCopyMatching(request as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let bytes = item as? Data, let key = String(data: bytes, encoding: .utf8) else {
-            throw Self.failure("无法访问 macOS 钥匙串，请允许 Cyberboard Studio 访问已保存的 API Key。")
+            throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。")
         }
         return key
+    }
+    private func keyPath(_ provider: String) -> URL {
+        stateDirectory.appendingPathComponent("ai-keys", isDirectory: true).appendingPathComponent(provider + ".key")
+    }
+    private func localKeyBytes(_ provider: String) throws -> Data? {
+        let path = keyPath(provider)
+        guard FileManager.default.fileExists(atPath: path.path) else { return nil }
+        let bytes = try Data(contentsOf: path)
+        guard bytes.count <= 65536 else { throw Self.failure("此服务的本机 API Key 文件过大，请检查本机文件后重新保存。") }
+        return bytes
+    }
+    private static func decodedKey(_ bytes: Data) throws -> String? {
+        guard let key = String(data: bytes, encoding: .utf8), key.count <= 4096,
+              key.unicodeScalars.allSatisfy({ $0.value >= 33 && $0.value <= 126 }) else {
+            throw Self.failure("此服务的本机 API Key 文件无法读取，请重新保存。")
+        }
+        return key.isEmpty ? nil : key
+    }
+    private func writeLocalKey(_ provider: String, _ bytes: Data) throws {
+        let directory = keyPath(provider).deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let temporary = directory.appendingPathComponent("." + UUID().uuidString + ".tmp")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try bytes.write(to: temporary, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        let path = keyPath(provider)
+        let status = temporary.withUnsafeFileSystemRepresentation { source in
+            path.withUnsafeFileSystemRepresentation { destination in rename(source!, destination!) }
+        }
+        guard status == 0 else { throw Self.failure("无法保存此服务的本机 API Key，原密钥已保留。") }
+    }
+    private func readKey(_ provider: String) throws -> String? {
+        if let credentialAccess { return try credentialAccess.read(provider) }
+        // An empty local file records an explicit removal. Never resurrect the
+        // old Keychain item after deleting a key in the new storage.
+        if let bytes = try localKeyBytes(provider) { return try Self.decodedKey(bytes) }
+        if legacyUnavailable.contains(provider) { throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。") }
+        if legacyChecked.contains(provider) { return nil }
+        do {
+            if let key = try readLegacyKey(provider), !key.isEmpty {
+                guard let valid = try Self.decodedKey(Data(key.utf8)) else { return nil }
+                try writeLocalKey(provider, Data(valid.utf8))
+                legacyChecked.insert(provider)
+                return valid
+            }
+            legacyChecked.insert(provider)
+            return nil
+        } catch {
+            legacyUnavailable.insert(provider)
+            throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。")
+        }
     }
     private func keyExists(_ provider: String) throws -> Bool {
         if let credentialAccess {
             if let exists = credentialAccess.exists { return try exists(provider) }
             return !(try credentialAccess.read(provider) ?? "").isEmpty
         }
-        // Loading settings only needs to know whether a saved item exists.
-        // Never request secret data or wait for a system authorization dialog here.
-        var request = query(provider)
-        request[kSecReturnAttributes as String] = true
-        request[kSecMatchLimit as String] = kSecMatchLimitOne
-        request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &item)
-        if status == errSecItemNotFound { return false }
-        guard status == errSecSuccess else {
-            throw Self.failure("此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。")
-        }
-        return true
+        return !(try readKey(provider) ?? "").isEmpty
     }
     private func writeKey(_ provider: String, _ key: String) throws {
         if let credentialAccess { try credentialAccess.write(provider, key); return }
-        let attributes = [kSecValueData as String: Data(key.utf8)]
-        let status = SecItemUpdate(query(provider) as CFDictionary, attributes as CFDictionary)
-        if status == errSecItemNotFound {
-            var request = query(provider)
-            request[kSecValueData as String] = Data(key.utf8)
-            request[kSecAttrLabel as String] = "Cyberboard Studio · \(provider)"
-            guard SecItemAdd(request as CFDictionary, nil) == errSecSuccess else { throw Self.failure("无法将 API Key 保存到 macOS 钥匙串。") }
-        } else if status != errSecSuccess { throw Self.failure("无法更新 macOS 钥匙串中的 API Key。") }
+        try writeLocalKey(provider, Data(key.utf8))
+        legacyUnavailable.remove(provider)
     }
     private func deleteKey(_ provider: String) throws {
         if let credentialAccess { try credentialAccess.delete(provider); return }
-        let status = SecItemDelete(query(provider) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.failure("无法删除 macOS 钥匙串中的 API Key。") }
+        try writeLocalKey(provider, Data())
+        legacyUnavailable.remove(provider)
+    }
+    private func restoreLocalKey(_ provider: String, _ bytes: Data?) throws {
+        if let bytes { try writeLocalKey(provider, bytes) }
+        else if FileManager.default.fileExists(atPath: keyPath(provider).path) {
+            try FileManager.default.removeItem(at: keyPath(provider))
+        }
     }
     private func writeMetadata(_ config: [String: String]) throws {
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
@@ -167,7 +215,7 @@ final class AISettingsStore {
     private func publicSettings(_ config: [String: String], hasKey: Any) throws -> [String: Any] {
         var result: [String: Any] = config
         result["hasKey"] = hasKey
-        result["credentialStore"] = "macOS 钥匙串"
+        result["credentialStore"] = "本机文件"
         result["modelDefaultsVersion"] = 2
         result["modelMigrated"] = lastModelMigration
         result["supportsImages"] = Self.supportsImages(config)
@@ -177,13 +225,13 @@ final class AISettingsStore {
             var item: [String: Any] = profile
             if provider == config["provider"] {
                 item["hasKey"] = hasKey
-                if hasKey is NSNull { item["credentialError"] = "此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。" }
+                if hasKey is NSNull { item["credentialError"] = "此服务的 API Key 无法自动读取，请重新输入并保存。" }
             }
             else {
                 do { item["hasKey"] = try keyExists(provider) }
                 catch {
                     item["hasKey"] = NSNull()
-                    item["credentialError"] = "此服务的密钥暂时无法读取，请检查系统凭据访问权限后重试。"
+                    item["credentialError"] = "此服务的 API Key 无法自动读取，请重新输入并保存。"
                 }
             }
             item["supportsImages"] = Self.supportsImages(profile)
@@ -199,7 +247,7 @@ final class AISettingsStore {
         do { hasKey = try keyExists(config["provider"]!) }
         catch { hasKey = NSNull() }
         var result = try publicSettings(config, hasKey: hasKey)
-        if hasKey is NSNull { result["credentialError"] = "此服务的密钥状态暂时无法读取，请检查系统凭据访问权限后重试。" }
+        if hasKey is NSNull { result["credentialError"] = "此服务的 API Key 无法自动读取，请重新输入并保存。" }
         return result
     }
     func revealAIKey(_ payload: [String: Any]) throws -> [String: Any] {
@@ -207,10 +255,10 @@ final class AISettingsStore {
         guard let provider = payload["provider"] as? String, Self.endpoints[provider] != nil else {
             throw Self.failure("请选择受支持的模型服务。")
         }
-        // The explicit local reveal action is separate from ordinary settings;
-        // it never loads metadata, changes the active provider or writes a key.
+        // Explicit reveal only returns the selected service's locally saved key.
+        // A legacy item may migrate silently; the active configuration is unchanged.
         do { return ["apiKey": try readKey(provider) ?? ""] }
-        catch { throw Self.failure("无法读取已保存的 API Key，请检查系统凭据访问权限后重试。") }
+        catch { throw Self.failure("无法读取已保存的 API Key，请重新输入并保存此服务的密钥。") }
     }
     func save(_ payload: [String: Any]) throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
@@ -227,11 +275,22 @@ final class AISettingsStore {
         let provider = config["provider"]!
         // Prepare every fallible read and the public response before credentials
         // or active metadata change. Unrelated locked accounts are explicit unknowns.
-        let previousKey = try readKey(provider)
+        let previousKey: String?
+        var unreadableKey = false
+        do { previousKey = try readKey(provider) }
+        catch {
+            // A blocked legacy read or malformed local key must not prevent
+            // an explicit replacement. Snapshot raw local bytes below so a
+            // later metadata failure can still restore the original file.
+            guard credentialAccess == nil, remove || !key.isEmpty else { throw error }
+            previousKey = nil
+            unreadableKey = true
+        }
+        let previousLocalBytes = credentialAccess == nil ? try localKeyBytes(provider) : nil
         let nextKey = remove ? nil : (key.isEmpty ? previousKey : key)
         profiles[provider] = config
         let prepared = try publicSettings(config, hasKey: !(nextKey ?? "").isEmpty)
-        let changesKey = nextKey != previousKey
+        let changesKey = unreadableKey || nextKey != previousKey || (credentialAccess == nil && remove && previousLocalBytes == nil)
         do {
             if changesKey {
                 if let nextKey { try writeKey(provider, nextKey) }
@@ -241,13 +300,14 @@ final class AISettingsStore {
         } catch {
             if changesKey {
                 do {
-                    if let previousKey { try writeKey(provider, previousKey) }
+                    if credentialAccess == nil { try restoreLocalKey(provider, previousLocalBytes) }
+                    else if let previousKey { try writeKey(provider, previousKey) }
                     else { try deleteKey(provider) }
                 } catch {
-                    throw Self.failure("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请检查系统凭据权限后重新保存该服务。")
+                    throw Self.failure("模型配置未切换，但密钥恢复失败，当前密钥状态无法确认。请重新保存该服务。")
                 }
             }
-            throw Self.failure("模型配置未保存，原配置和密钥已保留。请检查本机存储与凭据访问权限后重试。")
+            throw Self.failure("模型配置未保存，原配置和密钥已保留。请检查本机存储后重试。")
         }
         return prepared
     }
@@ -777,7 +837,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.3.1"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.4.0"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

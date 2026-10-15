@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline contract and rendering checks; no model API, credentials or USB."""
 import copy
+import hashlib
 import importlib.util
 import json
 import math
@@ -146,6 +147,34 @@ class RecipeChecks(unittest.TestCase):
             self.assertEqual(frame[-1][0], "#000000")
         self.assertEqual(compiler._value({"from": 0, "to": 1, "ease": "smooth"}, 0.25), 0.15625)
 
+    def test_dominant_keeps_one_complete_hue_instead_of_turning_rgb_overlap_white(self):
+        recipe = sample_recipe(3)
+        for region in ("top", "keys"):
+            recipe["scenes"][0][region] = [
+                {"kind": "solid", "color": color, "blend": "dominant"}
+                for color in ("#FF0000", "#00FF00", "#0000FF")]
+        original = copy.deepcopy(recipe)
+        design = compiler.compile_recipe(recipe)
+        self.assertEqual(set(design["frames"][0]), {"#0000FF"})
+        self.assertEqual(set(design["keyframes"][0]), {"#0000FF", "#000000"})
+        self.assertEqual(recipe, original)
+        for mode in ("add", "max"):
+            for layer in recipe["scenes"][0]["top"]:
+                layer["blend"] = mode
+            self.assertEqual(compiler.compile_recipe(recipe)["frames"][0][0], "#FFFFFF",
+                             "existing blend semantics stay backward compatible")
+
+    def test_dominant_compares_effective_strength_and_preserves_fades_and_bitmap_black(self):
+        recipe = sample_recipe(3)
+        recipe["scenes"][0]["top"] = [
+            {"kind": "solid", "color": "#FF0000", "opacity": 0.5},
+            {"kind": "solid", "color": "#FFFF00", "opacity": {"from": 0, "to": 1}, "blend": "dominant"}]
+        design = compiler.compile_recipe(recipe)
+        self.assertEqual([frame[0] for frame in design["frames"]], ["#800000", "#808000", "#FFFF00"])
+        recipe["scenes"][0]["top"].append({"kind": "bitmap", "rows": ["1"], "palette": ["#000000"],
+                                           "x": 20 / 39, "y": 0.5, "blend": "replace"})
+        self.assertEqual(compiler.compile_recipe(recipe)["frames"][-1][2 * 40 + 20], "#000000")
+
     def test_text_scrolls_vertically_and_cannot_render_on_keys(self):
         recipe = sample_recipe(5)
         recipe["scenes"][0]["top"] = [{"kind": "text", "text": "TIPTOP", "color": "#5A0000",
@@ -222,8 +251,71 @@ class RecipeChecks(unittest.TestCase):
         self.assertEqual(result["frames"][4], ["#12E5FF"] * 200)
         self.assertEqual(len(result["keyframes"]), 9)
 
+    def test_existing_32_row_animation_keeps_every_rgb_byte(self):
+        # Frozen against the public compiler before the 64-row expansion.
+        # Includes transparent source cells, opaque black cutouts, upward and
+        # return sampling, a background and independently blended key motions.
+        rows = ["".join("0" if (x + y) % 7 == 0 else "123"[(x // 3 + y // 4) % 3]
+                        for x in range(38)) for y in range(32)]
+        recipe = {"version": 1, "name": "旧图兼容网格", "description": "公开离线32行回归网格。",
+                  "frame_count": 41, "speed_ms": 30, "palette": ["#FF0000", "#0088FF", "#000000"],
+                  "scenes": [{"name": "往返", "start": 0, "end": 41,
+                              "top": [{"kind": "solid", "color": "#102030"},
+                                      {"kind": "bitmap", "rows": rows, "palette": ["#FF0000", "#0088FF", "#000000"],
+                                       "x": 0.5, "y": {"from": 4.75, "to": -3.75, "ease": "triangle"},
+                                       "scale": 1, "blend": "replace"}],
+                              "keys": [{"kind": "scan", "color": "#FF0000", "axis": "x",
+                                        "position": {"from": 0.1, "to": 0.9, "ease": "sine"}, "width": 0.6},
+                                       {"kind": "scan", "color": "#0088FF", "axis": "y",
+                                        "position": {"from": 1, "to": 0, "ease": "triangle"},
+                                        "width": 0.7, "blend": "max"}]}]}
+        design = compiler.compile_recipe(recipe)
+        pixels = json.dumps({key: design[key] for key in ("frames", "keyframes")}, separators=(",", ":")).encode()
+        self.assertEqual(hashlib.sha256(pixels).hexdigest(),
+                         "1e425b766759ca2d9d5c40e339103ccac7502cab73b021fa175a14483d399f5f")
+
+    def test_bitmap_full_64_by_40_size_compiles_without_resizing_the_source(self):
+        recipe = sample_recipe(69)
+        recipe["scenes"][0]["top"] = [
+            {"kind": "bitmap", "rows": ["1" * 40] * 64, "scale": 1,
+             "palette": ["#FF0000"], "y": {"from": 9.25, "to": -8.25}, "blend": "replace"}]
+        original = copy.deepcopy(recipe)
+        result = compiler.compile_recipe(recipe)
+        self.assertEqual(result["frames"][0], ["#000000"] * 200)
+        self.assertEqual(result["frames"][-1], ["#000000"] * 200)
+        self.assertEqual(result["frames"][34], ["#FF0000"] * 200)
+        self.assertEqual(recipe, original)
+        self.assertEqual(compiler.compile_recipe(recipe), result)
+        self.assertEqual(compiler.MAX_WORK, 8_000_000)
+        self.assertEqual(compiler.MAX_LAYERS, 96)
+        for frame in result["keyframes"]:
+            self.assertTrue(all(frame[i] == "#000000" for i in compiler.RESERVED_LEDS))
+
+    def test_64_row_scroll_exposes_each_native_row_and_preserves_wide_pixel_ratio(self):
+        # Encode a distinct six-bit row number in each 38-column source row.
+        # Center samples move exactly one native row per frame, without turning
+        # 64 rows into five or widening the identity marks independently.
+        rows = ["1" + "".join("1" if row & (1 << bit) else "2" for bit in range(6))
+                + "2" * 30 + "1" for row in range(64)]
+        recipe = sample_recipe(64)
+        recipe["scenes"][0]["top"] = [
+            {"kind": "bitmap", "rows": rows, "palette": ["#FF0000", "#000000"],
+             "x": 0.5, "scale": 1, "y": {"from": 33.5 / 4, "to": (33.5 - 63) / 4},
+             "blend": "replace"}]
+        result = compiler.compile_recipe(recipe)
+        observed = []
+        for index, frame in enumerate(result["frames"]):
+            center = frame[80:120]
+            self.assertEqual(center[0], "#000000")
+            self.assertEqual(center[39], "#000000")
+            self.assertEqual((center[1], center[38]), ("#FF0000", "#FF0000"))
+            actual_row = sum((center[2 + bit] == "#FF0000") << bit for bit in range(6))
+            self.assertEqual(actual_row, index)
+            observed.append(actual_row)
+        self.assertEqual(observed, list(range(64)))
+
     def test_bitmap_malicious_shape_palette_indices_and_fields_rejected(self):
-        for rows in ([], [""], ["1" * 41], ["1"] * 33, ["123", "12"], ["1;eval()"], ["1\n2"],
+        for rows in ([], [""], ["1" * 41], ["1"] * 65, ["123", "12"], ["1;eval()"], ["1\n2"],
                      [True], "111", ["G"], ["3"]):
             recipe = sample_recipe(1)
             recipe["scenes"][0]["top"] = [{"kind": "bitmap", "rows": rows}]
@@ -244,12 +336,29 @@ class RecipeChecks(unittest.TestCase):
 
     def test_bitmap_source_cells_are_included_in_work_budget(self):
         recipe = sample_recipe(1)
-        recipe["scenes"][0]["top"] = [{"kind": "bitmap", "rows": ["1" * 40] * 32}]
+        recipe["scenes"][0]["top"] = [{"kind": "bitmap", "rows": ["1" * 40] * 64}]
         recipe["scenes"][0]["keys"] = []
-        with patch.object(compiler, "MAX_WORK", 200 + 1280 - 1):
+        with patch.object(compiler, "MAX_WORK", 200 + 2560 - 1):
             self.reject(recipe, "预算超限")
-        with patch.object(compiler, "MAX_WORK", 200 + 1280):
+        with patch.object(compiler, "MAX_WORK", 200 + 2560):
             self.assertEqual(len(compiler.compile_recipe(recipe)["frames"]), 1)
+
+    def test_bitmap_height_bound_matches_full_compact_schema_and_local_validation(self):
+        try:
+            import jsonschema
+        except ImportError:
+            self.skipTest("Optional schema-check dependency not present")
+        validators = [jsonschema.Draft202012Validator(make()) for make in
+                      (compiler.recipe_schema, compiler.model_recipe_schema)]
+        for height in (32, 33, 48, 56, 64, 65):
+            recipe = sample_recipe(1)
+            recipe["scenes"][0]["top"] = [{"kind": "bitmap", "rows": ["1" * 40] * height}]
+            for validator in validators:
+                self.assertEqual(validator.is_valid(recipe), height <= 64)
+            if height <= 64:
+                compiler.compile_recipe(recipe)
+            else:
+                self.reject(recipe, "1–64")
 
     def test_unknown_code_fields_and_unknown_layer_kinds_are_rejected(self):
         for location, field in (("root", "code"), ("scene", "key_layer"), ("layer", "expression"), ("motion", "eval")):
@@ -351,8 +460,10 @@ class RecipeChecks(unittest.TestCase):
             layer = {"kind": kind, "color": "#FFFFFF", **({"text": "CYBER"} if kind == "text" else {})}
             if kind == "bitmap":
                 layer = {"kind": "bitmap", "rows": ["010", "111", "010"]}
+            layer["blend"] = "dominant"
             recipe["scenes"][0]["top"] = [layer]
             validator.validate(recipe)
+            jsonschema.Draft202012Validator(compiler.model_recipe_schema()).validate(recipe)
             compiler.compile_recipe(recipe)
 
     def test_compact_model_schema_is_substantially_smaller_and_keeps_defaults(self):
@@ -437,7 +548,7 @@ class RecipeChecks(unittest.TestCase):
             target["unsafe"] = "not supported"
             mutations.append(recipe)
         for kind, fields in (("solid", {}), ("bitmap", {}), ("bitmap", {"rows": ["G"]}),
-                             ("bitmap", {"rows": ["1"] * 33}), ("bitmap", {"rows": ["1" * 41]}),
+                             ("bitmap", {"rows": ["1"] * 65}), ("bitmap", {"rows": ["1" * 41]}),
                              ("bitmap", {"rows": ["1"], "palette": []}),
                              ("text", {"color": "#FFFFFF", "text": "lowercase"}),
                              ("checker", {"color": "#FFFFFF", "cells_x": 41}),

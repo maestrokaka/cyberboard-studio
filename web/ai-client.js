@@ -22,8 +22,9 @@
   function settingsStatus(text,error=false){$('aiSettingsStatus').textContent=text;$('aiSettingsStatus').classList.toggle('error',error);}
   function generationStatus(text,error=false){$('aiGenerationStatus').hidden=false;$('aiGenerationStatus').textContent=text;$('aiGenerationStatus').classList.toggle('error',error);}
   function selectedProfile(){const provider=$('aiProvider').value;return profiles[provider]||{provider,baseUrl:endpoints[provider].china,model:defaults[provider],hasKey:false};}
-  function credentialProblem(){const profile=selectedProfile();return profile.credentialError||(profile.hasKey===null?'该服务的密钥状态暂时无法读取。请先恢复系统凭据访问，再重新读取连接。':'');}
+  function credentialProblem(){const profile=selectedProfile();return profile.credentialError||(profile.hasKey===null?'旧 Key 暂时无法读取，请重新输入并保存。':'');}
   function unchangedRevealedKey(){return !!revealedKey&&revealedKey.provider===$('aiProvider').value&&$('aiApiKey').value===revealedKey.value;}
+  function replacementKey(){return !!$('aiApiKey').value.trim()&&!unchangedRevealedKey();}
   function hideKey(){keyRevealSequence++;keyRevealBusy=false;if(revealedKey&&$('aiApiKey').value===revealedKey.value)$('aiApiKey').value='';revealedKey=null;$('aiApiKey').type='password';}
   function pageChanged(page){if(page!=='models'){hideKey();refresh();}}
   function formIsSaved(){const form=formSettings(),saved=selectedProfile();return form.baseUrl===saved.baseUrl&&form.model===saved.model&&(!$('aiApiKey').value.trim()||unchangedRevealedKey());}
@@ -38,14 +39,14 @@
    $('aiUseCurrentStyle').disabled=busy;document.querySelectorAll('[data-ai-example]').forEach(button=>button.disabled=busy);
    $('addAIImagesBtn').disabled=busy||imageImporting||images.length>=3;
    settingsControls.forEach(id=>$(id).disabled=busy||settingsBusy||keyRevealBusy||!native);
-   $('saveAISettingsBtn').disabled=busy||settingsBusy||keyRevealBusy||!native||!!credentialError;
+   $('saveAISettingsBtn').disabled=busy||settingsBusy||keyRevealBusy||!native||!!credentialError&&!replacementKey();
    $('testAIConnectionBtn').disabled=busy||settingsBusy||keyRevealBusy||!configured||!native||!formIsSaved();
    $('removeAIKeyBtn').disabled=busy||settingsBusy||keyRevealBusy||!configured||!native;
    const keyVisible=$('aiApiKey').type==='text';$('toggleAIKeyBtn').textContent=keyRevealBusy?'读取中…':keyVisible?'隐藏':'显示';$('toggleAIKeyBtn').setAttribute('aria-pressed',String(keyVisible));$('toggleAIKeyBtn').setAttribute('aria-label',keyVisible?'隐藏 API Key':'显示 API Key');$('toggleAIKeyBtn').disabled=busy||settingsBusy||keyRevealBusy||!native||(!$('aiApiKey').value&&!configured&&selectedProfile().hasKey!==null);
    $('aiModelBadge').textContent=busy?providerName(activeRequest?.provider||settings?.provider)+' · 制作中':loaded?name+' · '+settings.model+(settings.hasKey===null?' · 密钥状态未确认':settings.hasKey===false?' · 未配置':''):'AI · 尚未读取连接';
    $('aiSettingsBadge').textContent=!native?'桌面 App 中配置':credentialError?'密钥无法读取':!loaded?'尚未读取':configured?'密钥已保存':'尚未配置';
-   $('aiApiKey').placeholder=credentialError?'请先恢复此服务的系统凭据访问':configured?'已保存；输入新密钥可替换':'输入你的 API Key';
-   $('aiCredentialNote').textContent=credentialError?'此服务的 API Key 暂时无法读取，请重试。':'API Key 默认隐藏，点击「显示」可以查看。';
+   $('aiApiKey').placeholder=credentialError?'重新输入 Key 后可直接保存':configured?'已保存；输入新密钥可替换':'输入你的 API Key';
+   $('aiCredentialNote').textContent=credentialError?'旧 Key 暂时无法读取；输入新的 Key 可直接保存。':'Key 仅保存在本机；默认隐藏，点击「显示」查看。';
    $('aiModelCapability').textContent=capabilityNote();
    $('aiActiveConnection').textContent=loaded?'工作台当前使用：'+name+' · '+settings.model+'。服务和模型修改后，点击「保存并使用」生效。':'每个服务分别保存模型、接口与密钥，切换不会删除已有连接。';
    $('aiSendHint').textContent='描述'+(images.length?'和 '+images.length+' 张参考图':'与所选参考图')+'发送给 '+(loaded?name:'已保存的创作服务')+'。节奏自动编排，可在描述里指定时长；预览后再同步。';
@@ -129,14 +130,17 @@
     const result=await api('revealAIKey',{provider});
     if(request!==keyRevealSequence||provider!==$('aiProvider').value||state.page!=='models')return;
     if(typeof result?.apiKey!=='string')throw Error('无法读取已保存的 API Key，请重试。');
+    profiles[provider]={...selectedProfile(),hasKey:!!result.apiKey};delete profiles[provider].credentialError;
+    if(settings?.provider===provider){settings={...settings,hasKey:!!result.apiKey};delete settings.credentialError;}
     if(!result.apiKey){settingsStatus('此服务尚未保存 API Key。');return;}
     revealedKey={provider,value:result.apiKey};input.value=result.apiKey;input.type='text';
+    settingsStatus('Key 已显示，点击「隐藏」可收起。');
    }catch(error){if(request===keyRevealSequence&&provider===$('aiProvider').value&&state.page==='models')settingsStatus(message(error),true);}
    finally{if(request===keyRevealSequence){keyRevealBusy=false;refresh();}}
   }
   async function saveSettings(){
    if(settingsBusy||state.aiBusy||keyRevealBusy||!native)return;
-   if(credentialProblem()){settingsStatus(credentialProblem()+' 尚未改动密钥或连接，请先恢复系统凭据访问。',true);return;}
+   if(credentialProblem()&&!replacementKey()){settingsStatus('旧 Key 暂时无法读取，重新输入 Key 后可直接保存。',true);return;}
    const payload=formSettings(),key=$('aiApiKey').value.trim();if(!payload.model){settingsStatus('请填写官方模型 ID，或选择已有模型。',true);return;}if(key&&!unchangedRevealedKey())payload.apiKey=key;
    settingsBusy=true;refresh();settingsStatus('正在保存连接…');
    try{applySettings(await api('saveAISettings',payload));loaded=true;settingsStatus(providerName(settings.provider)+' 连接已保存，工作台将使用此服务，可继续测试连接。');toast(providerName(settings.provider)+' 连接已保存。');}
@@ -185,13 +189,18 @@
    try{await api('cancelAI',{requestId:request.id});}catch(error){generationStatus('已停止接收本次作品，正在等待请求结束。');}
   }
   function progress(event){if(!activeRequest||activeRequest.cancelRequested||event.requestId!==activeRequest.id)return;const name=providerName(activeRequest.provider),stages={ai_request:'正在向 '+name+' 提交创作描述…',ai_receiving:name+' 正在编排灯效和转场…',ai_compile:'正在生成帧并检查顶部与轴灯数据…',ai_quality:'正在检查灯光可见性与循环衔接…'};if(stages[event.stage])generationStatus(stages[event.stage]);}
-  function showCreation(design){const ai=isAIWork(design);$('aiCreationNote').hidden=!ai;if(ai)$('aiCreationNote').textContent=providerName(design.ai?.provider||(design.origin==='kimi-ai'?'kimi-open':design.origin.replace(/-ai$/,'')))+' 创作'+(design.ai?.model?' · '+design.ai.model:'')+'\n'+(design.description||'顶部与轴灯已编排，可以调整亮度和节奏后同步。');}
+  function showCreation(design){
+   const ai=isAIWork(design);$('aiCreationNote').hidden=!ai;if(!ai)return;
+   const colorWarnings=new Set(['weak_top_intensity','saturated_layers_whitened']);
+   const warnings=Array.isArray(design.ai?.quality?.warnings)?design.ai.quality.warnings.filter(item=>item&&colorWarnings.has(item.code)&&typeof item.message==='string').slice(0,2).map(item=>item.message.slice(0,180)):[];
+   $('aiCreationNote').textContent=providerName(design.ai?.provider||(design.origin==='kimi-ai'?'kimi-open':design.origin.replace(/-ai$/,'')))+' 创作'+(design.ai?.model?' · '+design.ai.model:'')+'\n'+(design.description||'顶部与轴灯已编排，可以调整亮度和节奏后同步。')+(warnings.length?'\n预览留意：'+warnings.join(' '):'');
+  }
   $('aiSettingsLink').onclick=()=>navigate('models');$('generateAIBtn').onclick=generate;$('cancelAIBtn').onclick=cancel;
   $('addAIImagesBtn').onclick=addImages;
   document.querySelectorAll('[data-ai-example]').forEach(button=>button.onclick=()=>{if(state.aiBusy)return;$('creativeBrief').value=button.dataset.aiExample;options.saveBrief?.();});
   $('saveAISettingsBtn').onclick=saveSettings;$('testAIConnectionBtn').onclick=testConnection;$('removeAIKeyBtn').onclick=removeKey;$('toggleAIKeyBtn').onclick=toggleKeyVisibility;
   $('aiProvider').onchange=()=>{showProfile(selectedProfile());refresh();settingsStatus(credentialProblem()||'已载入该服务的本机连接。点击「保存并使用」后，工作台才会切换服务。',!!credentialProblem());};
-  $('aiRegion').onchange=()=>{refresh();settingsStatus(credentialProblem()||'接口选项已修改，保存后生效。',!!credentialProblem());};$('aiModel').onchange=()=>{modelChanged();refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiCustomModel').oninput=()=>{refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiApiKey').oninput=()=>{revealedKey=null;refresh();settingsStatus(credentialProblem()||'密钥尚未保存，点击「保存并使用」后生效。',!!credentialProblem());};
+  $('aiRegion').onchange=()=>{refresh();settingsStatus(credentialProblem()||'接口选项已修改，保存后生效。',!!credentialProblem());};$('aiModel').onchange=()=>{modelChanged();refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiCustomModel').oninput=()=>{refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiApiKey').oninput=()=>{revealedKey=null;refresh();const problem=credentialProblem();settingsStatus(replacementKey()?'新的 Key 尚未保存，点击「保存并使用」即可。':problem||'密钥尚未保存，点击「保存并使用」后生效。',!!problem&&!replacementKey());};
   $('aiApiKey').type='password';providerChanged();refresh();
   return {loadSettings,refresh,progress,showCreation,generate,cancel,pageChanged};
  }

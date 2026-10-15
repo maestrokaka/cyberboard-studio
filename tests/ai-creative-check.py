@@ -25,7 +25,7 @@ def drawing(count=100, speed=40, black=False):
                  'top': [{'kind': 'scan', 'axis': 'x', 'color': '#000000' if black else '#00C0D8',
                           'width': .3, 'position': {'from': .2, 'to': .8, 'ease': 'sine'}}],
                  'keys': [{'kind': 'solid', 'color': '#000000' if black else '#00C0D8',
-                           'opacity': {'from': .1, 'to': .4, 'ease': 'sine'}}]}]}
+                           'opacity': {'from': .55, 'to': 1, 'ease': 'sine'}}]}]}
 
 
 class CreativeChecks(unittest.TestCase):
@@ -142,7 +142,7 @@ class CreativeChecks(unittest.TestCase):
         r = ai.generate(self.payload(), opener=op, progress=lambda a,b: events.append(a))
         self.assertEqual((len(r['design']['frames']),r['design']['speed_ms']), (100,40))
         meta = r['design']['ai']
-        self.assertEqual(meta['promptVersion'], 2)
+        self.assertEqual(meta['promptVersion'], 4)
         self.assertEqual(meta['timing']['source'],'brief')
         self.assertTrue(meta['quality']['passed'])
         self.assertIn('ai_quality',events)

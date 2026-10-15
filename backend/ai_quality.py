@@ -13,17 +13,38 @@ import re
 
 VISIBLE_CHANNEL_MIN = 16
 BLACK_CHANNEL_MAX = 2
+STRONG_CHANNEL_MIN = 160
+NEAR_WHITE_CHANNEL_MIN = 160
+NEAR_WHITE_MIN_CHANNEL_RATIO = 0.75
+LARGE_NEAR_WHITE_FRACTION = 0.25
 MAX_FRAMES = 255
 RESERVED_KEYS = frozenset((57, 61, 74, 78, 82, 83, 84))
 _RGB = re.compile(r"^#[0-9a-fA-F]{6}$")
 _NEGATION = re.compile(r"(?:不要|不能|避免|不允许|不需要|没有|不是|无需|勿|非|"
-                       r"\bnot|\bnever|\bwithout|\bavoid|\bdon't|\bno)"
-                       r"\s*(?:任何|出现|再|a\s+|any\s+)?$", re.I)
+                       r"\bnot|\bnever|\bwithout|\bavoid|\bdon't|\bdo not|\bno)"
+                       r"\s*(?:(?:任何|出现|再|全屏|大面积|主体|变成|使用|太|过于|a\s+|any\s+|"
+                       r"full[- ]screen\s+|large\s+|turning\s+|becoming\s+|make\s+|it\s+|too\s+|overly\s+)\s*)*$", re.I)
+_REGION_WORDS = r"轴灯|键灯|顶屏|顶部|\bkey lights\b|\bkeys\b|\bbacklight\b|\btop (?:display|screen|matrix)\b"
+_LESS_BRIGHT = (r"暗一点|暗一些|稍微暗|(?:亮度)?低一点|(?:亮度)?低一些|"
+                r"(?:不要|别|避免)(?:太|过于)(?:明)?亮|\bdimmer\b|\blow\b|"
+                r"\b(?:don't|do not) (?:make (?:it )?)?(?:too|overly) bright\b")
 
 
 def _affirmed(text, pattern):
-    return any(not _NEGATION.search(text[max(0, m.start() - 18):m.start()])
+    return any(not _NEGATION.search(text[max(0, m.start() - 32):m.start()])
                for m in re.finditer(pattern, text, re.I))
+
+
+def _regional_dim(text, subject):
+    """Keep comparative brightness requests within their named region/clause."""
+    for match in re.finditer(subject, text, re.I):
+        if _NEGATION.search(text[max(0, match.start() - 32):match.start()]):
+            continue
+        body = re.split(r"[，。；,;\n]|" + _REGION_WORDS, text[match.end():match.end() + 40],
+                        maxsplit=1, flags=re.I)[0]
+        if _affirmed(body, _LESS_BRIGHT):
+            return True
+    return False
 
 
 def _intents(brief):
@@ -47,7 +68,25 @@ def _intents(brief):
         "dark_pause": _affirmed(text, r"黑场|暗场|熄灭|黑屏暂停|黑屏停顿|\bblackout\b|"
                                r"\bdark (?:pause|hold|scene)\b|\bblack (?:pause|hold|frames?)\b|"
                                r"\bfade to black\b"),
-        "dim": _affirmed(text, r"低亮|暗色|夜间|微光|\bdim\b|\blow brightness\b|\bdark ambient\b"),
+        "dim": (_affirmed(text, r"低亮|暗色|夜间|微光|柔和|柔光|\bdim\b|\blow brightness\b|"
+                          r"\bdark ambient\b|\bsoft (?:light|glow|lighting)\b") or
+                (not re.search(_REGION_WORDS, text, re.I) and _affirmed(text, _LESS_BRIGHT))),
+        "dim_keys": _regional_dim(text, r"轴灯|键灯|\bkey lights\b|\bkeys\b|\bbacklight\b"),
+        "dim_top": _regional_dim(text, r"顶屏|顶部|\btop (?:display|screen|matrix)\b"),
+        "subtle_keys": _affirmed(text, r"轴灯(?!.{0,8}(?:不要|不能|避免|不需要|无需|勿)).{0,8}(?:衬托|陪衬|弱光|压低|低调)|"
+                                r"(?:衬托|陪衬|压低).{0,8}轴灯|\bsubtle (?:key lights|backlight|keys)\b|"
+                                r"\b(?:key lights|backlight|keys).{0,12}\bsubtle\b"),
+        "bright": _affirmed(text, r"高亮|明亮|足够亮|亮度充足|强光|\bbright\b|\bhigh brightness\b"),
+        "white_mix": _affirmed(text, r"白色|白光|白猫|白兔|雪白|粉彩|柔光|柔和|渐变|彩虹混色|"
+                              r"\bwhite\b|\bpastel\w*\b|\bsoft (?:light|glow|lighting)\b|"
+                              r"\bgradient\w*\b|\brainbow (?:mix|blend)\w*\b"),
+        "pure_primary": _affirmed(text, r"(?:纯|正)(?:红|绿|蓝|黄|青|品红|橙)(?:色|光)?|"
+                                 r"\b(?:pure|solid|saturated) (?:red|green|blue|yellow|cyan|magenta|orange)\b"),
+        # This is a prohibition, so do not run it through the positive-intent
+        # negation filter used for exceptions such as '不要白色'.
+        "avoid_white": bool(re.search(r"(?:不要|避免|不能|不许|不允许|勿).{0,6}(?:白色|白光|泛白|发白|漂白)|"
+                                      r"(?:不泛白|不发白|无白色)|\b(?:no|without|avoid) white\b|"
+                                      r"\b(?:do not|don't) (?:turn white|wash out)\b", text, re.I)),
         "entry_exit": _affirmed(text, r"入场|出场|离场|退场|追逐|滚动|\boff.?screen\b|"
                                r"\benter\w*\b|\bexit\w*\b|\bchase\b|\bscroll\w*\b"),
         "seamless": _affirmed(text, r"无缝|首尾一致|首尾相同|\bseamless\b|\bmatching endpoints\b"),
@@ -58,12 +97,23 @@ def _intents(brief):
                             r"\bkeys only\b|\bbacklight only\b|\bdisable (?:the )?top\b|"
                             r"\btop (?:display|matrix|screen) off\b"),
         "keys_off": _affirmed(text, r"关闭轴灯|轴灯熄灭|只要顶屏|仅顶屏|\btop only\b|"
-                             r"\b(?:key lights|backlight|backlighting) off\b"),
+                             r"\b(?:key lights|backlight|backlighting) off\b|"
+                             r"\b(?:turn off|disable) (?:the )?(?:key lights|backlight|backlighting)\b"),
     }
 
 
 def _rounded(value):
     return round(value, 6) if math.isfinite(value) else None
+
+
+def _percentile(ordered, fraction):
+    """Nearest-rank percentile of nonblack max-channel samples; empty is zero."""
+    return ordered[max(0, math.ceil(len(ordered) * fraction) - 1)] if ordered else 0
+
+
+def _near_white(rgb):
+    peak = max(rgb)
+    return peak >= NEAR_WHITE_CHANNEL_MIN and min(rgb) / peak >= NEAR_WHITE_MIN_CHANNEL_RATIO
 
 
 def _runs(flags):
@@ -91,6 +141,11 @@ def _region(frames, width, speed_ms, active):
                 cache[color] = tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
         pixels.append(tuple(cache[frame[i]] for i in active))
     count = len(pixels)
+    samples = [max(c) for frame in pixels for c in frame]
+    nonblack = sorted(value for value in samples if value > 0)
+    strong = sum(value >= STRONG_CHANNEL_MIN for value in samples)
+    near_white = sum(_near_white(c) for frame in pixels for c in frame)
+    total = count * len(active)
     visible = [sum(max(c) >= VISIBLE_CHANNEL_MIN for c in frame) for frame in pixels]
     maxima = [max(max(c) for c in frame) for frame in pixels]
     dark = [value == 0 for value in visible]
@@ -114,6 +169,13 @@ def _region(frames, width, speed_ms, active):
         "frame_count": count, "duration_ms": count * speed_ms, "active_led_positions": len(active),
         "visible_leds_min": min(visible), "visible_leds_mean": _rounded(sum(visible) / count),
         "visible_leds_max": max(visible), "peak_rgb_channel": max(maxima),
+        "sampled_pixel_count": total, "nonblack_pixel_count": len(nonblack),
+        "nonblack_max_channel_p50": _percentile(nonblack, 0.5),
+        "nonblack_max_channel_p90": _percentile(nonblack, 0.9),
+        "strong_pixel_count": strong, "strong_pixel_fraction": _rounded(strong / total),
+        "strong_nonblack_fraction": _rounded(strong / len(nonblack)) if nonblack else 0,
+        "near_white_pixel_count": near_white, "near_white_pixel_fraction": _rounded(near_white / total),
+        "near_white_nonblack_fraction": _rounded(near_white / len(nonblack)) if nonblack else 0,
         "dark_frame_count": sum(dark), "dark_frame_fraction": _rounded(sum(dark) / count),
         "longest_dark_ms": longest * speed_ms, "longest_dark_loop_ms": wrapped * speed_ms,
         "longest_interior_dark_ms": interior * speed_ms,
@@ -127,6 +189,88 @@ def _region(frames, width, speed_ms, active):
     }
 
 
+def _layer_colors(layer, palette):
+    """Actual declared sources only, excluding unused bitmap palette entries."""
+    opacity = layer.get("opacity", 1)
+    peak_opacity = max(opacity["from"], opacity["to"]) if type(opacity) is dict else opacity
+    if peak_opacity <= 0:
+        return []
+    if layer["kind"] == "bitmap":
+        colors = layer.get("palette", palette)
+        used = {int(c, 16) for row in layer["rows"] for c in row} - {0}
+        values = [colors[i - 1] for i in sorted(used)]
+    else:
+        values = [layer["color"]]
+        if "color_to" in layer:
+            values.append(layer["color_to"])
+    return [tuple(int(value[i:i + 2], 16) for i in (1, 3, 5)) for value in values]
+
+
+def _saturated(rgb):
+    peak = max(rgb)
+    return peak >= STRONG_CHANNEL_MIN and (peak - min(rgb)) / peak >= 0.65
+
+
+def _mixing_sources(layers, palette):
+    """Conservative evidence of different saturated layers mixing towards white.
+
+    Dominant/replace alone do not add per-channel color evidence. Any actual
+    white/neutral source disables the finding rather than judging its purpose.
+    Source colors are not modified or used to grant user-intent exceptions.
+    """
+    sources = [_layer_colors(layer, palette) for layer in layers]
+    if any(_near_white(color) for colors in sources for color in colors):
+        return False
+    prior, bounds = [], [0, 0, 0]
+    mixing = False
+    for layer, colors in zip(layers, sources):
+        saturated = [color for color in colors if _saturated(color)]
+        current = [max((c[i] for c in saturated), default=0) for i in range(3)]
+        blend = layer.get("blend", "add")
+        unlike = any(max(abs(a[i] / max(a) - b[i] / max(b)) for i in range(3)) >= 0.5
+                     for a in prior for b in saturated)
+        if blend in ("add", "max"):
+            combined = ([min(255, a + b) for a, b in zip(bounds, current)] if blend == "add"
+                        else [max(a, b) for a, b in zip(bounds, current)])
+            mixing = mixing or (unlike and _near_white(combined))
+            bounds = combined
+        else:
+            # Upper bounds are enough for a warning candidate; actual output
+            # must independently contain a large near-white area below.
+            bounds = [max(a, b) for a, b in zip(bounds, current)]
+        prior.extend(saturated)
+    return mixing
+
+
+def _white_mixing_evidence(design, recipe):
+    """Only structurally valid, timing-matched recipe sources support this check."""
+    if type(recipe) is not dict:
+        return []
+    from lighting_recipe import RecipeError, validate_recipe
+    try:
+        validate_recipe(recipe)
+    except (RecipeError, TypeError, KeyError, RecursionError):
+        return []
+    if (recipe["frame_count"] != len(design["frames"]) or
+            recipe["frame_count"] != len(design["keyframes"]) or recipe["speed_ms"] != design["speed_ms"]):
+        return []
+    evidence = []
+    for si, scene in enumerate(recipe["scenes"]):
+        for region, field, active in (("top", "frames", tuple(range(200))),
+                                      ("keys", "keyframes", tuple(i for i in range(90) if i not in RESERVED_KEYS))):
+            if not _mixing_sources(scene[region], recipe["palette"]):
+                continue
+            frames = design[field][scene["start"]:scene["end"]]
+            total = len(frames) * len(active)
+            count = sum(_near_white(tuple(int(frame[i][p:p + 2], 16) for p in (1, 3, 5)))
+                        for frame in frames for i in active)
+            fraction = count / total
+            if fraction >= LARGE_NEAR_WHITE_FRACTION:
+                evidence.append({"scene_index": si, "region": region,
+                                 "near_white_pixel_fraction": _rounded(fraction)})
+    return evidence
+
+
 def inspect_design_quality(design, *, brief="", has_images=False):
     """Return JSON-safe issues, warnings and measured pixel/timing proxies.
 
@@ -138,8 +282,13 @@ def inspect_design_quality(design, *, brief="", has_images=False):
     issues, warnings = [], []
     intent = _intents(brief)
     metrics = {"has_images": bool(has_images), "intent": intent,
-               "visibility_proxy": {"visible_channel_min": VISIBLE_CHANNEL_MIN,
-                                    "black_channel_max": BLACK_CHANNEL_MAX}, "regions": {}}
+               "visibility_proxy": {"kind": "digital_rgb_not_measured_light_output",
+                                    "visible_channel_min": VISIBLE_CHANNEL_MIN,
+                                    "black_channel_max": BLACK_CHANNEL_MAX,
+                                    "nonblack_channel_min": 1, "strong_channel_min": STRONG_CHANNEL_MIN,
+                                    "near_white_peak_min": NEAR_WHITE_CHANNEL_MIN,
+                                    "near_white_min_channel_ratio": NEAR_WHITE_MIN_CHANNEL_RATIO,
+                                    "large_near_white_pixel_fraction": LARGE_NEAR_WHITE_FRACTION}, "regions": {}}
     report = {"passed": False, "issues": issues, "warnings": warnings, "metrics": metrics}
 
     def add(target, code, message, **details):
@@ -172,7 +321,7 @@ def inspect_design_quality(design, *, brief="", has_images=False):
             add(issues, "all_dark_output", f"{target_label}全程接近熄灭，请检查主体位置和亮度。", region=target_name)
             black_issue = True
         elif target["visible_leds_max"] == 0:
-            bucket = warnings if intent["dim"] or intent["static"] or intent["sparse"] else issues
+            bucket = warnings if intent["dim"] or intent["dim_" + target_name] or intent["static"] or intent["sparse"] else issues
             add(bucket, "near_black_output", f"{target_label}所有帧均低于可见性检查阈值，请核对是否有意保持微光。", region=target_name)
             black_issue = bucket is issues
         elif target["frame_count"] >= 10 and target["duration_ms"] >= 800 and target["dark_frame_fraction"] >= 0.95:
@@ -198,6 +347,23 @@ def inspect_design_quality(design, *, brief="", has_images=False):
         add(warnings if allowed else issues, "static_output",
             "顶屏和轴灯在整个时间轴中都完全不变；如需动画，请让形状、位置或颜色随帧变化。")
 
+    if not (intent["all_off"] or intent["keys_off"] or intent["dim"] or intent["dim_keys"] or intent["subtle_keys"]):
+        # A real but uniformly weak key track is distinct from an absent/off
+        # track. Static is not permission for weak encoding under a bright top.
+        if (keys["nonblack_pixel_count"] and keys["peak_rgb_channel"] < 128 and
+                keys["nonblack_max_channel_p90"] < 96 and top["peak_rgb_channel"] >= STRONG_CHANNEL_MIN):
+            add(issues, "weak_keys_intensity",
+                "顶屏明亮，但轴灯整体偏暗；请提高轴灯主题亮区，保留黑底和拖尾。",
+                region="keys", peak_rgb_channel=keys["peak_rgb_channel"],
+                nonblack_max_channel_p90=keys["nonblack_max_channel_p90"])
+    if not (black_issue or intent["all_off"] or intent["top_off"] or intent["dim"] or intent["dim_top"]):
+        if (top["nonblack_pixel_count"] and top["peak_rgb_channel"] < 96 and
+                top["nonblack_max_channel_p90"] < 64):
+            add(issues if intent["bright"] else warnings, "weak_top_intensity",
+                "顶屏整体较暗，请确认是否符合你想要的效果。",
+                region="top", peak_rgb_channel=top["peak_rgb_channel"],
+                nonblack_max_channel_p90=top["nonblack_max_channel_p90"])
+
     for region, values in metrics["regions"].items():
         if values["frame_count"] < 12 or values["static"]:
             continue
@@ -213,6 +379,15 @@ def inspect_design_quality(design, *, brief="", has_images=False):
 
     ai = design.get("ai")
     recipe = ai.get("recipe") if type(ai) is dict else design.get("recipe")
+    if not intent["white_mix"]:
+        evidence = _white_mixing_evidence(design, recipe)
+        if evidence:
+            # Images may legitimately contain an unmentioned white subject.
+            # Pixel/source evidence cannot establish reference-image fidelity.
+            block = not has_images and (intent["avoid_white"] or intent["pure_primary"])
+            add(issues if block else warnings, "saturated_layers_whitened",
+                "有色灯光重叠后出现大片近白色，请核对主体是否应该保持原色。",
+                evidence=evidence)
     inherited = []
     if type(recipe) is dict and type(recipe.get("scenes")) is list:
         for si, scene in enumerate(recipe["scenes"][:255]):

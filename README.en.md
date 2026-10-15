@@ -12,23 +12,23 @@ This README is in English. The desktop app interface and full user guide are cur
 
 ## See it in action
 
-A 77-second walkthrough: switch keyboard appearances and lighting effects, create a new design with Kimi `k3` and a reference image, then sync it to slot 03. Generation and transfer waits are sped up. The final scene shows the effect on a real CYBERBOARD R6. Recorded on macOS, with Chinese narration and captions.
+A 77-second walkthrough: switch keyboard appearances and lighting effects, create a new design with Kimi `k3` and a reference image, then sync it to slot 03. Generation and transfer waits are sped up. The final scene shows the effect on a real CYBERBOARD R6. Previously recorded on macOS, with Chinese narration and captions. It demonstrates the workflow; the workbench screenshots and preset list below are updated for v0.4.0.
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## Screenshots
 
-These screenshots show the current macOS interface running in a separate demo workspace. Windows uses the same workbench interface. The appearance comparison uses the same preview engine, design and animation frame for every keyboard.
+The workbench and library screenshots show the v0.4.0 interface in a separate demo workspace with no keyboard connected. Mac and Windows share this interface. The appearance comparison uses the same preview engine, design and animation frame for every keyboard.
 
 ### Lighting workbench
 
 AI creation stays on the workbench alongside the preview, lighting controls and three slot drafts. Click a keyboard thumbnail to change the appearance without changing your design or writing to the device.
 
-![Lighting workbench with AI creation and slot drafts](docs/screenshots/workbench-v030.png)
+![Lighting workbench with AI creation and slot drafts](docs/screenshots/workbench-v040.jpg)
 
 ### Model connections
 
-Configure Kimi Code, Kimi Open Platform, MiniMax or DeepSeek, with separate provider, region, model and API key settings. Keys are hidden by default; use the Show / Hide button to view them. Keys are stored using the operating system's credential protection and are excluded from exported lighting JSON.
+Configure Kimi Code, Kimi Open Platform, MiniMax or DeepSeek, with separate provider, region, model and API key settings. Keys are hidden by default; use the Show / Hide button to view them. Keys are stored in per-provider local files, without additional system authorization prompts, and are excluded from exported lighting JSON.
 
 ![Model connections and API key controls](docs/screenshots/model-services-v030.png)
 
@@ -53,9 +53,11 @@ The collection includes official photos of sold-out finishes. These are preview 
 
 ### Lighting library
 
-Browse designs, palettes and loop lengths, or return to the workbench to preview them. Custom designs can be renamed, exported, moved to the trash and restored. Built-in designs remain available.
+Eight built-in designs cover player portraits, character animation, cyberpunk lettering and abstract lighting. Browse designs, palettes and loop lengths, or return to the workbench to preview them. Custom designs can be renamed, exported, moved to the trash and restored. Built-in designs remain available.
 
-![Lighting library and trash controls](docs/screenshots/lighting-library-v030.png)
+The screenshot filters the eight-work library to the three revised Kaká presets.
+
+![Library filtered to the three Kaká presets](docs/screenshots/library-v040.jpg)
 
 ### Devices and configuration
 
@@ -65,13 +67,13 @@ Read the configuration JSON, choose the built-in modes you want to restore, revi
 
 ## Download and install
 
-The current release is [v0.3.1 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.1). Find the packages and their SHA-256 files under **Assets**.
+The current release is [v0.4.0 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0). Find the packages and their SHA-256 files under **Assets**.
 
 | Package | Platform | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.3.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
-| `Cyberboard-Studio-0.3.1-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
-| `Cyberboard-Studio-0.3.1-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
+| `Cyberboard-Studio-0.4.0-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
+| `Cyberboard-Studio-0.4.0-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
+| `Cyberboard-Studio-0.4.0-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
 
 All packages include the CLI and its runtime. You do not need to install Python separately. If Windows is missing WebView2, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` from the package with an internet connection.
 
@@ -81,7 +83,7 @@ The Mac app uses an ad-hoc signature and is not yet signed with an Apple Develop
 
 ## Quick start
 
-Version 0.3.1 improves short text and image-guided creation, keeps new designs independent of the previous preview's palette and timing, and accepts durations such as “4-second loop.” Compiled pixels receive conservative visibility and motion checks with at most one repair. These checks do not replace reviewing the animation.
+Version 0.4.0 adds three Kaká designs, the approved original EVA design and a glitch wordmark, bringing the built-in collection to eight. It improves portrait proportions, clean text holds and dark head silhouettes, and carries these lessons into the creation prompts. Complex subjects can use a bounded canvas up to 40×64 with proportional scrolling through the real 40×5 display. Color checks reduce unintended weak lighting and color washout; API keys stay in local per-provider files with simple Show / Hide controls. [Design iteration and prompt notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
 
 1. **Connect your keyboard by USB.** Use **Check connection（检查连接）** and verify the keyboard model before preparing a sync.
 2. **Set up a model.** Open **Model configuration（模型配置）**, choose the service, region and model, enter your own API key, then click **Save and use（保存并使用）**. Kimi Code defaults to `k3`.
@@ -101,7 +103,7 @@ Kimi Code and Kimi Open Platform use separate API keys and quotas. Code access i
 
 Timing is arranged automatically for the new design. You can request a total duration, such as “a 4-second loop”; the current preview's playback speed does not constrain the new creation. By default, the previous design's name, description and palette are not sent. Enable **Use current design style（使用当前作品风格）** under **More tools（更多工具）** only when you want that reference; your new description and images remain the priority.
 
-The app checks compiled lighting data and basic visibility, with at most one additional repair request for invalid or clearly invisible output. These checks do not judge aesthetics or guarantee image fidelity. Watch the entire top-matrix and key-lighting loop before syncing. Creation never assigns a slot or writes to USB automatically; repair is an additional model call, and submitted requests may use quota even if cancelled or unsuccessful.
+For tall subjects, the prompt favors a proportionally enlarged silhouette across roughly 34–38 columns, a quick continuous pass and a clear hold for identity features or text. Static designs, subtle motions and abstract effects are not forced to scroll. The app checks compiled lighting data and basic visibility, with at most one additional repair request for invalid or clearly invisible output. These checks do not judge aesthetics or guarantee image fidelity. Watch the entire top-matrix and key-lighting loop before syncing. Creation never assigns a slot or writes to USB automatically; repair is an additional model call, and submitted requests may use quota even if cancelled or unsuccessful.
 
 ### Existing configuration and first-time setup
 
@@ -120,15 +122,15 @@ For record migration, first-time initialization and troubleshooting, see the [fu
 - AI creation from text and reference images, using separate top-matrix and backlight animation sequences.
 - Kimi Code / Open Platform, MiniMax and DeepSeek connections. Image support depends on the selected model; text-only models cannot accept reference images.
 - Eight front-view keyboard appearances, thumbnail selection, playback controls, palette variants, brightness and timing adjustments.
-- A local design library, JSON import / export, custom names, trash and restore.
+- Eight built-in designs: Neon Rift（裂隙超载）, Data Storm（数据暴雨）, Redline Rush（红线竞速）, EVA（初号机 · 拘束解除）, Glitch Override（故障字标 · 终端夺权）and three Kaká designs（红黑22 / 极速突破 / 圣西罗之夜）. Local JSON import / export, custom names, trash and restore.
 - Three slot drafts, synchronization of a chosen slot or all pending drafts, backups and local history.
 - R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization. Clock synchronization currently uses **Asia/Shanghai (UTC+8)**.
 
 Firmware updates, key remapping, general image generation and video export are not currently included.
 
-On macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
+The v0.4.0 preset and prompt changes were checked offline and reviewed in animated previews. This round did not make live model API calls or write to USB. Earlier on macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
 
-The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, DPAPI credential storage and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
+The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, local key storage and migration, and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
 
 ## Local data
 
@@ -137,7 +139,7 @@ The Windows packages are cross-compiled and pass offline checks. This release's 
 | Designs, drafts, trash, plans, backups and non-secret model settings | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
 | CLI device records | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
 
-API keys use macOS Keychain or Windows user-level DPAPI protection. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
+API keys are stored directly in `ai-keys/<provider>.key` under the Studio data directory on both platforms. Legacy Keychain / DPAPI entries are read only for silent migration and are retained; if migration is unavailable, enter and save a replacement key directly. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
 
 ## Building and contributing
 
