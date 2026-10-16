@@ -20,7 +20,13 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## 内置灯效 GIF
 
-10 款预设按软件中的顺序列出，点击动图可查看大图。每张 GIF 使用 **CYBERBOARD R6「Vision」去背景正面实拍照片**，通过与 App 相同的预览渲染器合成顶部与轴灯动画，展示完整原速循环。源作品的 RGB 与节奏保持不变；GIF 为照片合成的屏幕预览，编码后颜色可能略有差异，不作为实机色准测量。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
+我已经借助 AI 创作并打磨了 **10 款灯效**，全部内置到软件中。无需配置模型，打开就能预览，选好后即可同步到键盘。
+
+想做自己的灯效，也可以接入 **Kimi、MiniMax 或 DeepSeek**，写下你的想法，让 AI 帮你创作。
+
+有想要的主题、角色或灯效，欢迎[到 GitHub Issues 留言告诉我](https://github.com/maestrokaka/cyberboard-studio/issues)。附上一句话描述或参考图，下一款内置灯效，也许就来自你的脑洞。
+
+下方是这 10 款灯效的整机动态预览，点击动图可查看大图。
 
 | 预设 | 预设 |
 | --- | --- |
@@ -29,6 +35,13 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 | **05 故障字标 · 终端夺权**<br>宽幅赛博字标与错位转场 · 4.8 秒<br><a href="docs/previews/glitch-override.gif"><img src="docs/previews/glitch-override.gif" width="384" alt="故障字标终端夺权：顶部与轴灯完整循环" /></a> | **06 马里奥 · 红帽闯关**<br>纯红帽子与像素闯关 · 4.2 秒<br><a href="docs/previews/mario-run.gif"><img src="docs/previews/mario-run.gif" width="384" alt="马里奥红帽闯关：顶部与轴灯完整循环" /></a> |
 | **07 猫逐萤火**<br>小猫与萤火追逐 · 6 秒<br><a href="docs/previews/cat-firefly.gif"><img src="docs/previews/cat-firefly.gif" width="384" alt="猫逐萤火：顶部与轴灯完整循环" /></a> | **08 卡卡 · 红黑22**<br>球星卡、肖像与姓名号码 · 4.8 秒<br><a href="docs/previews/kaka-rossonero.gif"><img src="docs/previews/kaka-rossonero.gif" width="384" alt="卡卡红黑22：顶部与轴灯完整循环" /></a> |
 | **09 卡卡 · 极速突破**<br>带球动作与清楚的 KAKA 22 · 4.8 秒<br><a href="docs/previews/kaka-breakaway.gif"><img src="docs/previews/kaka-breakaway.gif" width="384" alt="卡卡极速突破：顶部与轴灯完整循环" /></a> | **10 卡卡 · 圣西罗之夜**<br>庆祝姿态与红白旗浪 · 4.8 秒<br><a href="docs/previews/kaka-san-siro.gif"><img src="docs/previews/kaka-san-siro.gif" width="384" alt="卡卡圣西罗之夜：顶部与轴灯完整循环" /></a> |
+
+<details>
+<summary>关于动图预览</summary>
+
+动图采用 CYBERBOARD R6「Vision」去背景正面实拍照片，与 App 共用预览渲染器，合成顶部与轴灯的完整原速动画。源作品 RGB 与节奏不变；GIF 编码可能产生轻微色差，照片合成预览不代表实机色准。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
+
+</details>
 
 ## 应用截图
 

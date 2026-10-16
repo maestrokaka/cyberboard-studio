@@ -18,7 +18,13 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## Built-in lighting GIFs
 
-All ten presets appear in the app's order. Click a GIF for the larger view. Each uses a **background-removed, front-view CYBERBOARD R6 Vision photograph**, with top-matrix and key lighting composited by the same preview renderer as the app. The full original loop timing and source RGB are unchanged. GIF encoding may introduce slight color differences; these photo-composited screen previews are not hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+I've created and refined **ten lighting designs with AI**, and included them in the app. You can preview and use them without configuring a model, then sync your favorites to the keyboard.
+
+To make something of your own, connect **Kimi, MiniMax or DeepSeek**, describe your idea, and let AI help you create it.
+
+If there's a theme, character or effect you'd love to see, [leave me a suggestion in GitHub Issues](https://github.com/maestrokaka/cyberboard-studio/issues). Add a short description or reference image—the next built-in design might start with your idea.
+
+The ten full-keyboard previews below follow the app's order. Click a GIF for a larger view.
 
 | Preset | Preset |
 | --- | --- |
@@ -27,6 +33,13 @@ All ten presets appear in the app's order. Click a GIF for the larger view. Each
 | **05 Glitch Override · 故障字标 · 终端夺权**<br>Wide cyberpunk lettering and glitch transitions · 4.8 s<br><a href="docs/previews/glitch-override.gif"><img src="docs/previews/glitch-override.gif" width="384" alt="Glitch Override: complete top and key-light loop" /></a> | **06 Mario · 马里奥 · 红帽闯关**<br>Pure-red cap and pixel adventure · 4.2 s<br><a href="docs/previews/mario-run.gif"><img src="docs/previews/mario-run.gif" width="384" alt="Mario: complete top and key-light loop" /></a> |
 | **07 Cat Chasing Fireflies · 猫逐萤火**<br>A cat chasing fireflies · 6 s<br><a href="docs/previews/cat-firefly.gif"><img src="docs/previews/cat-firefly.gif" width="384" alt="Cat Chasing Fireflies: complete top and key-light loop" /></a> | **08 Kaká Rossonero 22 · 卡卡 · 红黑22**<br>Player card, portrait, name and number · 4.8 s<br><a href="docs/previews/kaka-rossonero.gif"><img src="docs/previews/kaka-rossonero.gif" width="384" alt="Kaka Rossonero 22: complete top and key-light loop" /></a> |
 | **09 Kaká Breakaway · 卡卡 · 极速突破**<br>Dribbling action and a clear KAKA 22 title · 4.8 s<br><a href="docs/previews/kaka-breakaway.gif"><img src="docs/previews/kaka-breakaway.gif" width="384" alt="Kaka Breakaway: complete top and key-light loop" /></a> | **10 Kaká San Siro · 卡卡 · 圣西罗之夜**<br>Celebration pose and red-white flags · 4.8 s<br><a href="docs/previews/kaka-san-siro.gif"><img src="docs/previews/kaka-san-siro.gif" width="384" alt="Kaka San Siro: complete top and key-light loop" /></a> |
+
+<details>
+<summary>About these previews</summary>
+
+Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photograph, with top-matrix and key lighting composited by the app's preview renderer. The full original loop timing and source RGB are unchanged. GIF encoding may introduce slight color differences; these photo-composited screen previews are not hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+
+</details>
 
 ## Screenshots
 
