@@ -42,22 +42,33 @@ def main():
     catalog = load(inputs / "preset-catalog.json")
     if catalog.get("schema_version") != 1 or not isinstance(catalog.get("works"), list) or not catalog["works"]:
         raise ValueError("Preset catalog is invalid")
-    designs, previews, seen = [], {}, set()
-    for entry in catalog["works"]:
-        name = entry.get("file")
-        if not isinstance(name, str) or Path(name).name != name or not name.endswith(".design.json"):
-            raise ValueError("Preset catalog must name public design files without a path")
-        design = load(inputs / "designs" / name)
-        identity = design.get("id")
-        if not isinstance(identity, str) or not identity or identity in seen:
-            raise ValueError("Preset identities must be unique")
-        seen.add(identity)
-        cover = entry.get("preview_frame", 48)
-        if type(cover) is not int or not 0 <= cover < len(design.get("frames", [])):
-            raise ValueError("Preset preview frame is outside its top animation")
-        designs.append(design)
-        previews[identity] = cover
-    for design in designs:
+    previews, seen = {}, set()
+
+    def read_presets(entries):
+        if not isinstance(entries, list):
+            raise ValueError("Preset catalog entries must be a list")
+        result = []
+        for entry in entries:
+            name = entry.get("file")
+            if not isinstance(name, str) or Path(name).name != name or not name.endswith(".design.json"):
+                raise ValueError("Preset catalog must name public design files without a path")
+            design = load(inputs / "designs" / name)
+            identity = design.get("id")
+            if not isinstance(identity, str) or not identity or identity in seen:
+                raise ValueError("Preset identities must be unique")
+            seen.add(identity)
+            cover = entry.get("preview_frame", 48)
+            if type(cover) is not int or not 0 <= cover < len(design.get("frames", [])):
+                raise ValueError("Preset preview frame is outside its top animation")
+            result.append(design)
+            previews[identity] = cover
+        return result
+
+    designs = read_presets(catalog["works"])
+    # Retired builtins remain available only to restore an existing selection or
+    # slot draft. They never occupy a new library card or a custom-work quota.
+    legacy = read_presets(catalog.get("legacy_works", []))
+    for design in designs + legacy:
         design["description"] = design.get("description") or design.get("tagline") or {
             "data-storm": "终端点亮、数据暴雨、矩阵穿流与扭曲涡流，酸绿流星撞入电蓝栅格。",
             "redline-rush": "起跑方格压缩、纵向加速、白热漂移与红线切入，红白路肩形成连续竞速。",
@@ -69,7 +80,8 @@ def main():
     layout = {"kind": "cyberboard-physical-layout", "keys": keys}
     (assets / "keymap-layout.json").write_text(
         json.dumps(layout, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-    bundle = {"views": views, "designs": designs, "presetPreviews": previews, "baseConfig": None,
+    bundle = {"views": views, "designs": designs, "legacyDesigns": legacy,
+              "presetPreviews": previews, "baseConfig": None,
               "snapshot": {"productId": None, "firmware": None, "connected": False}, "keyLayout": keys}
     catalog_path = inputs / "photos/preview-catalog.json"
     if catalog_path.is_file():
@@ -77,7 +89,7 @@ def main():
     (app / "web/data.js").write_text(
         "window.STUDIO_DATA=" + json.dumps(bundle, ensure_ascii=False, separators=(",", ":")) + ";\n",
         encoding="utf-8")
-    print(f"Bundled {len(designs)} creative works, {len(views)} unchanged photo views and generic geometry. No device record or USB access.")
+    print(f"Bundled {len(designs)} creative works, {len(legacy)} legacy work(s), {len(views)} unchanged photo views and generic geometry. No device record or USB access.")
 
 
 if __name__ == "__main__":

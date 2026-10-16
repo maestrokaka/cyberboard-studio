@@ -630,6 +630,14 @@ class Bridge:
             # frontend/backend metadata limits unnoticed.
             return isinstance(value, str) and len(value.encode("utf-16-le", errors="surrogatepass")) // 2 <= maximum
 
+        removed_builtins = payload.get("removedBuiltinIds", [])
+        require(isinstance(removed_builtins, list) and len(removed_builtins) <= 255,
+                "invalid_workspace", "已移除的内置作品清单无效。")
+        require(all(text_fits(identity, 256) and identity.strip() and
+                    not re.search(r"[\x00-\x1F\x7F]", identity) for identity in removed_builtins) and
+                len(set(removed_builtins)) == len(removed_builtins),
+                "invalid_workspace", "已移除的内置作品编号缺失、重复或无效。")
+
         def validate_design(design, identities):
             require(isinstance(design, dict), "invalid_workspace", "工作台作品格式无效。")
             identity = design.get("id")
@@ -700,6 +708,8 @@ class Bridge:
             # against active works first; an archive-only work cannot be assigned.
             require(item["designId"] not in trash_ids or item["designId"] in ids,
                     "invalid_workspace", "槽位草稿不能引用回收站中的作品，请先恢复该作品。")
+            require(item["designId"] not in removed_builtins or item["designId"] in ids,
+                    "invalid_workspace", "槽位草稿不能引用已移除的内置作品，请先恢复该作品。")
             # Built-in library IDs need not appear in custom designs. The UI
             # resolves them against the bundled library when restoring drafts.
             integer(item.get("brightness"), 0, 100, "亮度")
@@ -721,6 +731,7 @@ class Bridge:
                 all(isinstance(color, str) and RGB_RE.fullmatch(color) for color in palette),
                 "invalid_workspace", "工作台配色格式无效。")
         workspace = {"designs": copy.deepcopy(designs), "trash": copy.deepcopy(trash), "pending": copy.deepcopy(pending),
+                     "removedBuiltinIds": copy.deepcopy(removed_builtins),
                      "selectedId": selected, "targetSlot": target, "brief": brief, "palette": copy.deepcopy(palette),
                      "brightness": brightness, "speedMs": speed_ms, "exportFormat": export_format}
         if "previewAppearanceId" in payload:

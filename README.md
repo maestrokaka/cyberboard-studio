@@ -12,27 +12,39 @@
 
 ## 完整演示
 
-77 秒查看外观切换、不同灯效预览、Kimi k3 结合参考图创作，以及第 3 槽实际同步；生成与传输的等待过程已加速，结尾是 R6 实拍。此视频此前录制于 macOS，展示完整操作流程；下方截图与预设名单已更新至 v0.4.0。
+77 秒查看外观切换、不同灯效预览、Kimi k3 结合参考图创作，以及第 3 槽实际同步；生成与传输的等待过程已加速，结尾是 R6 实拍。此视频此前录制于 macOS，展示完整操作流程；下方截图与预设名单已更新至 v0.4.1。
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0)
+[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1)
+
+## 内置灯效 GIF
+
+10 款预设按软件中的顺序列出，点击动图可查看大图。每张 GIF 展示 **40×5 顶灯与 83 个物理轴灯位置**，包含完整原速循环，直接采用作品 RGB，未增亮或添加辉光。轴灯是位置示意，不是实拍或硬件色准测量。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
+
+| 预设 | 预设 |
+| --- | --- |
+| **01 裂隙超载**<br>青紫装甲与裂隙转场 · 7.68 秒<br><a href="docs/previews/neon-rift.gif"><img src="docs/previews/neon-rift.gif" width="384" alt="裂隙超载：顶部与轴灯完整循环" /></a> | **02 数据暴雨**<br>绿色数据光点与落雨 · 7.68 秒<br><a href="docs/previews/data-storm.gif"><img src="docs/previews/data-storm.gif" width="384" alt="数据暴雨：顶部与轴灯完整循环" /></a> |
+| **03 红线竞速**<br>红白轨迹与速度感 · 7.68 秒<br><a href="docs/previews/redline-rush.gif"><img src="docs/previews/redline-rush.gif" width="384" alt="红线竞速：顶部与轴灯完整循环" /></a> | **04 EVA初号机 · 觉醒序列**<br>紫绿装甲、眼部与觉醒阶段 · 4.8 秒<br><a href="docs/previews/eva-awakening.gif"><img src="docs/previews/eva-awakening.gif" width="384" alt="EVA初号机觉醒序列：顶部与轴灯完整循环" /></a> |
+| **05 故障字标 · 终端夺权**<br>宽幅赛博字标与错位转场 · 4.8 秒<br><a href="docs/previews/glitch-override.gif"><img src="docs/previews/glitch-override.gif" width="384" alt="故障字标终端夺权：顶部与轴灯完整循环" /></a> | **06 马里奥 · 红帽闯关**<br>纯红帽子与像素闯关 · 4.2 秒<br><a href="docs/previews/mario-run.gif"><img src="docs/previews/mario-run.gif" width="384" alt="马里奥红帽闯关：顶部与轴灯完整循环" /></a> |
+| **07 猫逐萤火**<br>小猫与萤火追逐 · 6 秒<br><a href="docs/previews/cat-firefly.gif"><img src="docs/previews/cat-firefly.gif" width="384" alt="猫逐萤火：顶部与轴灯完整循环" /></a> | **08 卡卡 · 红黑22**<br>球星卡、肖像与姓名号码 · 4.8 秒<br><a href="docs/previews/kaka-rossonero.gif"><img src="docs/previews/kaka-rossonero.gif" width="384" alt="卡卡红黑22：顶部与轴灯完整循环" /></a> |
+| **09 卡卡 · 极速突破**<br>带球动作与清楚的 KAKA 22 · 4.8 秒<br><a href="docs/previews/kaka-breakaway.gif"><img src="docs/previews/kaka-breakaway.gif" width="384" alt="卡卡极速突破：顶部与轴灯完整循环" /></a> | **10 卡卡 · 圣西罗之夜**<br>庆祝姿态与红白旗浪 · 4.8 秒<br><a href="docs/previews/kaka-san-siro.gif"><img src="docs/previews/kaka-san-siro.gif" width="384" alt="卡卡圣西罗之夜：顶部与轴灯完整循环" /></a> |
 
 ## 应用截图
 
-工作台与作品库截图更新至 v0.4.0，使用独立演示工作区，不连接键盘；Mac 与 Windows 共用这套界面。其余截图标明对应页面，八款外观比较图使用同一预览引擎、同一作品与同一帧。
+工作台与作品库截图更新至 v0.4.1，使用独立演示工作区，不连接键盘；Mac 与 Windows 共用这套界面。模型配置、设备与外观素材图保留 v0.3.0 的对应页面，八款外观比较图使用同一预览引擎、同一作品与同一帧。
 
 ### 灯效工作台
 
 点击预览左侧的键盘小图切换外观，整机画面随可用空间放大。AI 创作常驻工作台，预览下方与三个槽位并排，右侧集中调整作品参数；常用操作尽量在一屏完成。
 
-![带 AI 与参考图入口的灯效工作台](docs/screenshots/workbench-v040.jpg)
+![带 AI 与参考图入口的灯效工作台](docs/screenshots/workbench-v041.jpg)
 
 ### 模型配置
 
 左侧「模型配置」与灯效工作台并列，支持 Kimi Code / 开放平台、MiniMax 和 DeepSeek，分别保存服务、区域、模型和密钥。API Key 默认隐藏，可点击旁边的「显示 / 隐藏」查看当前服务已保存的 Key。切换服务会保留各自的连接；Key 按服务直接保存在本机，不增加系统授权弹窗，工作台与作品 JSON 不包含密钥。
 
-![多服务与模型设置](docs/screenshots/model-services-v030.png)
+![多服务与模型设置，v0.3.0 页面截图](docs/screenshots/model-services-v030.png)
 
 ### 键盘外观预览
 
@@ -51,37 +63,39 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 已纳入官网仍保留的售罄配色素材，参考外观与实时库存无关。[官网素材来源与检索范围](data/photos/official-photo-sources.json)
 
-![八款正面整机预览，同一作品与同一帧](docs/screenshots/appearance-gallery-v030.png)
+![八款正面整机预览，同一作品与同一帧，v0.3.0 素材](docs/screenshots/appearance-gallery-v030.png)
 
 ### 灯效作品库
 
-内置 8 款作品，涵盖红黑球星卡、人物动作、赛博字标与抽象光效。浏览像素缩略图、配色、动画帧数与循环时长，进入工作台预览；自定义作品支持命名、移入回收站和恢复。
+内置 10 款作品，涵盖赛博光效、EVA 觉醒、马里奥、猫逐萤火与三款卡卡。浏览像素缩略图、配色、动画帧数与循环时长，进入工作台预览；所有作品均可移入回收站、恢复或确认后永久删除，自定义作品还可命名。
 
-下图在八款作品中搜索「卡卡」，展示本次修订的三款内置作品。
+作品库可按名称与描述搜索，选择任意预设进入整机预览。
 
-![作品库筛选三款卡卡内置灯效](docs/screenshots/library-v040.jpg)
+![v0.4.1 灯效作品库](docs/screenshots/library-v041.jpg)
 
 ### 设备与配置
 
 先读取完整配置 JSON，再选择需要恢复的内置模式，核对字段差异与备份后确认同步。页面同时列出数据来源和各槽位草稿；下图展示未连接演示工作区中的入口。
 
-![设备与完整配置入口，演示工作区未连接键盘](docs/screenshots/device-configuration-v030.png)
+![设备与完整配置入口，v0.3.0 演示工作区未连接键盘](docs/screenshots/device-configuration-v030.png)
 
 ## 下载与运行
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.4.0-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
-| `Cyberboard-Studio-0.4.0-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
-| `Cyberboard-Studio-0.4.0-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
+| `Cyberboard-Studio-0.4.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
+| `Cyberboard-Studio-0.4.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
+| `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
 
 软件包均带 CLI 和运行环境，无需自己安装 Python。Windows 缺少 WebView2 时，运行包内 `Dependencies/MicrosoftEdgeWebview2Setup.exe`，联网安装后重新打开应用。
 
-当前版本为 [v0.4.0 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.3.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)、[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、本机 Key 保存与旧配置迁移、真实 USB 通信尚待 Windows 实机验证。
+当前版本为 [v0.4.1 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.4.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0)、[v0.3.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)、[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、本机 Key 保存与旧配置迁移、真实 USB 通信尚待 Windows 实机验证。
 
 Windows 优先使用普通包。遇到「Unknown Hard Error」时，先运行包内「诊断启动.cmd」，不要仅凭弹框换包；只有退出码与日志明确指向 CET 兼容问题时，才考虑兼容包。优先安装系统累计更新后继续使用普通包，具体见[启动故障处理](docs/USER_GUIDE.md#faq)。
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
+
+v0.4.1 收录最终确认的 10 款预设：原有三款、EVA 丰富版、故障字标、马里奥、猫逐萤火与三款卡卡，GitHub 为每款提供完整 GIF。所有作品都支持本机删除、回收站恢复和永久清理，删除状态重启后保留；这些操作不会改变已写入键盘的灯效。
 
 v0.4.0 新增三款卡卡、初号机和故障字标预设，共 8 款内置作品。卡卡改稿分别优化脸部比例、清除 `KAKA 22` 前的多余斜线、补清暗色头部轮廓；把这些经验整理进有图 / 无图创作提示词。复杂主体支持最多 40×64 高画布，按比例宽幅快滚并安排识别停留；全局配色检查和预览延续原始 RGB，减少意外暗淡与异色泛白。模型 Key 按服务直接保存在本机，默认隐藏、一键查看。[设计过程与提示词改进](docs/LIGHTING_DESIGN_NOTES.md)
 
@@ -92,10 +106,10 @@ v0.3.0 新增 MiniMax、DeepSeek 模型连接与按模型区分的参考图支�
 - AI 文字 / 参考图创作：最多 3 张图片，生成顶部与轴灯新动画，校验后自动入库预览。
 - Kimi Code / 开放平台、MiniMax、DeepSeek 连接与服务检查，Key 按服务在本机独立保存，默认隐藏、点击即可显示，不另加系统授权。
 - 独立「模型配置」页面，各服务可选官方模型或填写自定义模型 ID；仅支持视觉的模型接收参考图。
-- 8 款内置作品：裂隙超载、数据暴雨、红线竞速、初号机 · 拘束解除、故障字标 · 终端夺权、卡卡 · 红黑22、卡卡 · 极速突破、卡卡 · 圣西罗之夜；顶部与轴灯独立帧序列。
+- 10 款内置作品：裂隙超载、数据暴雨、红线竞速、EVA初号机 · 觉醒序列、故障字标 · 终端夺权、马里奥 · 红帽闯关、猫逐萤火、卡卡 · 红黑22、卡卡 · 极速突破、卡卡 · 圣西罗之夜；顶部与轴灯独立帧序列。
 - 8 款 R4 / R6 参考外观，包括两个型号各自的「Vision」；通过键盘缩略图切换并高亮当前选择，统一为去背景的正面整机预览，显示顶部及轴灯投影，记住所选外观。
 - 暂停、时间轴、亮度、节奏和配色变体；不透光键帽用键缝微光表现轴灯，透明键帽保留透光观感。
-- 作品命名、按显示名称导出 JSON、作品库与回收站；底部三个槽位选择目标、预览槽位内容和撤销草稿。
+- 自定义作品命名、按显示名称导出 JSON；内置与自定义作品均支持回收站、恢复与确认后永久删除。底部三个槽位选择目标、预览槽位内容和撤销草稿。
 - R4 / R6 设备身份检查、81 个实体键的 7 层键位读取、时间同步。
 - 同步前创建完整配置备份和计划，用户确认后传输，检查设备确认及全部键码读回。
 - 灯效计划读取并保留设备当前完整键位；本机旧记录提供灯效和其他槽位，不用旧键码覆盖现有按键。
@@ -123,7 +137,7 @@ MiniMax 默认 `MiniMax-M3`，DeepSeek 默认 `deepseek-flash`，均支持参考
 
 AI 根据素材设计图案和时间轴：五行能辨认的角色适合少而精的眨眼、摆动等微动作；需要完整高造型时，可用最多 40×64 的像素图按需滚动。宽幅角色优先让实际轮廓占约 34–38 列，保持比例，缩短空场，并给脸、标志或文字留清楚的停留；抽象、静态与微动作作品采用适合各自主题的结构。真实顶屏始终只有 40×5，模型输出的有限配方由本地编译，不执行任意代码。
 
-本轮 v0.4.0 的预设与提示词改进通过离线检查和动态预览，未重新调用真实模型 API，也未写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作作品；R6 第 3 槽已完成实际传输、设备确认和全部键码读回核对，并查看实拍灯效。MiniMax、DeepSeek、R4 写入，以及新增首次配置与内置模式恢复尚未完成对应真实账户 / 硬件验收；协议、图片处理、动画编译和交互另有离线检查。Windows 原生启动、本机 Key 迁移和真实 USB 仍待 Windows 实机验证。Kimi 官方将 Code 会员接口用于编程工具，产品集成推荐开放平台；本 App 保持真实客户端身份，实际权限与可用性以平台为准。[Kimi 官方接入说明](https://www.kimi.com/code/docs/)
+v0.4.0–v0.4.1 的预设与提示词改进通过离线检查和动态预览，未重新调用真实模型 API，也未写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作作品；R6 第 3 槽已完成实际传输、设备确认和全部键码读回核对，并查看实拍灯效。MiniMax、DeepSeek、R4 写入，以及新增首次配置与内置模式恢复尚未完成对应真实账户 / 硬件验收；协议、图片处理、动画编译和交互另有离线检查。Windows 原生启动、本机 Key 迁移和真实 USB 仍待 Windows 实机验证。Kimi 官方将 Code 会员接口用于编程工具，产品集成推荐开放平台；本 App 保持真实客户端身份，实际权限与可用性以平台为准。[Kimi 官方接入说明](https://www.kimi.com/code/docs/)
 
 启动应用与播放预览不会自动调用模型、探测或写入 USB。软件包不包含个人设备配置、键位读取记录或历史。
 

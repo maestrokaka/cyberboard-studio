@@ -242,6 +242,42 @@ class BackendChecks(unittest.TestCase):
         self.assertEqual(result["workspace"]["trash"], [])
         self.assertEqual(result["workspace"]["designs"], [self.design()])
         self.assertNotIn("workspaceWarning", result)
+
+    def test_removed_builtins_roundtrip_and_permanent_delete_stay_offline(self):
+        design = self.design()
+        design["id"] = "neon-rift"
+        entry = {"design": design, "deletedAt": "2026-10-16T01:00:00Z"}
+        payload = {"removedBuiltinIds": ["neon-rift", "old-builtin-from-earlier-version"], "trash": [entry]}
+        before = copy.deepcopy(payload)
+        self.backend.saveWorkspace(payload)
+        restored = self.backend.bootstrap({})["workspace"]
+        self.assertEqual(restored["removedBuiltinIds"], payload["removedBuiltinIds"])
+        self.assertEqual(restored["trash"], [entry])
+        self.assertEqual(payload, before)
+        self.backend.saveWorkspace({"removedBuiltinIds": payload["removedBuiltinIds"], "trash": []})
+        restored = self.backend.bootstrap({})["workspace"]
+        self.assertEqual(restored["removedBuiltinIds"], payload["removedBuiltinIds"])
+        self.assertEqual(restored["trash"], [])
+        self.assertEqual((self.probes, self.reads, self.serial_opens), (0, 0, 0))
+
+    def test_removed_builtins_validation_preserves_prior_workspace(self):
+        self.backend.saveWorkspace({"removedBuiltinIds": ["kept-hidden"]})
+        location = self.backend.state_dir / "workspace.json"
+        old_bytes = location.read_bytes()
+        for value in [None, "bad", {}, [""], ["  "], [1], [None], [["nested"]], ["a", "a"],
+                      ["bad\nidentifier"], ["bad\u007fidentifier"], ["x" * 257], ["😀" * 129],
+                      [str(i) for i in range(256)]]:
+            self.expect_error("invalid_workspace", lambda value=value: self.backend.saveWorkspace({"removedBuiltinIds": value}))
+            self.assertEqual(location.read_bytes(), old_bytes)
+        self.assertEqual(self.backend.validate_workspace({})["removedBuiltinIds"], [])
+        self.assertEqual(len(self.backend.validate_workspace({"removedBuiltinIds": [str(i) for i in range(255)]})["removedBuiltinIds"]), 255)
+
+    def test_removed_builtin_draft_is_rejected_but_active_custom_identity_wins(self):
+        pending = [{"slot": 3, "designId": "offline-design", "brightness": 100, "speedMs": 50}]
+        payload = {"removedBuiltinIds": ["offline-design"], "pending": pending}
+        self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace(payload))
+        self.backend.saveWorkspace({**payload, "designs": [self.design()]})
+        self.assertEqual(self.backend.bootstrap({})["workspace"]["pending"], pending)
         self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
 
     def test_workspace_preview_appearance_is_optional_and_validated(self):

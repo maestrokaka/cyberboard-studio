@@ -14,6 +14,22 @@
       "preview_frame": 48
     },
     {
+      "file": "eva-awakening.design.json",
+      "preview_frame": 99
+    },
+    {
+      "file": "glitch-override.design.json",
+      "preview_frame": 112
+    },
+    {
+      "file": "mario-run.design.json",
+      "preview_frame": 80
+    },
+    {
+      "file": "cat-firefly.design.json",
+      "preview_frame": 50
+    },
+    {
       "file": "kaka-rossonero.design.json",
       "preview_frame": 204
     },
@@ -24,14 +40,12 @@
     {
       "file": "kaka-san-siro.design.json",
       "preview_frame": 151
-    },
+    }
+  ],
+  "legacy_works": [
     {
       "file": "eva-unit01.design.json",
       "preview_frame": 61
-    },
-    {
-      "file": "glitch-override.design.json",
-      "preview_frame": 112
     }
   ]
 }

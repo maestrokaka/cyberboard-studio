@@ -12,25 +12,37 @@ This README is in English. The desktop app interface and full user guide are cur
 
 ## See it in action
 
-A 77-second walkthrough: switch keyboard appearances and lighting effects, create a new design with Kimi `k3` and a reference image, then sync it to slot 03. Generation and transfer waits are sped up. The final scene shows the effect on a real CYBERBOARD R6. Previously recorded on macOS, with Chinese narration and captions. It demonstrates the workflow; the workbench screenshots and preset list below are updated for v0.4.0.
+A 77-second walkthrough: switch keyboard appearances and lighting effects, create a new design with Kimi `k3` and a reference image, then sync it to slot 03. Generation and transfer waits are sped up. The final scene shows the effect on a real CYBERBOARD R6. Previously recorded on macOS, with Chinese narration and captions. It demonstrates the workflow; the workbench screenshots and preset list below are updated for v0.4.1.
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
+## Built-in lighting GIFs
+
+All ten presets appear in the app's order. Click a GIF for the larger view. Each shows the **40×5 top matrix and 83 physical key-light positions**, using the complete original timing and source RGB without added brightness or glow. These are lighting schematics, not photographs or hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+
+| Preset | Preset |
+| --- | --- |
+| **01 Neon Rift · 裂隙超载**<br>Cyan-purple armor and rift transitions · 7.68 s<br><a href="docs/previews/neon-rift.gif"><img src="docs/previews/neon-rift.gif" width="384" alt="Neon Rift: complete top and key-light loop" /></a> | **02 Data Storm · 数据暴雨**<br>Green data particles and rain · 7.68 s<br><a href="docs/previews/data-storm.gif"><img src="docs/previews/data-storm.gif" width="384" alt="Data Storm: complete top and key-light loop" /></a> |
+| **03 Redline Rush · 红线竞速**<br>Red-white trails and speed · 7.68 s<br><a href="docs/previews/redline-rush.gif"><img src="docs/previews/redline-rush.gif" width="384" alt="Redline Rush: complete top and key-light loop" /></a> | **04 EVA Awakening · EVA初号机 · 觉醒序列**<br>Purple-green armor, eyes and awakening stages · 4.8 s<br><a href="docs/previews/eva-awakening.gif"><img src="docs/previews/eva-awakening.gif" width="384" alt="EVA Awakening: complete top and key-light loop" /></a> |
+| **05 Glitch Override · 故障字标 · 终端夺权**<br>Wide cyberpunk lettering and glitch transitions · 4.8 s<br><a href="docs/previews/glitch-override.gif"><img src="docs/previews/glitch-override.gif" width="384" alt="Glitch Override: complete top and key-light loop" /></a> | **06 Mario · 马里奥 · 红帽闯关**<br>Pure-red cap and pixel adventure · 4.2 s<br><a href="docs/previews/mario-run.gif"><img src="docs/previews/mario-run.gif" width="384" alt="Mario: complete top and key-light loop" /></a> |
+| **07 Cat Chasing Fireflies · 猫逐萤火**<br>A cat chasing fireflies · 6 s<br><a href="docs/previews/cat-firefly.gif"><img src="docs/previews/cat-firefly.gif" width="384" alt="Cat Chasing Fireflies: complete top and key-light loop" /></a> | **08 Kaká Rossonero 22 · 卡卡 · 红黑22**<br>Player card, portrait, name and number · 4.8 s<br><a href="docs/previews/kaka-rossonero.gif"><img src="docs/previews/kaka-rossonero.gif" width="384" alt="Kaka Rossonero 22: complete top and key-light loop" /></a> |
+| **09 Kaká Breakaway · 卡卡 · 极速突破**<br>Dribbling action and a clear KAKA 22 title · 4.8 s<br><a href="docs/previews/kaka-breakaway.gif"><img src="docs/previews/kaka-breakaway.gif" width="384" alt="Kaka Breakaway: complete top and key-light loop" /></a> | **10 Kaká San Siro · 卡卡 · 圣西罗之夜**<br>Celebration pose and red-white flags · 4.8 s<br><a href="docs/previews/kaka-san-siro.gif"><img src="docs/previews/kaka-san-siro.gif" width="384" alt="Kaka San Siro: complete top and key-light loop" /></a> |
+
 ## Screenshots
 
-The workbench and library screenshots show the v0.4.0 interface in a separate demo workspace with no keyboard connected. Mac and Windows share this interface. The appearance comparison uses the same preview engine, design and animation frame for every keyboard.
+The workbench and library screenshots show the v0.4.1 interface in a separate demo workspace with no keyboard connected. Mac and Windows share this interface. Model, device and appearance images retain the corresponding v0.3.0 pages. The appearance comparison uses the same preview engine, design and animation frame for every keyboard.
 
 ### Lighting workbench
 
 AI creation stays on the workbench alongside the preview, lighting controls and three slot drafts. Click a keyboard thumbnail to change the appearance without changing your design or writing to the device.
 
-![Lighting workbench with AI creation and slot drafts](docs/screenshots/workbench-v040.jpg)
+![Lighting workbench with AI creation and slot drafts](docs/screenshots/workbench-v041.jpg)
 
 ### Model connections
 
 Configure Kimi Code, Kimi Open Platform, MiniMax or DeepSeek, with separate provider, region, model and API key settings. Keys are hidden by default; use the Show / Hide button to view them. Keys are stored in per-provider local files, without additional system authorization prompts, and are excluded from exported lighting JSON.
 
-![Model connections and API key controls](docs/screenshots/model-services-v030.png)
+![Model connections and API key controls, v0.3.0 screenshot](docs/screenshots/model-services-v030.png)
 
 ### Keyboard appearances
 
@@ -49,31 +61,31 @@ Eight appearances share a front view with the background removed:
 
 The collection includes official photos of sold-out finishes. These are preview options, independent of current stock. [Photo sources](data/photos/official-photo-sources.json)
 
-![Eight keyboard appearances showing the same design and frame](docs/screenshots/appearance-gallery-v030.png)
+![Eight keyboard appearances showing the same design and frame, v0.3.0 materials](docs/screenshots/appearance-gallery-v030.png)
 
 ### Lighting library
 
-Eight built-in designs cover player portraits, character animation, cyberpunk lettering and abstract lighting. Browse designs, palettes and loop lengths, or return to the workbench to preview them. Custom designs can be renamed, exported, moved to the trash and restored. Built-in designs remain available.
+Ten built-in designs cover cyberpunk lighting, EVA awakening, Mario, a cat chasing fireflies and three Kaká variations. Browse palettes and loop lengths, or return to the workbench to preview them. All designs can be moved to the trash, restored or permanently deleted after confirmation; custom designs can also be renamed.
 
-The screenshot filters the eight-work library to the three revised Kaká presets.
+Search the library by name or description, then open any preset in the full-keyboard preview.
 
-![Library filtered to the three Kaká presets](docs/screenshots/library-v040.jpg)
+![v0.4.1 lighting library](docs/screenshots/library-v041.jpg)
 
 ### Devices and configuration
 
 Read the configuration JSON, choose the built-in modes you want to restore, review the changes and backup, then confirm synchronization. This screenshot shows the controls in a demo workspace with no keyboard connected.
 
-![Device slots and configuration controls](docs/screenshots/device-configuration-v030.png)
+![Device slots and configuration controls, v0.3.0 screenshot](docs/screenshots/device-configuration-v030.png)
 
 ## Download and install
 
-The current release is [v0.4.0 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0). Find the packages and their SHA-256 files under **Assets**.
+The current release is [v0.4.1 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1). Find the packages and their SHA-256 files under **Assets**.
 
 | Package | Platform | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.4.0-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
-| `Cyberboard-Studio-0.4.0-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
-| `Cyberboard-Studio-0.4.0-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
+| `Cyberboard-Studio-0.4.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
+| `Cyberboard-Studio-0.4.1-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
+| `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
 
 All packages include the CLI and its runtime. You do not need to install Python separately. If Windows is missing WebView2, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` from the package with an internet connection.
 
@@ -83,7 +95,9 @@ The Mac app uses an ad-hoc signature and is not yet signed with an Apple Develop
 
 ## Quick start
 
-Version 0.4.0 adds three Kaká designs, the approved original EVA design and a glitch wordmark, bringing the built-in collection to eight. It improves portrait proportions, clean text holds and dark head silhouettes, and carries these lessons into the creation prompts. Complex subjects can use a bounded canvas up to 40×64 with proportional scrolling through the real 40×5 display. Color checks reduce unintended weak lighting and color washout; API keys stay in local per-provider files with simple Show / Hide controls. [Design iteration and prompt notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+Version 0.4.1 includes the final ten-design collection: the original three presets, expanded EVA Awakening, Glitch Override, Mario, Cat Chasing Fireflies and three Kaká variations. Each preset has a complete GIF preview above. Built-in and custom designs support local deletion, trash, restoration and confirmed permanent deletion; the deletion state persists across restarts. These library actions do not change lighting already written to the keyboard.
+
+Version 0.4.0 introduced the three Kaká designs, the original EVA design and a glitch wordmark. It improves portrait proportions, clean text holds and dark head silhouettes, and carries these lessons into the creation prompts. Complex subjects can use a bounded canvas up to 40×64 with proportional scrolling through the real 40×5 display. Color checks reduce unintended weak lighting and color washout; API keys stay in local per-provider files with simple Show / Hide controls. [Design iteration and prompt notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
 
 1. **Connect your keyboard by USB.** Use **Check connection（检查连接）** and verify the keyboard model before preparing a sync.
 2. **Set up a model.** Open **Model configuration（模型配置）**, choose the service, region and model, enter your own API key, then click **Save and use（保存并使用）**. Kimi Code defaults to `k3`.
@@ -122,13 +136,13 @@ For record migration, first-time initialization and troubleshooting, see the [fu
 - AI creation from text and reference images, using separate top-matrix and backlight animation sequences.
 - Kimi Code / Open Platform, MiniMax and DeepSeek connections. Image support depends on the selected model; text-only models cannot accept reference images.
 - Eight front-view keyboard appearances, thumbnail selection, playback controls, palette variants, brightness and timing adjustments.
-- Eight built-in designs: Neon Rift（裂隙超载）, Data Storm（数据暴雨）, Redline Rush（红线竞速）, EVA（初号机 · 拘束解除）, Glitch Override（故障字标 · 终端夺权）and three Kaká designs（红黑22 / 极速突破 / 圣西罗之夜）. Local JSON import / export, custom names, trash and restore.
+- Ten built-in designs: Neon Rift（裂隙超载）, Data Storm（数据暴雨）, Redline Rush（红线竞速）, EVA Awakening（EVA初号机 · 觉醒序列）, Glitch Override（故障字标 · 终端夺权）, Mario（马里奥 · 红帽闯关）, Cat Chasing Fireflies（猫逐萤火）and three Kaká designs（红黑22 / 极速突破 / 圣西罗之夜）. JSON import / export, custom names, and trash / restore / confirmed permanent deletion for all designs.
 - Three slot drafts, synchronization of a chosen slot or all pending drafts, backups and local history.
 - R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization. Clock synchronization currently uses **Asia/Shanghai (UTC+8)**.
 
 Firmware updates, key remapping, general image generation and video export are not currently included.
 
-The v0.4.0 preset and prompt changes were checked offline and reviewed in animated previews. This round did not make live model API calls or write to USB. Earlier on macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
+The v0.4.0–v0.4.1 preset and prompt changes were checked offline and reviewed in animated previews. This round did not make live model API calls or write to USB. Earlier on macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
 
 The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, local key storage and migration, and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
 

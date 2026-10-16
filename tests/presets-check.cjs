@@ -12,9 +12,12 @@ for (const file of ['web/studio-model.js', 'web/data.js'])
   vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
 const M = context.window.StudioModel, D = plain(context.window.STUDIO_DATA);
 const catalog = read('data/preset-catalog.json');
-const required = ['neon-rift', 'data-storm', 'redline-rush', 'kaka-rossonero-22',
-  'kaka-breakaway', 'candidate-kaka-san-siro', 'art-eva-unit01', 'cyberpunk-glitch-override'];
-assert.deepEqual(D.designs.map(d => d.id).sort(), required.sort(), 'release includes only the selected presets');
+const required = ['neon-rift', 'data-storm', 'redline-rush', 'collection-eva-awakening',
+  'cyberpunk-glitch-override', 'hardware-mario-pure-v3', 'kimi-a442cd51339f9bd4',
+  'kaka-rossonero-22', 'kaka-breakaway', 'candidate-kaka-san-siro'];
+assert.deepEqual(D.designs.map(d => d.id), required, 'release includes only the selected presets, with the three Kaká works last');
+assert.equal(D.designs.find(d => d.id === 'hardware-mario-pure-v3').name, '马里奥 · 红帽闯关', 'Mario display name has no parenthesized suffix');
+assert.deepEqual(D.legacyDesigns.map(d => d.id), ['art-eva-unit01'], 'original EVA remains available to old drafts without a library card');
 assert.equal(catalog.works.length, D.designs.length);
 assert.equal(new Set(D.designs.map(d => d.id)).size, D.designs.length);
 assert.equal(new Set(catalog.works.map(e => e.file)).size, catalog.works.length);
@@ -22,10 +25,10 @@ assert.equal(D.baseConfig, null);
 assert.deepEqual(D.snapshot, {productId: null, firmware: null, connected: false});
 const fixture = require('../data/test-fixtures.cjs')();
 const unchanged = JSON.stringify(fixture);
-for (const entry of catalog.works) {
+for (const entry of [...catalog.works, ...catalog.legacy_works]) {
   assert.equal(path.basename(entry.file), entry.file);
   const source = read('data/designs/' + entry.file);
-  const bundled = D.designs.find(d => d.id === source.id);
+  const bundled = [...D.designs, ...D.legacyDesigns].find(d => d.id === source.id);
   assert.ok(bundled, entry.file + ' must be in the actual App bundle');
   // prepare-data may supply a description for older works; all source content,
   // including every RGB byte, must otherwise survive bundling unchanged.

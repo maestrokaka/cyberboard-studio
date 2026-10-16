@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.0-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.1-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -54,12 +54,12 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "0.4.0")
+        self.assertEqual(release["version"], "0.4.1")
         self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
         self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
         self.assertIs(release["includesDeviceBaseline"], False)
         self.assertIs(release["startupAccessesUSB"], False)
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.0"))
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.1"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
@@ -126,6 +126,9 @@ class PackageChecks(unittest.TestCase):
         original = json.loads(canonical_source[len("window.STUDIO_DATA="):].strip().removesuffix(";"))
         self.assertGreaterEqual(len(original["designs"]), 3, "Release must retain the original built-in works")
         self.assertEqual(data["designs"], original["designs"], "Every released work must match the current prepared data, including new presets")
+        self.assertEqual(data["legacyDesigns"], original["legacyDesigns"], "Legacy draft compatibility must keep the complete original RGB")
+        self.assertEqual(data["presetPreviews"], original["presetPreviews"])
+        self.assertFalse({work["id"] for work in data["designs"]} & {work["id"] for work in data["legacyDesigns"]}, "Legacy works must not silently re-enter the main catalog")
         self.assertEqual(len(data["keyLayout"]), 81)
         self.assertTrue(all(len(key["bindings"]) == 1 for key in data["keyLayout"]))
         layout = json.loads((PACKAGE / "resources/web/assets/keymap-layout.json").read_text())

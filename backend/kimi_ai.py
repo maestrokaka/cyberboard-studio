@@ -21,7 +21,7 @@ BASE_URLS = {
 }
 DEFAULT_MODELS = {"kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3", "deepseek": "deepseek-flash"}
 PROVIDER_NAMES = {"kimi-code": "Kimi Code", "kimi-open": "Kimi", "minimax": "MiniMax", "deepseek": "DeepSeek"}
-USER_AGENT = "CyberboardStudio/0.4.0"
+USER_AGENT = "CyberboardStudio/0.4.1"
 MAX_WIRE_BYTES = 2 * 1024 * 1024
 MAX_CONTENT_BYTES = 128 * 1024
 MODEL_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")

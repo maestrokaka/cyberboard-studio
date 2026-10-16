@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "renderer": "scripts/build-preset-gifs.py",
+  "pillow_version": "12.3.0",
+  "rendering": "40 x 5 top LEDs plus 83 physical key LED positions, including three Space LEDs; flat schematic, no gain, glow, white cores, or recoloring",
+  "geometry_source": "data/photos/key-photo-layout.json",
+  "geometry_sha256": "7263989d6ee27a74ccd1788b42717ac0a09c55a692fa6cb318cd35518d792f2d",
+  "display_limit": "Screen RGB preview; not a physical color or brightness calibration",
+  "previews": [
+    {
+      "id": "neon-rift",
+      "name": "裂隙超载",
+      "source": "data/designs/neon-rift.design.json",
+      "source_sha256": "a03d935af27b52510ceccca6f9e408c4723e4aea777f6ba62bbfd68a942f5466",
+      "gif": "neon-rift.gif",
+      "gif_sha256": "bd7ca9c7260a06ca0e53be4d29e9197c96ae6cd6d998e350fac64c5d8dec81e7",
+      "bytes": 2046610,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 192,
+      "decoded_frames": 177,
+      "source_frame_ms": 40,
+      "total_duration_ms": 7680,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "data-storm",
+      "name": "数据暴雨",
+      "source": "data/designs/data-storm.design.json",
+      "source_sha256": "0f9c1f045384af885356a5f27cbc8a1ee84c3b86f1c2d25a8afb873fe94f3330",
+      "gif": "data-storm.gif",
+      "gif_sha256": "02acd2b1180c86fed1c7cb370bfc3ed8118596507fb603bbd26ab684d288cbe4",
+      "bytes": 1773414,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 192,
+      "decoded_frames": 176,
+      "source_frame_ms": 40,
+      "total_duration_ms": 7680,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "redline-rush",
+      "name": "红线竞速",
+      "source": "data/designs/redline-rush.design.json",
+      "source_sha256": "2fab6d294181c5474219ee718bcf93265c5a41df486e42f64c3e135b0bc0ae1a",
+      "gif": "redline-rush.gif",
+      "gif_sha256": "2978ede4060f5092d4c7aa8da5eb2346691b6b1e9a4bc2dd7ba7aaf387202c53",
+      "bytes": 2004319,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 192,
+      "decoded_frames": 176,
+      "source_frame_ms": 40,
+      "total_duration_ms": 7680,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "collection-eva-awakening",
+      "name": "EVA初号机 · 觉醒序列",
+      "source": "data/designs/eva-awakening.design.json",
+      "source_sha256": "1e121bcd7a345ebf963f8dee395ae7f1121c293a2a55262c67f84dc86e8b4a06",
+      "gif": "eva-awakening.gif",
+      "gif_sha256": "1976d9e4c97e4264b3e5716143ff2ec13932ee9e2fc246a89665f06172856969",
+      "bytes": 1330909,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 240,
+      "decoded_frames": 197,
+      "source_frame_ms": 20,
+      "total_duration_ms": 4800,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "cyberpunk-glitch-override",
+      "name": "故障字标 · 终端夺权",
+      "source": "data/designs/glitch-override.design.json",
+      "source_sha256": "1f0ddb357fb156184b23e4f375977416c99fd4dfbdad226f1d5be672c39b8cc4",
+      "gif": "glitch-override.gif",
+      "gif_sha256": "fc297f5718a519454000b66b9c19af42dbed31aba2bd0282be1aab1ee752a11f",
+      "bytes": 1981494,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 240,
+      "decoded_frames": 215,
+      "source_frame_ms": 20,
+      "total_duration_ms": 4800,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "hardware-mario-pure-v3",
+      "name": "马里奥 · 红帽闯关",
+      "source": "data/designs/mario-run.design.json",
+      "source_sha256": "db94fcdfa10d2ba660fd6a148136c420d7b982d2537206cdf1ee83e765feee93",
+      "gif": "mario-run.gif",
+      "gif_sha256": "92432c6b73717fdffb669324d3cbb35a74187dbbe6e43952f62ba981fc737832",
+      "bytes": 569884,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 140,
+      "decoded_frames": 106,
+      "source_frame_ms": 30,
+      "total_duration_ms": 4200,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "kimi-a442cd51339f9bd4",
+      "name": "猫逐萤火",
+      "source": "data/designs/cat-firefly.design.json",
+      "source_sha256": "d8dee828e64123837b5ea97e69b7a6d0a9df92c57e46984af0b39707fc56d22b",
+      "gif": "cat-firefly.gif",
+      "gif_sha256": "49f9214a599fc2c1861b295a0e985d4c531e146f0cb251f6740d7b75faede8b9",
+      "bytes": 781121,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 100,
+      "decoded_frames": 100,
+      "source_frame_ms": 60,
+      "total_duration_ms": 6000,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "kaka-rossonero-22",
+      "name": "卡卡 · 红黑22",
+      "source": "data/designs/kaka-rossonero.design.json",
+      "source_sha256": "a98ae1ae1ac6085d1723cc9dba7f512b6ba25ff5d4e2e8a765eff6b2d0c3398d",
+      "gif": "kaka-rossonero.gif",
+      "gif_sha256": "5830092707d6aec391b54782083632ccecfeb4fbbdfbacf572eb3066e52a62b9",
+      "bytes": 1944797,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 240,
+      "decoded_frames": 240,
+      "source_frame_ms": 20,
+      "total_duration_ms": 4800,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "kaka-breakaway",
+      "name": "卡卡 · 极速突破",
+      "source": "data/designs/kaka-breakaway.design.json",
+      "source_sha256": "b58dc4fd1acf6de759aa394eae2090bc1fa3c763cd42a0257084325ed06ada6c",
+      "gif": "kaka-breakaway.gif",
+      "gif_sha256": "cfb13ce60d963d38e849e764d37cc6a6e23221e60fa9ffe5d2f1bc89b8b86c80",
+      "bytes": 2129785,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 240,
+      "decoded_frames": 240,
+      "source_frame_ms": 20,
+      "total_duration_ms": 4800,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    },
+    {
+      "id": "candidate-kaka-san-siro",
+      "name": "卡卡 · 圣西罗之夜",
+      "source": "data/designs/kaka-san-siro.design.json",
+      "source_sha256": "c26c34f9b3d27472475225f539df9d7446afb9f024159f59b485f4f6ed1bbc3f",
+      "gif": "kaka-san-siro.gif",
+      "gif_sha256": "c555d5f776495444e8c83e9a28f3a71e1bb8402906901a26ee3ab3a3e0e11aae",
+      "bytes": 1913370,
+      "dimensions": [
+        640,
+        400
+      ],
+      "source_frames": 240,
+      "decoded_frames": 232,
+      "source_frame_ms": 20,
+      "total_duration_ms": 4800,
+      "loop": 0,
+      "rgb_quantization": "none; every decoded frame matches original RGB schematic exactly",
+      "timing_check": "every source tick matched; identical GIF frames may be merged without dropping duration"
+    }
+  ]
+}
