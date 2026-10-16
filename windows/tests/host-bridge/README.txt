@@ -1,7 +1,7 @@
 Offline native bridge protocol checks
 ====================================
 
-The net10.0 console project links the production BackendClient.cs and
+The net10.0 console project links the production BackendClient.cs, AISettings.cs,
 ResourcePolicy.cs and StartupDiagnostics.cs unchanged. HostPaths/HostLog are test-only shims. It launches
 fake-bridge.py with the local project Python in a temporary directory containing
 Chinese characters and spaces. The subprocess imports no cyberboard modules
@@ -25,6 +25,13 @@ interpreter executable (python.exe on Windows).
 These tests prove C# process/JSON bridge behavior and path policy execution on
 the Mac build host. They do not verify Windows WebView2 UI, Windows process
 launch, serial driver behavior or actual USB communication.
+
+Credential tests use only synthetic provider-local files under the temporary
+directory. Old encrypted files are ignored, not decrypted or migrated. They
+exercise direct saving/viewing/removal, provider isolation and exact rollback.
+The release builder and package checks reject system credential API markers in
+our own AISettings source and managed host; browser/runtime DLLs are outside
+that application credential check.
 
 The startup probe is tested with absent and synthetic fixed package files in
 Unicode paths. It distinguishes a managed-runtime entry from a missing package,

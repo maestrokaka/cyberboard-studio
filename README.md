@@ -16,7 +16,7 @@
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1)
+[查看本版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.2)
 
 ## 内置灯效 GIF
 
@@ -96,17 +96,19 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.4.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
-| `Cyberboard-Studio-0.4.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
-| `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
+| `Cyberboard-Studio-0.4.2-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」，双击打开 |
+| `Cyberboard-Studio-0.4.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC/Enterprise | 完整解压，双击 `Cyberboard Studio.exe`，保留旁边的 DLL 和 `resources` |
+| `Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip` | 遇到明确 CET 启动兼容错误、暂时无法更新系统的旧 Windows 10 x64 | 独立解压到新目录；仅此包取消 App 的 CET 标记，普通包保持 CET |
 
 软件包均带 CLI 和运行环境，无需自己安装 Python。Windows 缺少 WebView2 时，运行包内 `Dependencies/MicrosoftEdgeWebview2Setup.exe`，联网安装后重新打开应用。
 
-当前版本为 [v0.4.1 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.4.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0)、[v0.3.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)、[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、本机 Key 保存与旧配置迁移、真实 USB 通信尚待 Windows 实机验证。
+当前版本为 [v0.4.2 预览版](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.2)，软件包与对应 SHA-256 校验文件在该版本的 **Assets** 中。[v0.4.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1)、[v0.4.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.0)、[v0.3.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.3.0)、[v0.2.2](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.2)、[v0.2.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.1)、[v0.2.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.2.0) 与 [v0.1.0](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.1.0) 保留作为历史版本。Mac 包为本机 ad-hoc 签名，尚未用 Apple Developer ID 签名或公证；系统可能提示无法验证开发者，可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Intel Mac 尚未提供构建。Windows 版已交叉编译并通过离线检查，原生启动、本机 Key 保存与旧配置迁移、真实 USB 通信尚待 Windows 实机验证。
 
 Windows 优先使用普通包。遇到「Unknown Hard Error」时，先运行包内「诊断启动.cmd」，不要仅凭弹框换包；只有退出码与日志明确指向 CET 兼容问题时，才考虑兼容包。优先安装系统累计更新后继续使用普通包，具体见[启动故障处理](docs/USER_GUIDE.md#faq)。
 
 仓库与已发布版本公开可访问，无需登录即可查看源码、截图和下载软件。
+
+v0.4.2 移除旧 Keychain / DPAPI 密钥访问与兼容迁移，模型页只使用按服务保存的本机 Key 文件，保持默认隐藏、点击显示。已经保存到本机文件的 Key 继续使用；仅存在旧系统存储中的 Key 请重新粘贴并保存，App 不再尝试读取或解密旧记录。
 
 v0.4.1 收录最终确认的 10 款预设：原有三款、EVA 丰富版、故障字标、马里奥、猫逐萤火与三款卡卡，GitHub 为每款提供完整 GIF。所有作品都支持本机删除、回收站恢复和永久清理，删除状态重启后保留；这些操作不会改变已写入键盘的灯效。
 
@@ -150,7 +152,9 @@ MiniMax 默认 `MiniMax-M3`，DeepSeek 默认 `deepseek-flash`，均支持参考
 
 AI 根据素材设计图案和时间轴：五行能辨认的角色适合少而精的眨眼、摆动等微动作；需要完整高造型时，可用最多 40×64 的像素图按需滚动。宽幅角色优先让实际轮廓占约 34–38 列，保持比例，缩短空场，并给脸、标志或文字留清楚的停留；抽象、静态与微动作作品采用适合各自主题的结构。真实顶屏始终只有 40×5，模型输出的有限配方由本地编译，不执行任意代码。
 
-v0.4.0–v0.4.1 的预设与提示词改进通过离线检查和动态预览，未重新调用真实模型 API，也未写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作作品；R6 第 3 槽已完成实际传输、设备确认和全部键码读回核对，并查看实拍灯效。MiniMax、DeepSeek、R4 写入，以及新增首次配置与内置模式恢复尚未完成对应真实账户 / 硬件验收；协议、图片处理、动画编译和交互另有离线检查。Windows 原生启动、本机 Key 迁移和真实 USB 仍待 Windows 实机验证。Kimi 官方将 Code 会员接口用于编程工具，产品集成推荐开放平台；本 App 保持真实客户端身份，实际权限与可用性以平台为准。[Kimi 官方接入说明](https://www.kimi.com/code/docs/)
+v0.4.2 已在 macOS 原生 App 中实际打开模型配置页两次，识别已有本机 Key，未出现钥匙串授权提示。本轮没有调用模型或写入 USB。
+
+v0.4.0–v0.4.1 的预设与提示词改进通过离线检查和动态预览，未重新调用真实模型 API，也未写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作作品；R6 第 3 槽已完成实际传输、设备确认和全部键码读回核对，并查看实拍灯效。MiniMax、DeepSeek、R4 写入，以及新增首次配置与内置模式恢复尚未完成对应真实账户 / 硬件验收；协议、图片处理、动画编译和交互另有离线检查。Windows 原生启动、本机 Key 保存和真实 USB 仍待 Windows 实机验证。Kimi 官方将 Code 会员接口用于编程工具，产品集成推荐开放平台；本 App 保持真实客户端身份，实际权限与可用性以平台为准。[Kimi 官方接入说明](https://www.kimi.com/code/docs/)
 
 启动应用与播放预览不会自动调用模型、探测或写入 USB。软件包不包含个人设备配置、键位读取记录或历史。
 
@@ -178,7 +182,7 @@ v0.4.0–v0.4.1 的预设与提示词改进通过离线检查和动态预览，�
 | 作品、回收站、草稿、计划、备份、无密钥连接设置 | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
 | CLI 设备记录 | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
 
-`CYBERBOARD_DATA_DIR` 可显式指定 CLI 记录目录。用户数据与应用安装目录分开保存。`ai-settings.json` 仅保存服务、地址和模型；两平台均在 Studio 数据目录的 `ai-keys/<服务>.key` 中直接保存 Key，不另加加密或系统授权。旧钥匙串 / DPAPI 记录只作无弹窗兼容迁移；迁移不到时直接重新输入保存即可，旧记录不会被删除。参考图不会写入这些数据文件。
+`CYBERBOARD_DATA_DIR` 可显式指定 CLI 记录目录。用户数据与应用安装目录分开保存。`ai-settings.json` 仅保存服务、地址和模型；两平台均在 Studio 数据目录的 `ai-keys/<服务>.key` 中直接保存 Key，不另加加密或系统授权。已保存在这些本机文件中的 Key 继续使用。旧钥匙串 / DPAPI 记录不再读取、解密、迁移或删除；如果 Key 只保存在旧系统存储中，请在 App 重新粘贴并保存。参考图不会写入这些数据文件。
 
 ## 从源码构建
 

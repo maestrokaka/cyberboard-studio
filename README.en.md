@@ -92,13 +92,13 @@ Read the configuration JSON, choose the built-in modes you want to restore, revi
 
 ## Download and install
 
-The current release is [v0.4.1 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1). Find the packages and their SHA-256 files under **Assets**.
+The current release is [v0.4.2 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.2). Find the packages and their SHA-256 files under **Assets**. [v0.4.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1) remains available as a previous release.
 
 | Package | Platform | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.4.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
-| `Cyberboard-Studio-0.4.1-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
-| `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
+| `Cyberboard-Studio-0.4.2-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
+| `Cyberboard-Studio-0.4.2-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
+| `Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
 
 All packages include the CLI and its runtime. You do not need to install Python separately. If Windows is missing WebView2, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` from the package with an internet connection.
 
@@ -107,6 +107,8 @@ Use the standard Windows package first. For a startup failure, run `诊断启动
 The Mac app uses an ad-hoc signature and is not yet signed with an Apple Developer ID or notarized. See [Apple's guidance on opening apps](https://support.apple.com/en-gb/102445) if macOS blocks it. An Intel Mac build is not currently available.
 
 ## Quick start
+
+Version 0.4.2 removes legacy Keychain / DPAPI access and migration. Model connections use only per-provider local key files, with the same default-hidden Show / Hide controls. Existing local-file keys continue to work; if a key exists only in the old system store, paste and save it again in the app. The app no longer reads or decrypts those old entries.
 
 Version 0.4.1 includes the final ten-design collection: the original three presets, expanded EVA Awakening, Glitch Override, Mario, Cat Chasing Fireflies and three Kaká variations. Each preset has a complete GIF preview above. Built-in and custom designs support local deletion, trash, restoration and confirmed permanent deletion; the deletion state persists across restarts. These library actions do not change lighting already written to the keyboard.
 
@@ -155,9 +157,11 @@ For record migration, first-time initialization and troubleshooting, see the [fu
 
 Firmware updates, key remapping, general image generation and video export are not currently included.
 
+The v0.4.2 native macOS app was opened and its model settings page loaded twice. It recognized an existing local key without a Keychain authorization prompt. This check did not call a model or write to USB.
+
 The v0.4.0–v0.4.1 preset and prompt changes were checked offline and reviewed in animated previews. This round did not make live model API calls or write to USB. Earlier on macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
 
-The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, local key storage and migration, and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
+The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, local key storage and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
 
 ## Local data
 
@@ -166,7 +170,7 @@ The Windows packages are cross-compiled and pass offline checks. This release's 
 | Designs, drafts, trash, plans, backups and non-secret model settings | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
 | CLI device records | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
 
-API keys are stored directly in `ai-keys/<provider>.key` under the Studio data directory on both platforms. Legacy Keychain / DPAPI entries are read only for silent migration and are retained; if migration is unavailable, enter and save a replacement key directly. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
+API keys are stored directly in `ai-keys/<provider>.key` under the Studio data directory on both platforms. Existing local-file keys remain usable. Legacy Keychain / DPAPI entries are no longer read, decrypted, migrated or deleted; if a key exists only there, paste and save it again in the app. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
 
 ## Building and contributing
 

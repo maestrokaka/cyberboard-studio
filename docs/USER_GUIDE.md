@@ -1,6 +1,6 @@
 # Cyberboard Studio 完整使用说明
 
-适用版本：**v0.4.1 预览版** · macOS / Windows
+适用版本：**v0.4.2 预览版** · macOS / Windows
 
 Cyberboard Studio 用来预览、整理和同步 Cyberboard R4 / R6 的顶部灯效与轴灯。你可以先离线预览，或连接 Kimi、MiniMax、DeepSeek，用文字与支持的参考图制作新动画，再检查 USB 连接，把作品放入三个自定义槽位，查看同步计划后写入键盘。
 
@@ -28,13 +28,13 @@ Cyberboard Studio 用来预览、整理和同步 Cyberboard R4 / R6 的顶部灯
 
 ## 1. 下载与安装
 
-在 [v0.4.1 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
+在 [v0.4.2 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.2) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
 
 | 电脑 | 下载文件 | 当前适用范围 |
 | --- | --- | --- |
-| Mac | `Cyberboard-Studio-0.4.1-macOS-AppleSilicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
-| Windows | `Cyberboard-Studio-0.4.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise |
-| Windows 10 兼容包 | `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip` | 旧 Windows 10 明确出现 CET 启动兼容错误时单独测试，详见[故障处理](#faq) |
+| Mac | `Cyberboard-Studio-0.4.2-macOS-AppleSilicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
+| Windows | `Cyberboard-Studio-0.4.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise |
+| Windows 10 兼容包 | `Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip` | 旧 Windows 10 明确出现 CET 启动兼容错误时单独测试，详见[故障处理](#faq) |
 
 当前没有 Intel Mac 构建；Windows 32 位和 ARM64 原生版本尚未提供。Windows 系统兼容范围可参阅 [Microsoft 的 .NET 10 支持列表](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)。
 
@@ -217,7 +217,7 @@ MiniMax 的 `MiniMax-M3.1-Flash-Preview` 目前仅通过 M Plan / MiniMax Code �
 
 各服务的区域、模型和密钥分别保存；切换下拉框可以查看该服务的设置，点「保存并使用」后才成为工作台使用的服务。已有 Kimi 配置和密钥继续保留，移除一个服务的密钥不会清理其他服务。
 
-切换服务或离开「模型配置」时，Key 自动恢复隐藏；隐藏不会清空正在输入的新 Key。Mac 与 Windows 都按服务直接保存在本机，不额外增加系统授权或查看确认。要更换密钥，输入新的 Key 再保存；旧 Key 无法自动迁移时，可直接重新输入并保存，不需要恢复旧凭据访问。「移除密钥」删除当前服务的本机密钥，已有作品仍可预览、导出和同步。修改服务、区域或模型后，需要点「保存并使用」才生效。
+切换服务或离开「模型配置」时，Key 自动恢复隐藏；隐藏不会清空正在输入的新 Key。Mac 与 Windows 都按服务直接保存在本机，不额外增加系统授权或查看确认。要更换密钥，输入新的 Key 再保存。已经保存为本机文件的 Key 继续使用；仅保存在旧钥匙串 / DPAPI 中的 Key 需重新粘贴并保存，App 不再自动读取或解密旧记录。「移除密钥」删除当前服务的本机密钥，已有作品仍可预览、导出和同步。修改服务、区域或模型后，需要点「保存并使用」才生效。
 
 ### 文字与参考图制作
 
@@ -270,7 +270,9 @@ App 会检查编译后的顶部与轴灯数据，以及明显的意外全黑、�
 
 网络超时、权限、额度或不完整回复会提示失败，描述和已选图片保留，可以调整后再试。模型配方格式不正确，或编译后未通过基本可见性检查时，App **最多再请求一次修复**；仍不通过则拒绝入库，不自动回退成模板变体。通过检查的作品也需要自己预览。修复属于额外模型调用，**已提交的生成请求即使取消、超时或最终校验失败，仍可能占用额度或产生费用**。
 
-v0.4.0–v0.4.1 提示词与预设更新使用离线检查和动态预览验收，没有重新调用真实模型或写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作新灯效。MiniMax、DeepSeek 尚未完成对应真实账户生成验证；协议、图片处理、编排和交互有离线检查。Windows 原生启动、本机 Key 迁移和真实 USB 尚待 Windows 实机验证。服务和模型随平台变化，实际可用性以自己的测试和平台权限为准。错误排查见[第 14 节](#faq)。
+v0.4.2 已在 macOS 原生 App 实际打开模型配置页两次，已有本机 Key 被识别，未弹出钥匙串授权。本轮未测试模型请求或 USB 写入；Windows 原生 GUI、本机 Key 保存与 USB 仍待 Windows 实机验证。
+
+v0.4.0–v0.4.1 提示词与预设更新使用离线检查和动态预览验收，没有重新调用真实模型或写入 USB。此前 macOS 已实际验证 Code 密钥保存、连接检查、`kimi-for-coding` 在线生成，以及 `k3` 结合参考图制作新灯效。MiniMax、DeepSeek 尚未完成对应真实账户生成验证；协议、图片处理、编排和交互有离线检查。Windows 原生启动、本机 Key 保存和真实 USB 尚待 Windows 实机验证。服务和模型随平台变化，实际可用性以自己的测试和平台权限为准。错误排查见[第 14 节](#faq)。
 
 ### 保留外部 AI 工作流
 
@@ -553,9 +555,9 @@ Studio 目录中的 `workspace.json` 保存作品、回收站和草稿；`backup
 
 ### 模型设置与密钥
 
-Studio 目录中的 `ai-settings.json` 只保存当前服务和各服务的官方地址、模型，不包含 API Key。两平台的 Key 都按服务直接保存在 Studio 数据目录的 `ai-keys/<服务>.key` 中；`kimi-code`、`kimi-open`、`minimax`、`deepseek` 各自独立。旧版 Mac 钥匙串与 Windows `credentials/` 下的 DPAPI 文件只作无弹窗读取迁移，不再写入或删除。参考图不落盘到 Studio 数据目录。
+Studio 目录中的 `ai-settings.json` 只保存当前服务和各服务的官方地址、模型，不包含 API Key。两平台的 Key 都按服务直接保存在 Studio 数据目录的 `ai-keys/<服务>.key` 中；`kimi-code`、`kimi-open`、`minimax`、`deepseek` 各自独立。已经保存到这些本机文件的 Key 继续使用。旧版 Mac 钥匙串与 Windows `credentials/` 下的 DPAPI 文件不再读取、解密、迁移、写入或删除；仅保存在那里时，需在模型页重新粘贴并保存 Key。参考图不落盘到 Studio 数据目录。
 
-「移除密钥」会清空当前服务的本机 Key，并阻止它从旧记录再次出现；不会清理其他服务或旧系统凭据。旧 Key 无法迁移时直接重新输入保存即可。`ai-keys/` 不进入作品、工作台草稿、发布包或 GitHub；复制项目代码时不要包含这个个人目录。
+「移除密钥」会清空当前服务的本机 Key，不会清理其他服务或旧系统记录。App 只访问自己的 Key 文件，不读取旧系统凭据，也不会请求钥匙串授权。`ai-keys/` 不进入作品、工作台草稿、发布包或 GitHub；复制项目代码时不要包含这个个人目录。
 
 ### 备份与迁移
 
@@ -563,9 +565,11 @@ Studio 目录中的 `ai-settings.json` 只保存当前服务和各服务的官�
 
 ### 更新与卸载
 
+v0.4.2 移除 Mac Keychain 与 Windows DPAPI 的全部旧密钥访问和自动迁移。模型页只读取按服务保存的本机普通文件，默认隐藏，可点显示 / 隐藏；已有本机 Key 继续兼容，只有旧系统记录而没有本机 Key 时，需重新粘贴并保存。旧记录保留原样，不通过系统授权获取。灯效作品、槽位与 GIF 不因这次修复改变。
+
 v0.4.1 收录最终确认的 10 款预设：原三款、EVA 丰富版、故障字标、马里奥、猫逐萤火与三款卡卡。马里奥保留此前确认的纯色 RGB，猫逐萤火保留原始节奏；作品库按这个顺序展示，三款卡卡放在最后。全部内置作品支持本机删除、恢复与确认后永久清理，重启后保留删除状态；旧 EVA 的已有选择和槽位草稿继续兼容。GitHub 提供每款完整 GIF，方便先看效果。
 
-v0.4.0 新增三款卡卡、初号机和故障字标，连同原三款共 8 款内置预设。依据像素改稿优化有图 / 无图提示词：宽幅等比高画布、快速通行与识别停留、文字镜头留白、完整暗色轮廓；最高支持 40×64 像素图。全局保留主题特征色、检查意外弱轴灯及异色泛白，预览灯珠中心采用原始 RGB。两平台模型 Key 按服务直接保存在本机，默认隐藏、点击显示；旧凭据仅无弹窗读取迁移。新版保留旧自定义稿、草稿和回收站，不会自动写入键盘。[完整优化过程](LIGHTING_DESIGN_NOTES.md)
+v0.4.0 新增三款卡卡、初号机和故障字标，连同原三款共 8 款内置预设。依据像素改稿优化有图 / 无图提示词：宽幅等比高画布、快速通行与识别停留、文字镜头留白、完整暗色轮廓；最高支持 40×64 像素图。全局保留主题特征色、检查意外弱轴灯及异色泛白，预览灯珠中心采用原始 RGB。两平台模型 Key 按服务直接保存在本机，默认隐藏、点击显示；当时保留旧凭据读取迁移，v0.4.2 已移除该兼容路径。新版保留旧自定义稿、草稿和回收站，不会自动写入键盘。[完整优化过程](LIGHTING_DESIGN_NOTES.md)
 
 v0.3.0 新增 MiniMax、DeepSeek 与独立保存的服务配置，按模型区分参考图能力；提供最早实拍的 CYBERBOARD R6「Vision」及 7 款官网 R4 配色，共 8 款外观，通过预览左侧的键盘缩略图切换，全部统一为正面整机的去背景预览。工作台整合中间大预览、常驻 AI 创作、三个槽位和右侧作品参数，去掉 Logo 备选页面，保留已确认的正式应用图标。
 
@@ -670,11 +674,11 @@ Windows 检测会逐一检查 COM 口，某个端口出现 `Write timeout` 等�
 
 如果退出码为 `0x80131506`，且 `app-stderr.txt` 明确写着 **`Your Windows doesn't fully support CET`**，表示命中了旧 Windows 补丁与 .NET CET 的启动兼容问题，程序可能尚未进入自己的启动代码。[微软原因说明](https://github.com/dotnet/runtime/issues/108589)
 
-优先安装适用于自己系统的 Windows 累计更新，再使用普通包。暂时无法更新时，可单独测试 `Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip`：它仅取消此 App 的 CET 标记，不更改 Windows 系统安全策略。**CET 是硬件栈保护，兼容包不启用该保护；普通包仍启用。**将兼容包完整解压到新目录，不混用旧版 EXE、DLL 和资源；系统更新后建议返回普通包。该包已交叉编译并验证两种包的实际 CET 标记和运行组件一致性，仍需 Windows 实机启动确认。[微软项目级兼容选项](https://learn.microsoft.com/en-us/dotnet/core/compatibility/interop/9.0/cet-support)
+优先安装适用于自己系统的 Windows 累计更新，再使用普通包。暂时无法更新时，可单独测试 `Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip`：它仅取消此 App 的 CET 标记，不更改 Windows 系统安全策略。**CET 是硬件栈保护，兼容包不启用该保护；普通包仍启用。**将兼容包完整解压到新目录，不混用旧版 EXE、DLL 和资源；系统更新后建议返回普通包。该包已交叉编译并验证两种包的实际 CET 标记和运行组件一致性，仍需 Windows 实机启动确认。[微软项目级兼容选项](https://learn.microsoft.com/en-us/dotnet/core/compatibility/interop/9.0/cet-support)
 
 ### 模型提示未配置 / 密钥无法保存
 
-先在左侧「模型配置」选择与密钥对应的服务、区域和模型，输入完整单行 Key 并保存；仅修改下拉框不会切换已保存连接。旧 Key 无法自动迁移时，直接重新输入并点「保存并使用」；不需要系统凭据解锁或额外确认。密钥不要放进 JSON 或环境检查截图。
+先在左侧「模型配置」选择与密钥对应的服务、区域和模型，输入完整单行 Key 并保存；仅修改下拉框不会切换已保存连接。如果没有本机 Key 文件，直接重新粘贴并点「保存并使用」；App 不读取旧 Keychain / DPAPI，不需要系统凭据解锁或授权。密钥不要放进 JSON 或环境检查截图。
 
 ### 模型返回 401、403 或 429
 

@@ -301,52 +301,62 @@ internal static class Program
                 Check(JsonSerializer.SerializeToElement(reopened.RevealAIKey(Payload(new { provider = "kimi-code" }))).GetProperty("apiKey").GetString() == "plain-kimi-test-key", "Explicit reveal used another provider.");
                 return Task.CompletedTask;
             });
-            await Run("legacy migration retains old data and empty key tombstones prevent removed key resurrection", async () =>
+            await Run("old encrypted files are ignored; explicit local keys and removals stay provider scoped", async () =>
             {
-                var directory = Path.Combine(temp, "legacy to files");
+                var directory = Path.Combine(temp, "ignored encrypted files");
+                var encryptedDirectory = Path.Combine(directory, "credentials");
                 var keyDirectory = Path.Combine(directory, "ai-keys");
-                var legacy = new MemoryVault();
-                legacy.Keys["kimi-code"] = "legacy-kimi-test-key";
-                legacy.Keys["minimax"] = "legacy-minimax-test-key";
-                var files = new LocalFileCredentialVault(keyDirectory, legacy);
-                Check(files.Read("kimi-code") == "legacy-kimi-test-key", "Legacy key was not read.");
-                Check(File.ReadAllText(Path.Combine(keyDirectory, "kimi-code.key")) == "legacy-kimi-test-key", "Legacy key was not migrated.");
-                Check(legacy.Keys["kimi-code"] == "legacy-kimi-test-key", "Migration deleted or changed legacy key.");
-                legacy.DeniedProvider = "kimi-code";
-                files.Write("kimi-code", "new-kimi-test-key");
-                Check(files.Read("kimi-code") == "new-kimi-test-key", "Local key unnecessarily depended on legacy access.");
-                files.Delete("kimi-code");
-                Check(File.Exists(Path.Combine(keyDirectory, "kimi-code.key")) && new FileInfo(Path.Combine(keyDirectory, "kimi-code.key")).Length == 0, "Removal marker missing.");
-                Check(new LocalFileCredentialVault(keyDirectory, legacy).Read("kimi-code") is null, "Removed key resurrected from legacy storage.");
-                Check(files.Read("minimax") == "legacy-minimax-test-key" && legacy.Keys.Count == 2, "Migration/removal crossed providers.");
+                Directory.CreateDirectory(encryptedDirectory);
+                // Invalid synthetic bytes would fail if any compatibility read
+                // attempted to decrypt them. New reads never touch this path.
+                byte[] encrypted = [0xFF, 0x00, 0xFE, 0x01, 0x80];
+                foreach (var provider in new[] { "kimi-code", "minimax", "deepseek" })
+                    File.WriteAllBytes(Path.Combine(encryptedDirectory, provider + ".dpapi"), encrypted);
+                var settings = new AISettings(directory);
+                var files = new LocalFileCredentialVault(keyDirectory);
+                var normal = JsonSerializer.SerializeToElement(settings.Get());
+                Check(!normal.GetProperty("hasKey").GetBoolean() && normal.GetProperty("credentialError").ValueKind == JsonValueKind.Null, "Encrypted-only records must be missing, not unreadable system credentials.");
+                Check(!Directory.Exists(keyDirectory), "Read-only settings migrated an old encrypted file.");
+                Check(JsonSerializer.SerializeToElement(settings.RevealAIKey(Payload(new { provider = "kimi-code" }))).GetProperty("apiKey").GetString() == "", "Reveal accessed the old encrypted key.");
+                await Fails(() => { settings.Inject(Payload(new { })); return Task.CompletedTask; }, "保存 API Key");
+                settings.Save(Payload(new { provider = "minimax", apiKey = "other-service-test-key" }));
+                settings.Save(Payload(new { provider = "kimi-code", apiKey = "reentered-test-key" }));
+                Check(settings.Inject(Payload(new { })).Secret == "reentered-test-key", "User could not directly save a replacement.");
+                Check(files.Read("minimax") == "other-service-test-key", "Replacement crossed providers.");
+                settings.Save(Payload(new { provider = "kimi-code", removeKey = true }));
+                Check(new AISettings(directory).Inject(Payload(new { provider = "minimax" }), allowInactive: true).Secret == "other-service-test-key", "Removal changed another service after restart.");
+                Check(new LocalFileCredentialVault(keyDirectory).Read("kimi-code") is null, "Removed key resurrected after restart.");
+                foreach (var provider in new[] { "kimi-code", "minimax", "deepseek" })
+                    Check(File.ReadAllBytes(Path.Combine(encryptedDirectory, provider + ".dpapi")).SequenceEqual(encrypted), "New settings changed old encrypted data.");
                 foreach (var provider in new[] { "../kimi-code", "other", "", "KIMI-CODE" })
                     await Fails(() => { files.Write(provider, "test-key"); return Task.CompletedTask; }, "未知");
                 foreach (var key in new[] { "line\nbreak", "has space", "中文", new string('a', 4097) })
                     await Fails(() => { files.Write("deepseek", key); return Task.CompletedTask; }, "格式");
             });
-            await Run("unreadable active legacy key stays service scoped and explicit replacement restores normal use", async () =>
+            await Run("unreadable active local key stays service scoped and explicit replacement restores normal use", async () =>
             {
-                var directory = Path.Combine(temp, "unreadable legacy replacement");
-                var legacy = new MemoryVault { DeniedProvider = "kimi-code" };
-                legacy.Keys["minimax"] = "other-service-test-key";
-                var files = new LocalFileCredentialVault(Path.Combine(directory, "ai-keys"), legacy);
+                var directory = Path.Combine(temp, "unreadable local replacement");
+                var keyDirectory = Path.Combine(directory, "ai-keys");
+                Directory.CreateDirectory(keyDirectory);
+                File.WriteAllBytes(Path.Combine(keyDirectory, "kimi-code.key"), [0xFF, 0xFE, 0x00]);
+                File.WriteAllText(Path.Combine(keyDirectory, "minimax.key"), "other-service-test-key");
+                var files = new LocalFileCredentialVault(keyDirectory);
                 var settings = new AISettings(directory, files);
                 var normal = JsonSerializer.SerializeToElement(settings.Get());
-                Check(normal.GetProperty("hasKey").ValueKind == JsonValueKind.Null && normal.GetProperty("profiles").GetProperty("kimi-code").GetProperty("credentialError").GetString()!.Contains("重新输入"), "Unreadable active key blocked settings or became a false absence.");
-                Check(normal.GetProperty("profiles").GetProperty("minimax").GetProperty("hasKey").GetBoolean(), "One unreadable legacy service blocked another service.");
+                Check(normal.GetProperty("hasKey").ValueKind == JsonValueKind.Null && normal.GetProperty("profiles").GetProperty("kimi-code").GetProperty("credentialError").GetString()!.Contains("重新输入"), "Malformed local key blocked settings or became false absence.");
+                Check(normal.GetProperty("profiles").GetProperty("minimax").GetProperty("hasKey").GetBoolean(), "One malformed local key blocked another service.");
                 await Fails(() => { settings.Save(Payload(new { provider = "kimi-code" })); return Task.CompletedTask; }, "重新输入");
                 var saved = JsonSerializer.SerializeToElement(settings.Save(Payload(new { provider = "kimi-code", apiKey = "reentered-test-key" })));
-                Check(saved.GetProperty("hasKey").GetBoolean() && settings.Inject(Payload(new { })).Secret == "reentered-test-key", "User could not replace an undecryptable old key.");
+                Check(saved.GetProperty("hasKey").GetBoolean() && settings.Inject(Payload(new { })).Secret == "reentered-test-key", "User could not replace malformed local bytes.");
                 Check(files.Read("minimax") == "other-service-test-key", "Recovery overwrote another service.");
                 settings.Save(Payload(new { provider = "kimi-code", removeKey = true }));
-                Check(files.Read("kimi-code") is null, "Explicit removal fell back to unreadable legacy storage.");
+                Check(files.Read("kimi-code") is null, "Explicit removal retained malformed local bytes.");
             });
             await Run("file key transactions restore exact old files and absence when metadata commit fails", async () =>
             {
                 var directory = Path.Combine(temp, "file rollback settings");
                 var keyDirectory = Path.Combine(directory, "ai-keys");
-                var legacy = new MemoryVault();
-                var files = new LocalFileCredentialVault(keyDirectory, legacy);
+                var files = new LocalFileCredentialVault(keyDirectory);
                 var failMetadata = false;
                 var settings = new AISettings(directory, files, beforeMetadataCommit: () => { if (failMetadata) throw new IOException("Mock metadata failure"); });
                 settings.Save(Payload(new { provider = "kimi-code", apiKey = "original-file-test-key" }));
@@ -361,9 +371,8 @@ internal static class Program
                 Check(File.ReadAllBytes(keyPath).SequenceEqual(originalKey), "Removal did not restore the old file.");
                 await Fails(() => { settings.Save(Payload(new { provider = "kimi-open", apiKey = "new-provider-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
                 Check(!File.Exists(Path.Combine(keyDirectory, "kimi-open.key")), "Failed new key retained a file or removal marker.");
-                legacy.DeniedProvider = "minimax";
-                await Fails(() => { settings.Save(Payload(new { provider = "minimax", apiKey = "recover-legacy-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
-                Check(!File.Exists(Path.Combine(keyDirectory, "minimax.key")), "Failed legacy replacement did not restore absence.");
+                await Fails(() => { settings.Save(Payload(new { provider = "minimax", apiKey = "new-minimax-test-key" })); return Task.CompletedTask; }, "原配置和密钥已保留");
+                Check(!File.Exists(Path.Combine(keyDirectory, "minimax.key")), "Failed new provider key did not restore absence.");
                 Check(File.ReadAllText(metadataPath) == originalMetadata, "Failed key change switched public metadata.");
                 Check(!Directory.EnumerateFiles(directory, "*.tmp", SearchOption.AllDirectories).Any(), "Failed transaction left staging files.");
             });
@@ -398,21 +407,6 @@ internal static class Program
                 settings.Save(Payload(new { apiKey = "valid-recovery-test-key" }));
                 Check(settings.Inject(Payload(new { })).Secret == "valid-recovery-test-key", "Malformed local key could not be explicitly replaced.");
                 Check(!JsonSerializer.Serialize(settings.Get()).Contains("valid-recovery-test-key"), "Recovered key leaked through public settings.");
-            });
-            await Run("legacy DPAPI files are read-only compatibility data and are never rewritten or deleted", () =>
-            {
-                var directory = Path.Combine(temp, "retained DPAPI compatibility");
-                Directory.CreateDirectory(directory);
-                var path = Path.Combine(directory, "kimi-code.dpapi");
-                byte[] original = [1, 2, 3, 4, 5];
-                File.WriteAllBytes(path, original);
-                var old = new DPAPICredentialVault(directory);
-                try { old.Write("kimi-code", "new-test-key"); throw new Exception("Legacy write remained enabled."); }
-                catch (NotSupportedException) { }
-                try { old.Delete("kimi-code"); throw new Exception("Legacy delete remained enabled."); }
-                catch (NotSupportedException) { }
-                Check(File.ReadAllBytes(path).SequenceEqual(original), "Legacy compatibility modified the old encrypted bytes.");
-                return Task.CompletedTask;
             });
             await Run("legacy Code default migrates once while explicit and open models remain selected", () =>
             {

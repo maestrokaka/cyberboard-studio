@@ -43,6 +43,23 @@ def signature(app):
     run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)])
 
 
+def local_credentials_only(native):
+    source = (ROOT / "native/Studio.swift").read_text(encoding="utf-8")
+    for token in ("SecItem", "SecKeychain", "kSec", "Keychain", "Security", "legacyCredentialRead",
+                  "readLegacyKey", "legacyChecked", "legacyUnavailable", "Cyberboard Studio.Kimi"):
+        require(token not in source, "Native source contains forbidden system credential access: " + token)
+    require("Security" not in (ROOT / "native/build.sh").read_text(encoding="utf-8"),
+            "Native build explicitly links the system credential framework")
+    dependencies = run(["/usr/bin/otool", "-L", str(native)]).stdout
+    symbols = run(["/usr/bin/nm", "-u", str(native)]).stdout
+    require("Security.framework" not in dependencies, "Packaged native binary links Security")
+    require("SecItem" not in symbols and "SecKeychain" not in symbols,
+            "Packaged native binary imports system credential functions")
+    require(b"Cyberboard Studio.Kimi" not in native.read_bytes(),
+            "Packaged native binary retains the old credential service identity")
+    print("PASS native source/build and packaged-binary guards: local key files only")
+
+
 def preview_data(web):
     source = (web / "data.js").read_text(encoding="utf-8")
     prefix = "window.STUDIO_DATA="
@@ -85,11 +102,13 @@ def bundle_structure(app):
     contents = app / "Contents"
     resources = contents / "Resources"
     info = plistlib.loads((contents / "Info.plist").read_bytes())
-    require(info.get("CFBundleShortVersionString") == "0.4.1", "App version differs from this release")
+    require(info.get("CFBundleShortVersionString") == "0.4.2", "App version differs from this release")
+    require(info.get("CFBundleVersion") == "11", "App build number differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]
     require(run(["/usr/bin/lipo", "-archs", str(native)]).stdout.strip() == "arm64", "Native App is not arm64")
+    local_credentials_only(native)
     backend = resources / "backend/CyberboardBackend"
     binary = backend / "CyberboardBackend"
     require(binary.is_file() and os.access(binary, os.X_OK), "Frozen backend executable is missing")

@@ -1,7 +1,6 @@
 import Cocoa
 import WebKit
 import UniformTypeIdentifiers
-import Security
 
 struct AICredentialAccess {
     let read: (String) throws -> String?
@@ -13,13 +12,9 @@ struct AICredentialAccess {
 final class AISettingsStore {
     private let stateDirectory: URL
     private let lock = NSLock()
-    private let service = "Cyberboard Studio.Kimi"
     private var lastModelMigration = false
     private var profiles: [String: [String: String]] = [:]
     private let credentialAccess: AICredentialAccess?
-    private let legacyCredentialRead: ((String) throws -> String?)?
-    private var legacyChecked: Set<String> = []
-    private var legacyUnavailable: Set<String> = []
     private let beforeMetadataCommit: (() throws -> Void)?
     private static let endpoints: [String: [String]] = [
         "kimi-code": ["https://api.kimi.com/coding/v1", "https://api.kimi.ai/coding/v1"],
@@ -29,10 +24,9 @@ final class AISettingsStore {
     ]
 
     init(stateDirectory: URL, credentialAccess: AICredentialAccess? = nil,
-         legacyCredentialRead: ((String) throws -> String?)? = nil, beforeMetadataCommit: (() throws -> Void)? = nil) {
+         beforeMetadataCommit: (() throws -> Void)? = nil) {
         self.stateDirectory = stateDirectory
         self.credentialAccess = credentialAccess
-        self.legacyCredentialRead = legacyCredentialRead
         self.beforeMetadataCommit = beforeMetadataCommit
     }
     private static let defaultModels = ["kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3", "deepseek": "deepseek-flash"]
@@ -64,25 +58,6 @@ final class AISettingsStore {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard Self.validToken(model) else { throw Self.failure("模型名称只能包含字母、数字、点、横线、下划线或冒号，最多 128 个字符。") }
         return ["provider": provider, "baseUrl": baseURL, "model": model]
-    }
-    private func query(_ provider: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: provider]
-    }
-    private func readLegacyKey(_ provider: String) throws -> String? {
-        if let legacyCredentialRead { return try legacyCredentialRead(provider) }
-        // Migration is read-only and must never display a Keychain authorization
-        // dialog, including after an ad-hoc signature changes during an update.
-        var request = query(provider)
-        request[kSecReturnData as String] = true
-        request[kSecMatchLimit as String] = kSecMatchLimitOne
-        request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &item)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let bytes = item as? Data, let key = String(data: bytes, encoding: .utf8) else {
-            throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。")
-        }
-        return key
     }
     private func keyPath(_ provider: String) -> URL {
         stateDirectory.appendingPathComponent("ai-keys", isDirectory: true).appendingPathComponent(provider + ".key")
@@ -117,24 +92,10 @@ final class AISettingsStore {
     }
     private func readKey(_ provider: String) throws -> String? {
         if let credentialAccess { return try credentialAccess.read(provider) }
-        // An empty local file records an explicit removal. Never resurrect the
-        // old Keychain item after deleting a key in the new storage.
-        if let bytes = try localKeyBytes(provider) { return try Self.decodedKey(bytes) }
-        if legacyUnavailable.contains(provider) { throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。") }
-        if legacyChecked.contains(provider) { return nil }
-        do {
-            if let key = try readLegacyKey(provider), !key.isEmpty {
-                guard let valid = try Self.decodedKey(Data(key.utf8)) else { return nil }
-                try writeLocalKey(provider, Data(valid.utf8))
-                legacyChecked.insert(provider)
-                return valid
-            }
-            legacyChecked.insert(provider)
-            return nil
-        } catch {
-            legacyUnavailable.insert(provider)
-            throw Self.failure("此服务的旧 API Key 无法自动读取，请重新输入并保存。")
-        }
+        // Only this service's local file is a credential source. A missing or
+        // empty file is unconfigured and never falls back to another store.
+        guard let bytes = try localKeyBytes(provider) else { return nil }
+        return try Self.decodedKey(bytes)
     }
     private func keyExists(_ provider: String) throws -> Bool {
         if let credentialAccess {
@@ -146,12 +107,10 @@ final class AISettingsStore {
     private func writeKey(_ provider: String, _ key: String) throws {
         if let credentialAccess { try credentialAccess.write(provider, key); return }
         try writeLocalKey(provider, Data(key.utf8))
-        legacyUnavailable.remove(provider)
     }
     private func deleteKey(_ provider: String) throws {
         if let credentialAccess { try credentialAccess.delete(provider); return }
         try writeLocalKey(provider, Data())
-        legacyUnavailable.remove(provider)
     }
     private func restoreLocalKey(_ provider: String, _ bytes: Data?) throws {
         if let bytes { try writeLocalKey(provider, bytes) }
@@ -256,7 +215,6 @@ final class AISettingsStore {
             throw Self.failure("请选择受支持的模型服务。")
         }
         // Explicit reveal only returns the selected service's locally saved key.
-        // A legacy item may migrate silently; the active configuration is unchanged.
         do { return ["apiKey": try readKey(provider) ?? ""] }
         catch { throw Self.failure("无法读取已保存的 API Key，请重新输入并保存此服务的密钥。") }
     }
@@ -274,13 +232,13 @@ final class AISettingsStore {
         guard !(remove && !key.isEmpty) else { throw Self.failure("删除密钥与设置新密钥不能同时进行。") }
         let provider = config["provider"]!
         // Prepare every fallible read and the public response before credentials
-        // or active metadata change. Unrelated locked accounts are explicit unknowns.
+        // or active metadata change. Unrelated unreadable files are explicit unknowns.
         let previousKey: String?
         var unreadableKey = false
         do { previousKey = try readKey(provider) }
         catch {
-            // A blocked legacy read or malformed local key must not prevent
-            // an explicit replacement. Snapshot raw local bytes below so a
+            // A malformed local key must not prevent an explicit replacement.
+            // Snapshot raw local bytes below so a
             // later metadata failure can still restore the original file.
             guard credentialAccess == nil, remove || !key.isEmpty else { throw error }
             previousKey = nil
@@ -837,7 +795,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.4.1"])
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.4.2"])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

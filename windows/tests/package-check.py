@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.1-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.2-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -54,12 +54,24 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "0.4.1")
+        self.assertEqual(release["version"], "0.4.2")
         self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
+        self.assertEqual(release["managedHostSha256"], digest(PACKAGE / "Cyberboard Studio.dll"))
+        self.assertEqual(release["hostSourceSha256"],
+                         {path.relative_to(APP).as_posix(): digest(path)
+                          for path in sorted((APP / "windows/src").iterdir())
+                          if path.is_file() and path.suffix in (".cs", ".csproj", ".manifest")})
+        self.assertEqual(release["credentialStore"], "provider-local-plain-files")
+        self.assertIs(release["systemCredentialAccess"], False)
+        host_source = (APP / "windows/src/StudioForm.cs").read_text(encoding="utf-8")
+        self.assertIn('version = "0.4.2"', host_source)
+        self.assertIn('Cyberboard Studio 0.4.2', host_source)
+        self.assertIn('Cyberboard Studio 0.4.2'.encode("utf-16-le"),
+                      (PACKAGE / "Cyberboard Studio.dll").read_bytes())
         self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
         self.assertIs(release["includesDeviceBaseline"], False)
         self.assertIs(release["startupAccessesUSB"], False)
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.1"))
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.2"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
@@ -76,6 +88,21 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<H", data, offset + 24 + 68)[0], 2, "Native app has GUI subsystem")
         certificate_offset, certificate_size = struct.unpack_from("<II", data, offset + 24 + 112 + 4 * 8)
         self.assertEqual((certificate_offset, certificate_size), (0, 0), "This release must remain accurately described as unsigned, with no inherited Authenticode certificate")
+
+    def test_app_credentials_have_no_system_vault_or_encryption_routes(self):
+        # Scan only our own managed host. WebView2 and the .NET runtime can use
+        # Windows system APIs for unrelated browser/runtime behavior.
+        source = (APP / "windows/src/AISettings.cs").read_text(encoding="utf-8")
+        assembly = (PACKAGE / "Cyberboard Studio.dll").read_bytes()
+        forbidden = ("DPAPI", "ProtectedData", "CryptProtectData", "CryptUnprotectData",
+                     "CredRead", "CredWrite", "VaultEnumerate", "crypt32.dll")
+        for marker in forbidden:
+            self.assertNotIn(marker, source, marker)
+            self.assertNotIn(marker.encode("ascii"), assembly, marker)
+            self.assertNotIn(marker.encode("utf-16-le"), assembly, marker)
+        for removed in ("ICredentialVault? legacy", "legacy?.Read", 'Path.Combine(state, "credentials")'):
+            self.assertNotIn(removed, source)
+        self.assertIn('new LocalFileCredentialVault(Path.Combine(state, "ai-keys"))', source)
 
     def test_complete_web_python_and_migration_sources_match_the_release(self):
         def files(directory):

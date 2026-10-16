@@ -59,7 +59,7 @@ mkdir -p "$contents_dir/MacOS" "$contents_dir/Resources" "$build_dir"
 
 /usr/bin/xcrun swiftc -O -swift-version 5 -target "$(/usr/bin/uname -m)-apple-macosx13.0" \
   -module-cache-path "$build_dir/swift-module-cache" \
-  -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers -framework Security \
+  -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers \
   "$native_dir/Studio.swift" -o "$contents_dir/MacOS/CyberboardStudio"
 /bin/cp "$native_dir/Info.plist" "$contents_dir/Info.plist"
 if [[ -n "$dev_python" ]]; then

@@ -1,4 +1,4 @@
-Cyberboard Studio 0.4.1 · Windows x64 桌面版
+Cyberboard Studio 0.4.2 · Windows x64 桌面版
 
 完整使用说明（适用当前版本，含图示、JSON 格式和故障处理）：
 https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/USER_GUIDE.md
@@ -15,7 +15,14 @@ Enterprise 版本；普通 Windows 10、ARM64 原生版和 32 位版尚未验证
 本应用尚未进行商业代码签名。请使用本包提供的 SHA256SUMS 和发布校验文件
 核对来源；本包不会设置防火墙、自动启动、计划任务或自动升级。
 
-0.4.1 本次更新
+0.4.2 本次更新
+• 彻底移除旧版系统凭据读取、解密和自动迁移路径。API Key 只按服务读取或
+  保存本机 ai-keys\<provider>.key，默认隐藏，可直接显示/隐藏。
+• 已保存的本机文本 Key 保留；只有旧版加密记录时，会显示未配置，请重新
+  输入并保存。新版不读取、不迁移，也不删除旧加密文件。
+• 保留各服务独立设置、文件原子写入和保存失败回滚，不改作品或槽位草稿。
+
+继续包含 0.4.1 的更新
 • 按最终确认收录原有三款、EVA 丰富版、故障字标、马里奥、猫逐萤火和
   三款卡卡，共 10 套；三款卡卡位于作品库最后。
 • 主作品库的 EVA 使用「EVA初号机 · 觉醒序列」，240 帧、20 ms/帧，4.8 秒。
@@ -32,7 +39,7 @@ Enterprise 版本；普通 Windows 10、ARM64 原生版和 32 位版尚未验证
 • 灯珠预览减少偏白亮核；生成检查会提示明显的异色叠加漂白风险。
   已有和导入作品不会自动重涂；RGB 检查不能替代实机观感与完整循环预览。
 • API Key 按服务直接保存为本机独立文件，默认隐藏，可直接显示/隐藏。
-  新记录不再使用 DPAPI；旧记录仅尝试兼容读取，失败可直接重新输入。
+  不调用系统密钥存储或解密接口；旧加密记录需重新输入。
 • 升级遇到内置作品与旧自定义作品同 ID 时，保留自定义内容、回收站和草稿。
 
 你可以直接预览与导出
@@ -98,7 +105,8 @@ API Key 保存在工作室数据目录的 ai-keys\<provider>.key，每个服务�
 UTF-8 文本；界面默认隐藏，可用显示按钮查看，不再添加加密或系统授权步骤。
 ai-settings.json 只有当前服务和各服务的地址/模型，不含 Key。不要把密钥发到
 聊天、作品 JSON 或公开仓库；可在“模型配置”移除当前服务密钥。
-旧版 credentials\<provider>.dpapi 文件保留，能读取时自动迁移到新文件，不删除旧文件。
+旧版 credentials\<provider>.dpapi 文件可能仍在本机；新版不读取、不迁移或删除它。
+若尚未保存本机文本 Key，请重新输入并保存。
 Kimi Code 是会员编程接口，官方推荐产品集成使用开放平台；本应用保持真实
 客户端身份，接口拒绝此客户端时请使用官方支持接入或切换开放平台，不伪装。
 MiniMax M3 / M3.1 Flash 与 DeepSeek Flash 支持图片；Pro / M2.7 等文字
@@ -205,7 +213,7 @@ USB 连接
 • 出错日志：%LOCALAPPDATA%\Cyberboard Studio\logs\host.log
 • 模型服务元信息：%LOCALAPPDATA%\Cyberboard Studio\ai-settings.json（无密钥）
 • 模型密钥：%LOCALAPPDATA%\Cyberboard Studio\ai-keys\<provider>.key（UTF-8 文本）
-• 旧版密钥：%LOCALAPPDATA%\Cyberboard Studio\credentials\<provider>.dpapi（只读迁移兼容）
+• 旧版加密记录可能仍在 credentials 子目录；新版不读取、迁移或删除
 删除或替换解压目录不会删除这些用户数据。
 
 打开失败 / Unknown Hard Error
@@ -224,8 +232,8 @@ USB 连接
 验证情况
 这是在 Mac 上交叉编译的 Windows x64 版本。编译、共享界面测试、Windows
 COM/锁/时区离线模拟、迁移测试、依赖校验与 PE 架构检查已完成。
-本机没有 Windows 环境，Windows 原生启动、旧 DPAPI 解密迁移与真实 USB 通信
-尚待本次完整包的实机验证；独立密钥文件、失败回滚、AI 协议和编排有离线隔离检查。
+本机没有 Windows 环境，Windows 原生启动与真实 USB 通信尚待本次完整包的
+实机验证；独立密钥文件、旧加密记录不读取、失败回滚、AI 协议和编排有离线隔离检查。
 macOS 的 Kimi Code k3 在线成功不等于 Windows 平台和全部模型已验证。
 用户已反馈此前 Windows 10 CET 兼容修复包可以启动并完成同步，但不代表
 所有 Windows 版本均兼容。本次包的真实写入与完成后读回仍需实机验收。

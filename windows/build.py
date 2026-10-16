@@ -20,8 +20,18 @@ WINDOWS = Path(__file__).resolve().parent
 APP = WINDOWS.parent
 CACHE = APP / ".tools/windows-build"
 OUTPUT = APP / "build/windows/Cyberboard Studio"
-ARCHIVE = APP / "build/Cyberboard-Studio-0.4.1-Windows-x64.zip"
+ARCHIVE = APP / "build/Cyberboard-Studio-0.4.2-Windows-x64.zip"
 LOGO = APP / "web/assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png"
+SYSTEM_CREDENTIAL_MARKERS = ("DPAPI", "ProtectedData", "CryptProtectData", "CryptUnprotectData",
+                             "CredRead", "CredWrite", "VaultEnumerate", "crypt32.dll")
+
+
+def assert_local_key_storage():
+    source = (WINDOWS / "src/AISettings.cs").read_text(encoding="utf-8")
+    assembly = (OUTPUT / "Cyberboard Studio.dll").read_bytes()
+    for marker in SYSTEM_CREDENTIAL_MARKERS:
+        if marker in source or marker.encode("ascii") in assembly or marker.encode("utf-16-le") in assembly:
+            raise RuntimeError("System credential path reintroduced in application host: " + marker)
 
 
 def sha256(path):
@@ -74,6 +84,7 @@ def assemble(nuget, dotnet, bootstrapper, windows10_compat=False):
         raise RuntimeError("Prepare the embedded Windows Python runtime first.")
     if not (OUTPUT / "Cyberboard Studio.exe").is_file():
         raise RuntimeError("Publish the Windows executable before assembling.")
+    assert_local_key_storage()
     actual_cet = cet_compatible(OUTPUT / "Cyberboard Studio.exe")
     if actual_cet != (not windows10_compat):
         raise RuntimeError("Apphost CET bit does not match the requested package. Re-publish before assembling.")
@@ -154,7 +165,7 @@ def assemble(nuget, dotnet, bootstrapper, windows10_compat=False):
     # Debug symbols are development outputs; the complete managed runtime stays.
     (OUTPUT / "Cyberboard Studio.pdb").unlink(missing_ok=True)
     manifest = {
-        "product": "Cyberboard Studio", "version": "0.4.1", "rid": "win-x64",
+        "product": "Cyberboard Studio", "version": "0.4.2", "rid": "win-x64",
         "native": "WinForms + WebView2", "dotnet": frameworks.get("Microsoft.NETCore.App", "10.0.12") + " self-contained",
         "webview2Sdk": "1.0.4258.31", "python": "3.12.10 embedded x64",
         "cli": "0.1.2 with AM01R6 and Windows patches",
@@ -163,6 +174,11 @@ def assemble(nuget, dotnet, bootstrapper, windows10_compat=False):
         "cetCompat": actual_cet, "windows10CompatibilityBuild": windows10_compat,
         "validation": "Cross-compiled on macOS; offline tests. Windows launch/USB not yet verified.",
         "logoSha256": sha256(LOGO), "executableSha256": sha256(OUTPUT / "Cyberboard Studio.exe"),
+        "managedHostSha256": sha256(OUTPUT / "Cyberboard Studio.dll"),
+        "hostSourceSha256": {path.relative_to(APP).as_posix(): sha256(path)
+                             for path in sorted((WINDOWS / "src").iterdir())
+                             if path.is_file() and path.suffix in (".cs", ".csproj", ".manifest")},
+        "credentialStore": "provider-local-plain-files", "systemCredentialAccess": False,
         "webview2BootstrapperSha256": sha256(installer),
         "sources": {
             "dotnet": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json",
@@ -200,7 +216,7 @@ def main():
     args = parser.parse_args()
     if args.windows10_compat:
         OUTPUT = APP / "build/windows10-compat/Cyberboard Studio"
-        ARCHIVE = APP / "build/Cyberboard-Studio-0.4.1-Windows10-Compatibility-x64.zip"
+        ARCHIVE = APP / "build/Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip"
     args.nuget = args.nuget.expanduser().resolve()
     dotnet = Path(shutil.which(args.dotnet) or args.dotnet).expanduser().resolve()
     if not args.assemble_only and not dotnet.is_file():
