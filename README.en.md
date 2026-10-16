@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## Built-in lighting GIFs
 
-All ten presets appear in the app's order. Click a GIF for the larger view. Each shows the **40×5 top matrix and 83 physical key-light positions**, using the complete original timing and source RGB without added brightness or glow. These are lighting schematics, not photographs or hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+All ten presets appear in the app's order. Click a GIF for the larger view. Each uses a **background-removed, front-view CYBERBOARD R6 Vision photograph**, with top-matrix and key lighting composited by the same preview renderer as the app. The full original loop timing and source RGB are unchanged. GIF encoding may introduce slight color differences; these photo-composited screen previews are not hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
 
 | Preset | Preset |
 | --- | --- |
@@ -169,6 +169,15 @@ native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 ```
 
 The resulting app is `build/Cyberboard Studio.app`. Windows builds use .NET 10 SDK; see the [Windows runtime build notes](windows/runtime-readme.txt) and [package build instructions in Chinese](README.md#从源码构建).
+
+Optionally rebuild the ten photo-composited GitHub GIFs using Python with Pillow installed, Node.js and `@napi-rs/canvas`. From the repository root:
+
+```sh
+npm install --prefix .tools/gif-render @napi-rs/canvas
+python scripts/build-preset-gifs.py
+```
+
+The renderer checks `.tools/gif-render/node_modules` by default; use `STUDIO_CANVAS_MODULE` to select another Canvas module. It uses the app's preview engine and writes temporary PNGs only under `build/`, which stays out of uploads. This is a publishing tool, not an app video-export feature.
 
 Tests use synthetic device configurations and HTTP substitutes. They do not access USB or consume model credits. See the [offline checks](README.md#离线验证). Personal device records, credentials, backups and workspace data must stay out of commits and release packages.
 

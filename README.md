@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## 内置灯效 GIF
 
-10 款预设按软件中的顺序列出，点击动图可查看大图。每张 GIF 展示 **40×5 顶灯与 83 个物理轴灯位置**，包含完整原速循环，直接采用作品 RGB，未增亮或添加辉光。轴灯是位置示意，不是实拍或硬件色准测量。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
+10 款预设按软件中的顺序列出，点击动图可查看大图。每张 GIF 使用 **CYBERBOARD R6「Vision」去背景正面实拍照片**，通过与 App 相同的预览渲染器合成顶部与轴灯动画，展示完整原速循环。源作品的 RGB 与节奏保持不变；GIF 为照片合成的屏幕预览，编码后颜色可能略有差异，不作为实机色准测量。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
 
 | 预设 | 预设 |
 | --- | --- |
@@ -191,6 +191,15 @@ python windows/build.py --dotnet /path/to/dotnet --nuget /path/to/nuget-cache --
 ```
 
 `--dotnet`、`--nuget` 可省略以使用本机 SDK 与仓库内缓存；软件包始终包含完整运行组件。Windows 使用 `EnableWindowsTargeting`，允许从 Mac 交叉编译。WebView2 引导安装器来自 [Microsoft 官方下载](https://go.microsoft.com/fwlink/p/?LinkId=2124703)。
+
+可选重建 GitHub 的十款照片合成 GIF：使用已安装 Pillow 的 Python 环境、Node.js 与 `@napi-rs/canvas`，在仓库根目录执行；这是发布素材工具，不是 App 新增的视频导出功能。
+
+```sh
+npm install --prefix .tools/gif-render @napi-rs/canvas
+python scripts/build-preset-gifs.py
+```
+
+生成器默认查找 `.tools/gif-render/node_modules`，也可通过 `STUDIO_CANVAS_MODULE` 指定 Canvas 模块。它用 App 预览引擎合成照片动画；临时 PNG 只写入 `build/`，不上传。
 
 ## 离线验证
 
