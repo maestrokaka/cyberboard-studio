@@ -8,7 +8,7 @@ Create top-matrix and key-backlight animations through a dedicated AI conversati
 
 [Download and release history](https://github.com/maestrokaka/cyberboard-studio/releases) · [Full user guide (Chinese)](docs/USER_GUIDE.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues) · [Support the author](#support-the-author)
 
-The current build is **1.0.0-rc.1**, a release candidate for testing. Windows native GUI / USB and R4 writes still need hardware acceptance testing. See the [candidate notes](docs/RELEASE_1.0.0_RC1.md) for the current scope. The app interface remains in Chinese.
+The current build is **1.0.0-rc.2**, a release candidate for testing. Windows native GUI / USB and R4 writes still need hardware acceptance testing. See the [candidate notes](docs/RELEASE_1.0.0_RC2.md) for the current scope. The app interface remains in Chinese.
 
 ## See it in action
 
@@ -16,7 +16,7 @@ This 77-second demo shows appearance selection, lighting previews, Kimi k3 creat
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-[Candidate packages and notes](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1)
+[Candidate packages and notes](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2)
 
 ## Built-in lighting GIFs
 
@@ -51,19 +51,19 @@ The primary workflow is **AI creation → lighting workbench → device sync**. 
 
 The conversation is the main surface, alongside a collapsible photo preview and independent versions. Choose a fixed base version and modify both regions, only the top matrix or only the backlight. History and search live inside this page. A generated version enters the library only when you explicitly save it.
 
-![AI conversation, reference images and immutable versions](docs/screenshots/create-v100rc1.png)
+![AI conversation, reference images and immutable versions](docs/screenshots/create-v100rc2.png)
 
 ### Lighting workbench
 
 The large photo preview, brightness / timing controls and all three slot drafts share one page. Selecting a slot chooses an assignment target; its Preview action loads its contents, and Undo Draft removes the local draft. Switching conversations does not clear slot drafts.
 
-![Workbench with full preview and three slot drafts](docs/screenshots/workbench-v100rc1.png)
+![Workbench with full preview and three slot drafts](docs/screenshots/workbench-v100rc2.png)
 
 ### Keyboard appearances
 
 Eight front-view photo cards can be filtered by R4 / R6 and compared using the same design and frame. Appearance selection changes the preview only; the connected device is identified separately by a manual USB check.
 
-![Eight calibrated front-view appearances](docs/screenshots/appearances-v100rc1.png)
+![Eight calibrated front-view appearances](docs/screenshots/appearances-v100rc2.png)
 
 The catalog contains **R6「Vision」** and **R4「Fluo Free」「Bebop」「Gangstar」「Cloud White V2」「Stone Face」「Paisley」「Vision」**. R6 uses the earliest provided photograph; R4 photos come from Angry Miao's official site or store, including qualifying photos of sold-out colorways. [Sources and calibration](data/photos/official-photo-sources.json)
 
@@ -73,11 +73,11 @@ Model connections have their own page. Devices provides sub-tabs for slots, read
 
 | Package | Target | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-1.0.0-rc.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13+ | Extract and move `Cyberboard Studio.app` to Applications |
-| `Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip` | Windows 11 x64; some .NET 10-supported Windows 10 LTSC / Enterprise editions | Extract everything and run `Cyberboard Studio.exe`; retain DLLs and `resources` |
-| `Cyberboard-Studio-1.0.0-rc.1-Windows10-Compatibility-x64.zip` | Older Windows 10 with a confirmed CET startup error | Extract separately; only this package removes the app CET marker |
+| `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13+ | Extract and move `Cyberboard Studio.app` to Applications |
+| `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64; some .NET 10-supported Windows 10 LTSC / Enterprise editions | Extract everything and run `Cyberboard Studio.exe`; retain DLLs and `resources` |
+| `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | Older Windows 10 with a confirmed CET startup error | Extract separately; only this package removes the app CET marker |
 
-Download ZIPs and SHA-256 files from [v1.0.0-rc.1 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1). CLI and runtime components are bundled. Windows needs WebView2; if missing, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` with an internet connection. Intel Mac, 32-bit Windows and native Windows ARM64 packages are not available.
+Download ZIPs and SHA-256 files from [v1.0.0-rc.2 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2). CLI and runtime components are bundled. Windows needs WebView2; if missing, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` with an internet connection. Intel Mac, 32-bit Windows and native Windows ARM64 packages are not available.
 
 The Mac package uses an ad-hoc signature and has no Apple Developer ID signature or notarization. See [Apple's instructions for opening apps](https://support.apple.com/en-gb/102445). Windows native launch, key-file operations and USB still need acceptance testing for this candidate. For Unknown Hard Error, run the bundled startup diagnostic before choosing the compatibility package; use it only when the logs identify CET. Updating Windows and using the standard package is preferred.
 
@@ -105,7 +105,7 @@ For first-time setup, the app needs a trusted complete record from a previous su
 - Three independent slot drafts, single-slot or explicit all-pending sync, backups and local records.
 - R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization using Asia/Shanghai (UTC+8).
 
-Firmware updates, key remapping, general image generation and video export are not included. Offline checks and earlier live-provider tests do not establish Windows hardware compatibility or R4 USB acceptance; the [candidate notes](docs/RELEASE_1.0.0_RC1.md) distinguish these results.
+Firmware updates, key remapping, general image generation and video export are not included. Offline checks and earlier live-provider tests do not establish Windows hardware compatibility or R4 USB acceptance; the [candidate notes](docs/RELEASE_1.0.0_RC2.md) distinguish these results.
 
 ## Local data
 

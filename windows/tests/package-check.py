@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -54,7 +54,7 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "1.0.0-rc.1")
+        self.assertEqual(release["version"], "1.0.0-rc.2")
         self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
         self.assertEqual(release["managedHostSha256"], digest(PACKAGE / "Cyberboard Studio.dll"))
         self.assertEqual(release["hostSourceSha256"],
@@ -64,14 +64,14 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(release["credentialStore"], "provider-local-plain-files")
         self.assertIs(release["systemCredentialAccess"], False)
         host_source = (APP / "windows/src/StudioForm.cs").read_text(encoding="utf-8")
-        self.assertIn('ReleaseVersion = "1.0.0-rc.1"', host_source)
+        self.assertIn('ReleaseVersion = "1.0.0-rc.2"', host_source)
         self.assertIn('version = ReleaseVersion', host_source)
-        self.assertIn('1.0.0-rc.1'.encode("utf-16-le"),
+        self.assertIn('1.0.0-rc.2'.encode("utf-16-le"),
                       (PACKAGE / "Cyberboard Studio.dll").read_bytes())
         self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
         self.assertIs(release["includesDeviceBaseline"], False)
         self.assertIs(release["startupAccessesUSB"], False)
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 1.0.0-rc.1"))
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 1.0.0-rc.2"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)

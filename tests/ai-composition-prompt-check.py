@@ -129,7 +129,7 @@ class CompositionPromptChecks(unittest.TestCase):
                 self.assertFalse(result["repaired"])
                 self.assertEqual(len(opener.calls), 1)
                 request = opener.calls[0][0]
-                self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/1.0.0-rc.1")
+                self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/1.0.0-rc.2")
                 self.assertEqual(result["design"]["ai"]["promptVersion"], 5)
                 self.assertEqual(result["design"]["ai"]["recipe"]["scenes"][0]["top"][0]["rows"], rows)
                 self.assertEqual(len(result["design"]["frames"]), 69)

@@ -191,7 +191,7 @@ class ConversationChecks(unittest.TestCase):
             ai.generate(p, opener=op)
             request = op.calls[0][0]
             body = json.loads(request.data)
-            self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/1.0.0-rc.1")
+            self.assertEqual(request.get_header("User-agent"), "CyberboardStudio/1.0.0-rc.2")
             if model == "MiniMax-M3":
                 self.assertEqual(body["thinking"], {"type": "disabled"})
                 self.assertEqual(body["max_completion_tokens"], 16000)

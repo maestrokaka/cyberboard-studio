@@ -26,7 +26,7 @@ internal sealed class StudioForm : Form
     private bool workspaceFailureShowing;
     private bool documentReady;
     private bool exitApproved;
-    private const string ReleaseVersion = "1.0.0-rc.1";
+    private const string ReleaseVersion = "1.0.0-rc.2";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
     { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace" };

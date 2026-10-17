@@ -95,12 +95,27 @@
     style.id = 'keyboard-preview-engine-style';
     style.textContent = '.keyboard-preview{position:relative;isolation:isolate;width:100%;overflow:hidden;}' +
       '.keyboard-preview>.photo-base,.keyboard-preview>.key-overlay,.keyboard-preview>.led-overlay{' +
-      'position:absolute;inset:0;display:block;width:100%;height:100%;}' +
+      'position:absolute;display:block;object-fit:fill;}' +
       '.keyboard-preview>.key-overlay{pointer-events:none;mix-blend-mode:screen;}' +
       '.keyboard-preview>.led-overlay{pointer-events:none;}' +
       '.keyboard-preview>.preview-error{position:absolute;z-index:3;inset:auto 12px 12px;padding:10px 12px;' +
       'border:1px solid #70484b;border-radius:6px;color:#ffe0e0;background:#271619;font:12px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;}';
     (document.head || document.documentElement).appendChild(style);
+  }
+
+  // Every layer uses the same centered viewport. Aspect-ratio on the host is
+  // only an intrinsic size hint: fixed-height panels can override both axes.
+  function containBounds(availableWidth, availableHeight, sourceWidth, sourceHeight) {
+    if (![sourceWidth, sourceHeight].every(value => Number.isFinite(value) && value > 0)) {
+      throw new RangeError('照片裁切尺寸必须为正数');
+    }
+    const width = Number.isFinite(availableWidth) ? Math.max(0, availableWidth) : 0;
+    const height = Number.isFinite(availableHeight) && availableHeight > 0
+      ? availableHeight : width * sourceHeight / sourceWidth;
+    const scale = Math.min(width / sourceWidth, height / sourceHeight);
+    const fittedWidth = sourceWidth * scale, fittedHeight = sourceHeight * scale;
+    return { width: fittedWidth, height: fittedHeight,
+      left: (width - fittedWidth) / 2, top: (height - fittedHeight) / 2 };
   }
 
   class KeyboardPreview {
@@ -619,9 +634,20 @@
       if (this._texture.width !== tw || this._texture.height !== th) {
         this._texture.width = tw; this._texture.height = th;
       }
-      const desiredWidth = Math.max(640, Math.round(this.container.clientWidth * Math.min(global.devicePixelRatio || 1, 2)));
-      const width = Math.min(1400, desiredWidth), height = Math.round(width * ch / cw);
       this.container.style.aspectRatio = cw + ' / ' + ch;
+      const viewport = containBounds(this.container.clientWidth, this.container.clientHeight, cw, ch);
+      const desiredWidth = Math.max(640, Math.round(viewport.width * Math.min(global.devicePixelRatio || 1, 2)));
+      const width = Math.min(1400, desiredWidth), height = Math.round(width * ch / cw);
+      // Explicit CSS geometry is compatible with older WKWebView/WebView2 and
+      // prevents photo, key lights and top lights from choosing different fits.
+      for (const layer of [this.background, this.overlay, this.keyOverlay]) {
+        layer.style.width = viewport.width + 'px';
+        layer.style.height = viewport.height + 'px';
+        layer.style.left = viewport.left + 'px';
+        layer.style.top = viewport.top + 'px';
+        layer.style.right = layer.style.bottom = 'auto';
+      }
+      this.viewport = viewport;
       this.background.width = this.overlay.width = this.keyOverlay.width = width;
       this.background.height = this.overlay.height = this.keyOverlay.height = height;
       const isolated = this.framing === 'keyboard' && (this.view === 'front' || Array.isArray(view.keyboard_outline));
@@ -653,5 +679,6 @@
   }
 
   KeyboardPreview.isGalleryAllowed = galleryAllowed;
+  KeyboardPreview.containBounds = containBounds;
   global.KeyboardPreview = KeyboardPreview;
 })(window);

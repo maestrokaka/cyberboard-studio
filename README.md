@@ -8,7 +8,7 @@
 
 [下载候选版与版本记录](https://github.com/maestrokaka/cyberboard-studio/releases) · **[完整使用说明](docs/USER_GUIDE.md)** · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues) · [支持作者](#支持作者)
 
-当前为 **1.0.0-rc.1 候选版**，供正式版前试用。Windows 原生 GUI / USB、R4 写入等仍需实机验收，具体范围见[候选版说明](docs/RELEASE_1.0.0_RC1.md)。第一次使用可先阅读[五分钟上手](docs/USER_GUIDE.md#quick-start)。
+当前为 **1.0.0-rc.2 候选版**，供正式版前试用。Windows 原生 GUI / USB、R4 写入等仍需实机验收，具体范围见[候选版说明](docs/RELEASE_1.0.0_RC2.md)。第一次使用可先阅读[五分钟上手](docs/USER_GUIDE.md#quick-start)。
 
 ## 完整演示
 
@@ -16,7 +16,7 @@
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-[查看候选版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1)
+[查看候选版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2)
 
 ## 内置灯效 GIF
 
@@ -51,19 +51,19 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 对话是主画面，右侧轻预览可以收起。每次成功生成形成独立版本；选择基础版本后，可继续修改「顶部 + 轴灯」「仅顶部」或「仅轴灯」。会话历史放在页面内部，支持搜索和继续创作。结果留在会话中，点击「保存到作品库」才保存指定版本，点击「在工作台打开」再调整和交付。
 
-![AI 创作：对话、参考图与独立灯效版本](docs/screenshots/create-v100rc1.png)
+![AI 创作：对话、参考图与独立灯效版本](docs/screenshots/create-v100rc2.png)
 
 ### 灯效工作台
 
 大整机预览、亮度 / 节奏 / 配色工具和三槽总览集中在一页。点击槽位卡选择目标，「预览」查看槽位内容，「撤销草稿」只撤销本机准备的内容。先放入或更新目标槽位草稿，再查看计划并同步；切换 AI 会话不会清空槽位草稿。
 
-![灯效工作台：整机预览、参数与三槽总览](docs/screenshots/workbench-v100rc1.png)
+![灯效工作台：整机预览、参数与三槽总览](docs/screenshots/workbench-v100rc2.png)
 
 ### 键盘与外观
 
 8 款外观独立成卡片页，支持 R4 / R6 筛选，并用同一作品、同一帧比较。全部采用沿外壳轮廓去背景的正面整机照片，标签使用 `R6「Vision」` 等简洁名称。选择只影响观看，USB 实际设备身份以手动检查为准。
 
-![八款外观：统一正面、同一灯效帧](docs/screenshots/appearances-v100rc1.png)
+![八款外观：统一正面、同一灯效帧](docs/screenshots/appearances-v100rc2.png)
 
 | 参考外观 | 照片来源 |
 | --- | --- |
@@ -84,11 +84,11 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 | 文件 | 适用电脑 | 打开方式 |
 | --- | --- | --- |
-| `Cyberboard-Studio-1.0.0-rc.1-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」 |
-| `Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise | 完整解压后运行 `Cyberboard Studio.exe`，保留 DLL 和 `resources` |
-| `Cyberboard-Studio-1.0.0-rc.1-Windows10-Compatibility-x64.zip` | 日志明确出现 CET 启动兼容问题的旧 Windows 10 x64 | 独立解压到新目录，仅此包取消 App 的 CET 标记 |
+| `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」 |
+| `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise | 完整解压后运行 `Cyberboard Studio.exe`，保留 DLL 和 `resources` |
+| `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | 日志明确出现 CET 启动兼容问题的旧 Windows 10 x64 | 独立解压到新目录，仅此包取消 App 的 CET 标记 |
 
-在 [v1.0.0-rc.1 的 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1) 下载 ZIP 和对应 SHA-256 文件。包内包含 CLI 和运行环境，无需另外安装 Python；Windows 缺少 WebView2 时，运行 `Dependencies/MicrosoftEdgeWebview2Setup.exe` 联网安装。Intel Mac、Windows 32 位与 ARM64 原生包尚未提供。
+在 [v1.0.0-rc.2 的 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) 下载 ZIP 和对应 SHA-256 文件。包内包含 CLI 和运行环境，无需另外安装 Python；Windows 缺少 WebView2 时，运行 `Dependencies/MicrosoftEdgeWebview2Setup.exe` 联网安装。Intel Mac、Windows 32 位与 ARM64 原生包尚未提供。
 
 Mac 包为本机 ad-hoc 签名，尚未使用 Apple Developer ID 签名或公证；首次打开可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Windows 候选包的原生启动、Key 文件操作与 USB 仍需实机验收。遇到「Unknown Hard Error」先运行「诊断启动.cmd」，仅在日志明确指向 CET 时考虑兼容包；优先更新系统后使用普通包。详见[故障处理](docs/USER_GUIDE.md#faq)。
 
@@ -107,7 +107,7 @@ Mac 包为本机 ad-hoc 签名，尚未使用 Apple Developer ID 签名或公证
 - 同步前完整配置备份与计划；指定单槽或明确同步全部待同步草稿，保留当前全部键码并读回检查。
 - 缺少原记录时提供明确范围的首次配置，已有记录时可只恢复指定内置模式；本机历史与恢复计划。
 
-DeepSeek 读取限制修正为分别约束有效输出、思考内容和传输数据；MiniMax 兼容完整 `stop` 后流关闭的结束方式，并为 M3 调整思考参数。未完成或超限回复仍会拒绝，不接受半成品。[模型与验收范围](docs/RELEASE_1.0.0_RC1.md)
+DeepSeek 读取限制修正为分别约束有效输出、思考内容和传输数据；MiniMax 兼容完整 `stop` 后流关闭的结束方式，并为 M3 调整思考参数。未完成或超限回复仍会拒绝，不接受半成品。[模型与验收范围](docs/RELEASE_1.0.0_RC2.md)
 
 ## 从一句描述开始
 
@@ -214,7 +214,7 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 
 ## 在 GitHub 更新
 
-源码与公开文档提交到 `main`；软件包通过 Releases 发布。`v1.0.0-rc.1` 使用 prerelease 标记，验收完成前不标成稳定 1.0.0。个人会话、参考图、工作区、设备记录、Key 和编译缓存不进入 Git 历史。
+源码与公开文档提交到 `main`；软件包通过 Releases 发布。`v1.0.0-rc.2` 使用 prerelease 标记，验收完成前不标成稳定 1.0.0。个人会话、参考图、工作区、设备记录、Key 和编译缓存不进入 Git 历史。
 
 ---
 

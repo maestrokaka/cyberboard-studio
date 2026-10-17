@@ -1,8 +1,8 @@
 # Cyberboard Studio 完整使用说明
 
-适用版本：**v1.0.0-rc.1 候选版** · macOS / Windows
+适用版本：**v1.0.0-rc.2 候选版** · macOS / Windows
 
-Cyberboard Studio 是第三方怒喵键盘软件，面向 CYBERBOARD R4 / R6。你可以离线预览预设，或在独立 AI 对话中连接 Kimi、MiniMax、DeepSeek，以文字和参考图创作、逐版修改；再到工作台调整参数，放入指定槽位，核对计划后同步。候选版供正式版前试用，Windows 原生操作和 R4 写入等尚需实机验收，见[候选版说明](RELEASE_1.0.0_RC1.md)。
+Cyberboard Studio 是第三方怒喵键盘软件，面向 CYBERBOARD R4 / R6。你可以离线预览预设，或在独立 AI 对话中连接 Kimi、MiniMax、DeepSeek，以文字和参考图创作、逐版修改；再到工作台调整参数，放入指定槽位，核对计划后同步。候选版供正式版前试用，Windows 原生操作和 R4 写入等尚需实机验收，见[候选版说明](RELEASE_1.0.0_RC2.md)。
 
 [下载软件](https://github.com/maestrokaka/cyberboard-studio/releases) · [返回项目首页](../README.md) · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
 
@@ -28,13 +28,13 @@ Cyberboard Studio 是第三方怒喵键盘软件，面向 CYBERBOARD R4 / R6。�
 
 ## 1. 下载与安装
 
-在 [v1.0.0-rc.1 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
+在 [v1.0.0-rc.2 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
 
 | 电脑 | 下载文件 | 当前适用范围 |
 | --- | --- | --- |
-| Mac | `Cyberboard-Studio-1.0.0-rc.1-macOS-AppleSilicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
-| Windows | `Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise |
-| Windows 10 兼容包 | `Cyberboard-Studio-1.0.0-rc.1-Windows10-Compatibility-x64.zip` | 旧 Windows 10 明确出现 CET 启动兼容错误时单独测试，详见[故障处理](#faq) |
+| Mac | `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
+| Windows | `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise |
+| Windows 10 兼容包 | `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | 旧 Windows 10 明确出现 CET 启动兼容错误时单独测试，详见[故障处理](#faq) |
 
 当前没有 Intel Mac 构建；Windows 32 位和 ARM64 原生版本尚未提供。Windows 系统兼容范围可参阅 [Microsoft 的 .NET 10 支持列表](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md)。
 
@@ -127,7 +127,7 @@ Windows 版已完成交叉编译与离线检查，**Windows 原生启动、本�
 
 ## 4. 整机、顶部与轴灯预览
 
-![候选版整机工作台与三槽总览](screenshots/workbench-v100rc1.png)
+![候选版整机工作台与三槽总览](screenshots/workbench-v100rc2.png)
 
 ### 参考外观与灯珠样式
 
@@ -151,7 +151,7 @@ Windows 版已完成交叉编译与离线检查，**Windows 原生启动、本�
 
 「键盘与外观」是独立页面。八张卡片使用同一作品与同一帧，可按 R4 / R6 筛选；短标签省去 CYBERBOARD 前缀，长配色名保持一行。点击外观后返回 AI 创作或工作台，使用所选照片；工作台预览名称也可跳转到外观页。
 
-![八款外观卡片与型号筛选](screenshots/appearances-v100rc1.png)
+![八款外观卡片与型号筛选](screenshots/appearances-v100rc2.png)
 
 所有外观都采用与 CYBERBOARD R6「Vision」一致的干净正面整机画面，沿实体外壳轮廓去除环境背景和镜面倒影。R4 与 R6 的「Vision」按型号分别提供，R6 使用最早提供的正面实拍；7 款 R4 外观取自官网与官方商城，包含仍有合格素材的售罄配色。当前外观会注明照片型号与来源；官网素材的原始像素保留，软件只按校准位置投影灯光，不会给其他配色重新涂色或生成不存在的实物外观。[官网素材来源、检索范围与校准记录](../data/photos/official-photo-sources.json)
 
@@ -204,7 +204,7 @@ Key 只按服务存入普通本机文件。已有文本 Key 保留；只有旧 K
 
 ### 新建对话：文字或参考图
 
-![独立 AI 对话、参考图与版本预览](screenshots/create-v100rc1.png)
+![独立 AI 对话、参考图与版本预览](screenshots/create-v100rc2.png)
 
 1. 点「＋ 新对话」，选择「全新创作」「顶部 + 轴灯」。空会话没有可保存或交付的结果。
 2. 用日常语言写画面、动作、颜色或总时长。也可点「＋ 参考图」添加 1–3 张图片，核对缩略图；旁边 `×` 移除当前输入中的图片。
@@ -263,7 +263,7 @@ App 用有限配方编译 RGB 帧，不执行模型返回代码；检查格式�
 
 结构 / 基本可见性最多触发一次额外修复请求；网络、限流和权限失败不自动连续重试。已提交的生成、修复、取消或失败都可能占用额度和计费。生成和设备写入不能同时进行，同步计划打开时先关闭再创作。
 
-候选版把 DeepSeek 的有效输出、思考内容和传输数据分别限制，避免仅凭包含思考 / SSE 信息的累计体积提前拒绝。MiniMax 兼容完整 `stop` 后关闭流的结束方式，M3 调整思考参数；长度截断、有效输出不完整和校验失败仍拒绝。已有 K3、MiniMax Flash 和 DeepSeek Flash 的真实账户测试记录，新候选的具体回归结果见[验收说明](RELEASE_1.0.0_RC1.md)；这不代表所有账户或 Windows / R4 硬件已验收。
+候选版把 DeepSeek 的有效输出、思考内容和传输数据分别限制，避免仅凭包含思考 / SSE 信息的累计体积提前拒绝。MiniMax 兼容完整 `stop` 后关闭流的结束方式，M3 调整思考参数；长度截断、有效输出不完整和校验失败仍拒绝。已有 K3、MiniMax Flash 和 DeepSeek Flash 的真实账户测试记录，新候选的具体回归结果见[验收说明](RELEASE_1.0.0_RC2.md)；这不代表所有账户或 Windows / R4 硬件已验收。
 
 ### 本地模板与外部 AI
 
@@ -648,7 +648,7 @@ Windows 检测会逐一检查 COM 口，某个端口出现 `Write timeout` 等�
 
 如果退出码为 `0x80131506`，且 `app-stderr.txt` 明确写着 **`Your Windows doesn't fully support CET`**，表示命中了旧 Windows 补丁与 .NET CET 的启动兼容问题，程序可能尚未进入自己的启动代码。[微软原因说明](https://github.com/dotnet/runtime/issues/108589)
 
-优先安装适用于自己系统的 Windows 累计更新，再使用普通包。暂时无法更新时，可单独测试 `Cyberboard-Studio-1.0.0-rc.1-Windows10-Compatibility-x64.zip`：它仅取消此 App 的 CET 标记，不更改 Windows 系统安全策略。**CET 是硬件栈保护，兼容包不启用该保护；普通包仍启用。**将兼容包完整解压到新目录，不混用旧版 EXE、DLL 和资源；系统更新后建议返回普通包。该包已交叉编译并验证两种包的实际 CET 标记和运行组件一致性，仍需 Windows 实机启动确认。[微软项目级兼容选项](https://learn.microsoft.com/en-us/dotnet/core/compatibility/interop/9.0/cet-support)
+优先安装适用于自己系统的 Windows 累计更新，再使用普通包。暂时无法更新时，可单独测试 `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip`：它仅取消此 App 的 CET 标记，不更改 Windows 系统安全策略。**CET 是硬件栈保护，兼容包不启用该保护；普通包仍启用。**将兼容包完整解压到新目录，不混用旧版 EXE、DLL 和资源；系统更新后建议返回普通包。该包已交叉编译并验证两种包的实际 CET 标记和运行组件一致性，仍需 Windows 实机启动确认。[微软项目级兼容选项](https://learn.microsoft.com/en-us/dotnet/core/compatibility/interop/9.0/cet-support)
 
 ### 模型提示未配置 / 密钥无法保存
 

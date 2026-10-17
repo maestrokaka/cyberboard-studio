@@ -1,10 +1,10 @@
-Cyberboard Studio 1.0.0-rc.1 · Windows x64 候选版
+Cyberboard Studio 1.0.0-rc.2 · Windows x64 候选版
 
 第三方怒喵（Angry Miao）键盘工具，面向 CYBERBOARD R4 / CYBERBOARD R6。
 此包为 1.0 正式发布前候选版，不代表 Windows GUI / Key 文件操作 / USB 或 R4
 写入已经完成实机验收。完整指南与验收范围：
 https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/USER_GUIDE.md
-https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/RELEASE_1.0.0_RC1.md
+https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/RELEASE_1.0.0_RC2.md
 
 下载与安装
 1. 整个 ZIP 解压到普通目录，例如 D:\Apps\Cyberboard Studio。
@@ -23,7 +23,7 @@ Python、CLI 和 .NET 运行组件已附，无需另外安装。此包没有商�
 兼容包只取消本 App 的 CET 标记，不修改系统安全设置，不扩大 .NET 官方系统
 支持范围。优先更新系统后继续使用普通包，不要混用普通和兼容包的文件。
 
-1.0.0-rc.1 本次更新
+1.0.0-rc.2 本次更新
 • AI 创作独立为对话页：主对话、参考图、可收起的轻预览和完整版本。
   会话搜索在页面内部；每次接受的结果新增版本，选择基础版本继续修改。
 • 明确选择顶部+轴灯、仅顶部、仅轴灯；局部编辑保留另一灯域完整帧和时序。

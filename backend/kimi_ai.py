@@ -23,7 +23,7 @@ BASE_URLS = {
 }
 DEFAULT_MODELS = {"kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3.1-Flash-Preview", "deepseek": "deepseek-flash"}
 PROVIDER_NAMES = {"kimi-code": "Kimi Code", "kimi-open": "Kimi", "minimax": "MiniMax", "deepseek": "DeepSeek"}
-USER_AGENT = "CyberboardStudio/1.0.0-rc.1"
+USER_AGENT = "CyberboardStudio/1.0.0-rc.2"
 # SSE overhead is not recipe size. DeepSeek emits many small thinking deltas;
 # the previously shared 2 MiB ceiling stopped it before any final content.
 MAX_WIRE_BYTES = 8 * 1024 * 1024

@@ -104,7 +104,7 @@ def bundle_structure(app):
     info = plistlib.loads((contents / "Info.plist").read_bytes())
     require(info.get("CFBundleShortVersionString") == "1.0.0", "App version differs from this release")
     require(info.get("CFBundleVersion") == "1.0.0", "App build number differs from this release")
-    require(info.get("CyberboardDisplayVersion") == "1.0.0-rc.1", "Candidate display version differs from this release")
+    require(info.get("CyberboardDisplayVersion") == "1.0.0-rc.2", "Candidate display version differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]

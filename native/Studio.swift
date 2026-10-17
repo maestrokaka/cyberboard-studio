@@ -390,7 +390,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var workspaceFailureShowing = false
     private var documentReady = false
     private var exitApproved = false
-    private let releaseVersion = "1.0.0-rc.1"
+    private let releaseVersion = "1.0.0-rc.2"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace"
