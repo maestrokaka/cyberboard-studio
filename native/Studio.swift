@@ -29,7 +29,7 @@ final class AISettingsStore {
         self.credentialAccess = credentialAccess
         self.beforeMetadataCommit = beforeMetadataCommit
     }
-    private static let defaultModels = ["kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3", "deepseek": "deepseek-flash"]
+    private static let defaultModels = ["kimi-code": "k3", "kimi-open": "kimi-k3", "minimax": "MiniMax-M3.1-Flash-Preview", "deepseek": "deepseek-flash"]
     static func supportsImages(_ config: [String: String]) -> Bool {
         switch config["provider"] {
         case "minimax": return ["MiniMax-M3", "MiniMax-M3.1-Flash-Preview"].contains(config["model"] ?? "")
@@ -345,6 +345,32 @@ final class JSONLineReader {
     }
 }
 
+// A single asynchronous save barrier owns an exit attempt. Repeated close
+// requests and replies from timed-out attempts must not close a later window.
+enum WorkspaceExitIntent { case closeWindow, terminate, reload }
+
+struct WorkspaceExitGate {
+    private(set) var token: String?
+    private(set) var intent: WorkspaceExitIntent?
+    var isPending: Bool { token != nil }
+
+    mutating func begin(_ intent: WorkspaceExitIntent) -> String? {
+        guard token == nil else { return nil }
+        let token = UUID().uuidString
+        self.token = token
+        self.intent = intent
+        return token
+    }
+
+    mutating func finish(_ token: String) -> WorkspaceExitIntent? {
+        guard self.token == token else { return nil }
+        let intent = self.intent
+        self.token = nil
+        self.intent = nil
+        return intent
+    }
+}
+
 final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
                        WKScriptMessageHandler, WKNavigationDelegate {
     private var window: NSWindow!
@@ -359,6 +385,12 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private let aiSettings = AISettingsStore(stateDirectory: FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/Cyberboard Studio", isDirectory: true))
     private var deviceWritePending = false
+    private var workspaceExit = WorkspaceExitGate()
+    private var workspaceExitTimeout: DispatchWorkItem?
+    private var workspaceFailureShowing = false
+    private var documentReady = false
+    private var exitApproved = false
+    private let releaseVersion = "1.0.0-rc.1"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace"
@@ -409,14 +441,85 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if deviceWritePending { showWriteInProgress(); return .terminateCancel }
-        cancelActiveAI()
-        return .terminateNow
+        if exitApproved { return .terminateNow }
+        requestWorkspaceExit(.terminate)
+        // Keep normal WebView callbacks and dialogs running while the frontend
+        // waits for its asynchronous saveWorkspace reply.
+        return .terminateCancel
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if deviceWritePending { showWriteInProgress(); return false }
+        if exitApproved { return true }
+        requestWorkspaceExit(.closeWindow)
+        return false
+    }
+
+    private func requestWorkspaceExit(_ intent: WorkspaceExitIntent) {
+        guard !workspaceFailureShowing else { return }
+        guard let token = workspaceExit.begin(intent) else { return }
+        if !documentReady { completeWorkspaceExit(token); return }
+        sendEvent(["event": "workspaceExit", "phase": "saving"])
+        let timeout = DispatchWorkItem { [weak self] in
+            self?.failWorkspaceExit(token, message: "保存工作区的等待时间已超过 20 秒。")
+        }
+        workspaceExitTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: timeout)
+        let script = """
+        (() => {
+          const token = '\(token)';
+          const reply = action => {
+            const message = {id: token, action, payload: {token}};
+            if (window.StudioNative?.postMessage) window.StudioNative.postMessage(message);
+            else window.webkit.messageHandlers.studio.postMessage(message);
+          };
+          Promise.resolve().then(() => {
+            if (typeof window.StudioApp?.flushWorkspace !== 'function') throw new Error('Workspace unavailable');
+            return window.StudioApp.flushWorkspace();
+          }).then(() => reply('closeWorkspaceReady'), () => reply('closeWorkspaceFailed'));
+          return true;
+        })();
+        """
+        webView.evaluateJavaScript(script) { [weak self] _, error in
+            if error != nil { self?.failWorkspaceExit(token, message: "无法完成工作区保存，请保留窗口后重试。") }
+        }
+    }
+
+    private func completeWorkspaceExit(_ token: String) {
+        guard let intent = workspaceExit.finish(token) else { return }
+        workspaceExitTimeout?.cancel(); workspaceExitTimeout = nil
+        if deviceWritePending { showWriteInProgress(); return }
+        // Stop generation only after the prompt, revisions and slot drafts are
+        // durably saved. Never block the WebView/UI thread waiting for a child.
         cancelActiveAI()
-        return true
+        switch intent {
+        case .reload:
+            sendEvent(["event": "workspaceExit", "phase": "complete"])
+            DispatchQueue.main.async { [weak self] in self?.webView.reload() }
+        case .closeWindow:
+            exitApproved = true
+            DispatchQueue.main.async { [weak self] in self?.window.performClose(nil) }
+        case .terminate:
+            exitApproved = true
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
+    }
+
+    private func failWorkspaceExit(_ token: String, message: String) {
+        guard let intent = workspaceExit.finish(token) else { return }
+        workspaceExitTimeout?.cancel(); workspaceExitTimeout = nil
+        sendEvent(["event": "workspaceExit", "phase": "failed"])
+        workspaceFailureShowing = true
+        let alert = NSAlert()
+        alert.messageText = "工作区尚未保存"
+        alert.informativeText = message + " 当前窗口会保留，创作不会因本次退出丢失。"
+        alert.addButton(withTitle: "重试保存")
+        alert.addButton(withTitle: intent == .reload ? "取消重新载入" : "取消退出")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self else { return }
+            self.workspaceFailureShowing = false
+            if response == .alertFirstButtonReturn { self.requestWorkspaceExit(intent) }
+        }
     }
 
     private func showWriteInProgress() {
@@ -433,7 +536,8 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         bar.addItem(appRoot)
         let appMenu = NSMenu()
         appRoot.submenu = appMenu
-        appMenu.addItem(withTitle: "关于 Cyberboard Studio", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let about = appMenu.addItem(withTitle: "关于 Cyberboard Studio", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏 Cyberboard Studio", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
@@ -469,10 +573,12 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     @objc private func importFromMenu() { sendEvent(["event": "menu", "action": "importJSON"]) }
     @objc private func exportFromMenu() { sendEvent(["event": "menu", "action": "exportJSON"]) }
+    @objc private func showAbout() {
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationVersion: releaseVersion, .version: "1.0.0"])
+    }
     @objc private func reloadFromMenu() {
         if deviceWritePending { showWriteInProgress(); return }
-        cancelActiveAI()
-        webView.reload()
+        requestWorkspaceExit(.reload)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -481,6 +587,16 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
               let id = body["id"], (id is String || id is NSNumber),
               let action = body["action"] as? String else { return }
         let payload = body["payload"] as? [String: Any] ?? [:]
+        if action == "closeWorkspaceReady" || action == "closeWorkspaceFailed" {
+            guard let token = payload["token"] as? String, id as? String == token else { return }
+            if action == "closeWorkspaceReady" { completeWorkspaceExit(token) }
+            else { failWorkspaceExit(token, message: "工作区没有成功写入本机，请重试保存或取消退出。") }
+            return
+        }
+        if workspaceExit.isPending || exitApproved,
+           ["generateAI", "testAIConnection", "execute", "setTime", "importJSON", "exportJSON", "importAIImages", "saveAISettings"].contains(action) {
+            reply(id: id, error: "正在保存工作区，请等待完成后再操作。"); return
+        }
         switch action {
         case "importJSON": importJSON(id: id)
         case "exportJSON": exportJSON(id: id, payload: payload)
@@ -795,10 +911,12 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": "0.4.2"])
+        documentReady = webView.url?.isFileURL == true
+        sendEvent(["event": "nativeReady", "app": "Cyberboard Studio", "version": releaseVersion])
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        documentReady = false
         cancelActiveAI()
         navigationGeneration += 1
     }
@@ -806,7 +924,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
-        if deviceWritePending { decisionHandler(.cancel); return }
+        if deviceWritePending || workspaceExit.isPending { decisionHandler(.cancel); return }
         if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
         if url.isFileURL, let resources = Bundle.main.resourceURL {
             let webDir = resources.appendingPathComponent("web", isDirectory: true).standardizedFileURL.path + "/"

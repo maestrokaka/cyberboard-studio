@@ -46,7 +46,8 @@ class StrictProtocolChecks(unittest.TestCase):
         self.assertEqual(len(opener.calls), 1)
 
     def test_long_sse_line_and_large_wire_stop_before_model_content(self):
-        for raw in (b":" + b"x" * 65536 + b"\n", (b":" + b"x" * 4095 + b"\n") * 513):
+        for raw in (b":" + b"x" * ai.MAX_LINE_BYTES + b"\n",
+                    (b":" + b"x" * 4095 + b"\n") * (ai.MAX_WIRE_BYTES // 4097 + 1)):
             with self.subTest(bytes=len(raw)):
                 opener = fixture.Opener(fixture.Response(raw, stream=True))
                 self.error(("ai_response_large",), lambda: ai.generate(self.payload(), opener=opener))
@@ -89,7 +90,7 @@ class StrictProtocolChecks(unittest.TestCase):
 
     def test_payload_fields_never_spill_into_request_body(self):
         payload = self.payload()
-        payload.update({"current": "private-current", "meta": "private-meta", "history": "private-history",
+        payload.update({"current": "private-current", "meta": "private-meta", "syncHistory": "private-history",
                         "key_layer": "private-key-layer", "device": {"productId": "private-device"}})
         payload["reference"] = {"id": "private-id", "frames": "private-pixels", "keyframes": "private-axis",
                                 "ai": {"recipe": "private-previous-recipe"}, "name": "公共作品名"}

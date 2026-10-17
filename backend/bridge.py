@@ -734,6 +734,111 @@ class Bridge:
                      "removedBuiltinIds": copy.deepcopy(removed_builtins),
                      "selectedId": selected, "targetSlot": target, "brief": brief, "palette": copy.deepcopy(palette),
                      "brightness": brightness, "speedMs": speed_ms, "exportFormat": export_format}
+        conversations = copy.deepcopy(payload.get("conversations", []))
+        require(isinstance(conversations, list) and len(conversations) <= 20,
+                "workspace_limit", "最多保留 20 个创作会话，请导出作品并整理会话。")
+        conversation_ids = set()
+        for conversation in conversations:
+            require(isinstance(conversation, dict) and set(conversation) <= {
+                "id", "title", "createdAt", "updatedAt", "draft", "turns", "versions", "selectedVersionId"},
+                "invalid_workspace", "创作会话字段无效。")
+            identity = conversation.get("id")
+            require(text_fits(identity, 128) and identity.strip() and identity not in conversation_ids,
+                    "invalid_workspace", "创作会话编号缺失或重复。")
+            conversation_ids.add(identity)
+            require(text_fits(conversation.get("title"), 256), "invalid_workspace", "会话名称过长。")
+            for timestamp in ("createdAt", "updatedAt"):
+                require(text_fits(conversation.get(timestamp), 64), "invalid_workspace", "会话时间无效。")
+            versions = conversation.get("versions", [])
+            require(isinstance(versions, list) and len(versions) <= 12,
+                    "workspace_limit", "每个会话最多保留 12 个版本，请保存作品后开启新会话。")
+            version_ids = set()
+            for version in versions:
+                require(isinstance(version, dict) and set(version) <= {
+                    "id", "label", "createdAt", "design", "provider", "model", "savedDesignId", "baseVersionId", "scope", "changeSummary"},
+                    "invalid_workspace", "创作版本字段无效。")
+                version_id = version.get("id")
+                require(text_fits(version_id, 128) and version_id.strip() and version_id not in version_ids,
+                        "invalid_workspace", "创作版本编号缺失或重复。")
+                version_ids.add(version_id)
+                validate_design(version.get("design"), set())
+                require(version.get("baseVersionId") is None or
+                        version["baseVersionId"] in version_ids and version["baseVersionId"] != version_id,
+                        "invalid_workspace", "创作版本的基础版本不存在。")
+                require(text_fits(version.get("label", ""), 256) and text_fits(version.get("createdAt", ""), 64),
+                        "invalid_workspace", "创作版本说明无效。")
+                for field in ("provider", "model", "savedDesignId", "baseVersionId"):
+                    require(version.get(field) is None or text_fits(version[field], 256),
+                            "invalid_workspace", "创作版本来源无效。")
+                require(version.get("scope", "both") in ("both", "top", "keys"),
+                        "invalid_workspace", "版本修改范围无效。")
+                require(text_fits(version.get("changeSummary", ""), 2000),
+                        "invalid_workspace", "版本修改说明过长。")
+            selected_version = conversation.get("selectedVersionId")
+            require(selected_version is None or selected_version in version_ids,
+                    "invalid_workspace", "选中的创作版本不存在。")
+
+            def validate_conversation_images(images):
+                from ai_images import from_payload, ImageError
+                require(isinstance(images, list) and len(images) <= 3,
+                        "invalid_workspace", "每条创作记录最多保留三张参考图。")
+                for image in images:
+                    require(isinstance(image, dict) and set(image) <= {"name", "dataUrl"} and
+                            text_fits(image.get("name", "参考图"), 256),
+                            "invalid_workspace", "会话参考图字段无效。")
+                if images:
+                    try:
+                        normalized = from_payload(images)
+                        images[:] = [{"name": image["name"], "dataUrl": image["dataUrl"]} for image in normalized]
+                    except ImageError:
+                        raise BridgeError("invalid_workspace", "会话参考图格式或大小无效。") from None
+
+            draft = conversation.get("draft", {})
+            require(isinstance(draft, dict) and set(draft) <= {"brief", "images", "scope", "baseVersionId"},
+                    "invalid_workspace", "会话输入草稿字段无效。")
+            require(text_fits(draft.get("brief", ""), 4000) and draft.get("scope", "both") in ("both", "top", "keys"),
+                    "invalid_workspace", "会话输入或修改范围无效。")
+            require(draft.get("baseVersionId") is None or draft["baseVersionId"] in version_ids,
+                    "invalid_workspace", "会话修改基底不存在。")
+            validate_conversation_images(draft.get("images", []))
+            turns = conversation.get("turns", [])
+            require(isinstance(turns, list) and len(turns) <= 60,
+                    "workspace_limit", "会话记录已达上限，请保存作品后开启新会话。")
+            turn_ids = set()
+            for turn in turns:
+                require(isinstance(turn, dict) and set(turn) <= {
+                    "id", "role", "text", "createdAt", "versionId", "status", "images", "requestId", "baseVersionId", "provider", "model", "scope"},
+                    "invalid_workspace", "对话记录字段无效。")
+                turn_id = turn.get("id")
+                require(text_fits(turn_id, 128) and turn_id.strip() and turn_id not in turn_ids,
+                        "invalid_workspace", "对话记录编号无效。")
+                turn_ids.add(turn_id)
+                require(turn.get("role") in ("user", "assistant") and text_fits(turn.get("text", ""), 6000),
+                        "invalid_workspace", "对话角色或内容无效。")
+                require(text_fits(turn.get("createdAt", ""), 64), "invalid_workspace", "对话时间无效。")
+                require(turn.get("versionId") is None or turn["versionId"] in version_ids,
+                        "invalid_workspace", "对话引用版本不存在。")
+                require(turn.get("baseVersionId") is None or turn["baseVersionId"] in version_ids,
+                        "invalid_workspace", "对话引用的基础版本不存在。")
+                require(turn.get("scope", "both") in ("both", "top", "keys"),
+                        "invalid_workspace", "对话修改范围无效。")
+                for field in ("status", "requestId", "baseVersionId", "provider", "model", "scope"):
+                    require(turn.get(field) is None or text_fits(turn[field], 256),
+                            "invalid_workspace", "对话状态无效。")
+                validate_conversation_images(turn.get("images", []))
+        active_conversation = payload.get("activeConversationId")
+        require(active_conversation is None or active_conversation in conversation_ids,
+                "invalid_workspace", "当前创作会话不存在。")
+        workspace["conversations"] = copy.deepcopy(conversations)
+        workspace["activeConversationId"] = active_conversation
+        def has_credential(value):
+            if isinstance(value, dict):
+                return any(str(key).lower() in ("apikey", "api_key", "authorization", "credential", "password") or
+                           has_credential(item) for key, item in value.items())
+            if isinstance(value, list):
+                return any(has_credential(item) for item in value)
+            return isinstance(value, str) and bool(re.search(r"\bsk-(?:cp-)?[A-Za-z0-9_-]{20,}", value))
+        require(not has_credential(workspace), "workspace_credentials", "作品或对话中包含密钥，请移除密钥后保存。")
         if "previewAppearanceId" in payload:
             appearance = payload["previewAppearanceId"]
             require(isinstance(appearance, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", appearance),
@@ -754,15 +859,68 @@ class Bridge:
         try:
             require(location.stat().st_size <= MAX_WORKSPACE_BYTES, "workspace_too_large", "工作台草稿超过 32 MB。")
             saved = load_json(location)
+            require(isinstance(saved, dict) and type(saved.get("version", 1)) is int and
+                    saved.get("version", 1) in (1, 2), "invalid_workspace", "工作区版本无效或暂不支持。")
             workspace = self.validate_workspace(saved)
             workspace["savedAt"] = saved.get("savedAt")
             return workspace, None
         except (BridgeError, OSError, ValueError, TypeError, KeyError):
             return None, "保存的工作台草稿无法载入。原文件已保留，灯效与设备配置不受影响。"
 
+    def preserve_unreadable_workspace(self, source):
+        """Preserve every original byte before recovering an unreadable store.
+
+        Stream even an oversized damaged file; never decode/log its potentially
+        private contents or overwrite a previous recovery snapshot.
+        """
+        import os
+        temporary = source.with_name(f".workspace-recovery.{uuid.uuid4().hex}.tmp")
+        digest = hashlib.sha256()
+        try:
+            with source.open("rb") as original, temporary.open("xb") as snapshot:
+                while data := original.read(1024 * 1024):
+                    digest.update(data)
+                    snapshot.write(data)
+                snapshot.flush()
+                os.fsync(snapshot.fileno())
+            temporary.chmod(0o600)
+            backup = source.with_name("workspace-recovery-" + digest.hexdigest() + ".json")
+            if backup.exists():
+                # Repeated failed saves reuse an intact snapshot; a conflicting
+                # manually edited snapshot is retained under its old name.
+                existing = hashlib.sha256()
+                with backup.open("rb") as previous:
+                    while data := previous.read(1024 * 1024):
+                        existing.update(data)
+                if existing.digest() == digest.digest():
+                    return backup
+                backup = source.with_name("workspace-recovery-" + digest.hexdigest() + "-" + uuid.uuid4().hex + ".json")
+            temporary.replace(backup)
+            return backup
+        except OSError:
+            raise BridgeError("workspace_recovery_failed", "无法备份原工作区，已停止保存以保留原文件。请检查本机存储后重试。") from None
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def saveWorkspace(self, payload):
         workspace = self.validate_workspace(payload)
-        workspace.update(version=1, savedAt=now_iso())
+        workspace.update(version=2, savedAt=now_iso())
+        # One pre-conversation snapshot supports an explicit return to the prior
+        # release. It stays in the private data directory, never in the bundle.
+        previous = self.state_dir / "workspace.json"
+        backup = self.state_dir / "workspace-before-1.0.json"
+        if previous.is_file():
+            try:
+                require(previous.stat().st_size <= MAX_WORKSPACE_BYTES, "workspace_too_large", "旧工作区过大。")
+                old = load_json(previous)
+                require(isinstance(old, dict) and type(old.get("version", 1)) is int and
+                        old.get("version", 1) in (1, 2), "invalid_workspace", "旧工作区版本无效。")
+                self.validate_workspace(old)
+            except (BridgeError, OSError, ValueError, TypeError, KeyError):
+                self.preserve_unreadable_workspace(previous)
+            else:
+                if old.get("version", 1) < 2 and not backup.exists():
+                    atomic_json(backup, old, compact=True)
         atomic_json(self.state_dir / "workspace.json", workspace, compact=True)
         return {"saved": True, "savedAt": workspace["savedAt"], "designCount": len(workspace["designs"]),
                 "pendingCount": len(workspace["pending"]), "trashCount": len(workspace["trash"])}

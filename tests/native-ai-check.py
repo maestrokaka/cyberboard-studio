@@ -56,7 +56,7 @@ do {
     try metadata(["provider": "kimi-open", "model": "kimi-k3"])
     try check(try store.loadConfiguration()["model"] == "kimi-k3", "Open-platform model was replaced")
 
-    try check(try AISettingsStore.configuration(["provider": "minimax"])["model"] == "MiniMax-M3", "MiniMax defaults")
+    try check(try AISettingsStore.configuration(["provider": "minimax"])["model"] == "MiniMax-M3.1-Flash-Preview", "MiniMax defaults")
     try check(try AISettingsStore.configuration(["provider": "deepseek"])["model"] == "deepseek-flash", "DeepSeek defaults")
     try check(AISettingsStore.supportsImages(try AISettingsStore.configuration(["provider": "deepseek"])), "Flash image capability")
     try check(!AISettingsStore.supportsImages(try AISettingsStore.configuration(["provider": "deepseek", "model": "deepseek-v4-pro"])), "Pro incorrectly marked vision")
@@ -80,6 +80,7 @@ do {
     let allProfiles = settings["profiles"] as! [String: [String: Any]]
     try check(allProfiles["kimi-code"]?["model"] as? String == "k3-256k", "Kimi model lost after service switching")
     try check(allProfiles["minimax"]?["baseUrl"] as? String == "https://api.minimax.io/v1", "MiniMax region lost after restart")
+    try check(allProfiles["minimax"]?["model"] as? String == "MiniMax-M3", "Saved MiniMax model was overwritten by the new default")
     try check(allProfiles["deepseek"]?["hasKey"] as? Bool == true && allProfiles["deepseek"]?["supportsImages"] as? Bool == false, "Profile capability/key state wrong")
     try rejects { _ = try reopened.inject(["provider": "minimax"]) }
     let injected = try reopened.inject(["provider": "minimax"], allowInactive: true)
@@ -334,7 +335,7 @@ do {
 checks = checks.replace("@autoclosure () -> Bool", "@autoclosure () throws -> Bool").replace("if !condition()", "if try !condition()")
 for token in ("SecItem", "SecKeychain", "kSec", "Keychain", "Security", "legacyCredentialRead", "readLegacyKey", "legacyChecked", "legacyUnavailable", "Cyberboard Studio.Kimi"):
     assert token not in source, f"Native host contains forbidden system credential access: {token}"
-assert "Security" not in (root / "native/build.sh").read_text(encoding="utf-8")
+assert "-framework Security" not in (root / "native/build.sh").read_text(encoding="utf-8")
 with tempfile.TemporaryDirectory(prefix="cyberboard-native-ai-") as directory:
     temporary = pathlib.Path(directory)
     swift = temporary / "main.swift"

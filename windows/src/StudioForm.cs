@@ -21,6 +21,12 @@ internal sealed class StudioForm : Form
         ForeColor = Color.FromArgb(238, 241, 247), BackColor = Color.FromArgb(14, 16, 21), Font = new Font("Segoe UI", 12)
     };
     private bool deviceWritePending;
+    private readonly WorkspaceExitGate workspaceExit = new();
+    private CancellationTokenSource? workspaceExitTimeout;
+    private bool workspaceFailureShowing;
+    private bool documentReady;
+    private bool exitApproved;
+    private const string ReleaseVersion = "1.0.0-rc.1";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
     { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace" };
@@ -64,7 +70,7 @@ internal sealed class StudioForm : Form
         Controls.Add(menu);
         Shown += async (_, _) => await InitializeAsync();
         FormClosing += OnClosing;
-        FormClosed += (_, _) => { aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
+        FormClosed += (_, _) => { workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -126,7 +132,8 @@ internal sealed class StudioForm : Form
                     return;
                 }
                 loading.Visible = false;
-                SendEvent(new { @event = "nativeReady", app = "Cyberboard Studio", version = "0.4.2", platform = "windows" });
+                documentReady = true;
+                SendEvent(new { @event = "nativeReady", app = "Cyberboard Studio", version = ReleaseVersion, platform = "windows" });
             };
             core.ProcessFailed += (_, args) =>
             {
@@ -189,7 +196,7 @@ internal sealed class StudioForm : Form
         view.DropDownItems.Add(MenuItem("重新载入", Keys.Control | Keys.R, ReloadWorkbench));
         var help = new ToolStripMenuItem("帮助");
         help.DropDownItems.Add(MenuItem("关于 Cyberboard Studio", Keys.None, () => MessageBox.Show(this,
-            "Cyberboard Studio 0.4.2\nWindows 桌面版\n\nAI 灯效创作、整机预览、JSON 导入导出与本地 USB 同步。",
+            "Cyberboard Studio " + ReleaseVersion + "\nWindows 桌面版\n\nAI 对话创作、整机预览、JSON 导入导出与本地 USB 同步。",
             "关于 Cyberboard Studio", MessageBoxButtons.OK, MessageBoxIcon.Information)));
         menu.Items.AddRange([file, edit, view, help]);
         return menu;
@@ -206,14 +213,13 @@ internal sealed class StudioForm : Form
     private void ReloadWorkbench()
     {
         if (deviceWritePending) { ShowWriteInProgress(); return; }
-        aiCancellation?.Cancel();
-        if (web.CoreWebView2 is not null) web.CoreWebView2.Reload();
+        _ = RequestWorkspaceExitAsync(WorkspaceExitIntent.Reload);
     }
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
-        if (deviceWritePending) { args.Cancel = true; return; }
-        if (ResourcePolicy.IsDocument(args.Uri)) { aiCancellation?.Cancel(); navigationGeneration++; return; }
+        if (deviceWritePending || workspaceExit.IsPending) { args.Cancel = true; return; }
+        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; aiCancellation?.Cancel(); navigationGeneration++; return; }
         args.Cancel = true;
         if (args.IsUserInitiated) OpenExternalLink(args.Uri);
     }
@@ -244,7 +250,20 @@ internal sealed class StudioForm : Form
                 ? value.Clone() : JsonSerializer.SerializeToElement(new { });
         }
         catch (JsonException) { return; }
+        if (action is "closeWorkspaceReady" or "closeWorkspaceFailed")
+        {
+            if (!payload.TryGetProperty("token", out var tokenValue) || tokenValue.ValueKind != JsonValueKind.String ||
+                id.ValueKind != JsonValueKind.String || id.GetString() != tokenValue.GetString()) return;
+            var token = tokenValue.GetString()!;
+            if (action == "closeWorkspaceReady") CompleteWorkspaceExit(token);
+            else FailWorkspaceExit(token, "工作区没有成功写入本机，请重试保存或取消退出。");
+            return;
+        }
         var generation = navigationGeneration;
+        if ((workspaceExit.IsPending || exitApproved) && action is "generateAI" or "testAIConnection" or "execute" or "setTime" or "importJSON" or "exportJSON" or "importAIImages" or "saveAISettings")
+        {
+            ReplyError(id, "正在保存工作区，请等待完成后再操作。", generation); return;
+        }
         var writesDevice = DeviceWriteActions.Contains(action);
         try
         {
@@ -427,9 +446,84 @@ internal sealed class StudioForm : Form
 
     private void OnClosing(object? sender, FormClosingEventArgs args)
     {
-        if (!deviceWritePending) { aiCancellation?.Cancel(); return; }
+        if (exitApproved && !deviceWritePending) return;
         args.Cancel = true;
-        ShowWriteInProgress();
+        if (deviceWritePending) { ShowWriteInProgress(); return; }
+        _ = RequestWorkspaceExitAsync(WorkspaceExitIntent.CloseWindow);
+    }
+
+    private async Task RequestWorkspaceExitAsync(WorkspaceExitIntent intent)
+    {
+        if (workspaceFailureShowing) return;
+        var token = workspaceExit.Begin(intent);
+        if (token is null) return;
+        if (!documentReady || web.CoreWebView2 is null) { CompleteWorkspaceExit(token); return; }
+        SendEvent(new { @event = "workspaceExit", phase = "saving" });
+        workspaceExitTimeout = new CancellationTokenSource();
+        _ = WatchWorkspaceExitAsync(token, workspaceExitTimeout.Token);
+        var script = $$$"""
+            (() => {
+              const token = '{{{token}}}';
+              const reply = action => window.StudioNative.postMessage({id: token, action, payload: {token}});
+              Promise.resolve().then(() => {
+                if (typeof window.StudioApp?.flushWorkspace !== 'function') throw new Error('Workspace unavailable');
+                return window.StudioApp.flushWorkspace();
+              }).then(() => reply('closeWorkspaceReady'), () => reply('closeWorkspaceFailed'));
+              return true;
+            })();
+            """;
+        try { await web.CoreWebView2.ExecuteScriptAsync(script); }
+        catch (Exception) { FailWorkspaceExit(token, "无法完成工作区保存，请保留窗口后重试。"); }
+    }
+
+    private async Task WatchWorkspaceExitAsync(string token, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20), cancellation);
+            if (!IsDisposed) FailWorkspaceExit(token, "保存工作区的等待时间已超过 20 秒。");
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void CompleteWorkspaceExit(string token)
+    {
+        var intent = workspaceExit.Finish(token);
+        if (intent is null) return;
+        workspaceExitTimeout?.Cancel(); workspaceExitTimeout?.Dispose(); workspaceExitTimeout = null;
+        if (deviceWritePending) { ShowWriteInProgress(); return; }
+        // The UI thread remains available for saveWorkspace bridge replies.
+        // Cancel generation only after the frontend confirms durable saving.
+        aiCancellation?.Cancel();
+        if (intent == WorkspaceExitIntent.Reload)
+        {
+            SendEvent(new { @event = "workspaceExit", phase = "complete" });
+            BeginInvoke(() => web.CoreWebView2?.Reload());
+        }
+        else
+        {
+            exitApproved = true;
+            // Defer Close until the synchronous WebView message callback exits.
+            BeginInvoke(Close);
+        }
+    }
+
+    private void FailWorkspaceExit(string token, string message)
+    {
+        var intent = workspaceExit.Finish(token);
+        if (intent is null) return;
+        workspaceExitTimeout?.Cancel(); workspaceExitTimeout?.Dispose(); workspaceExitTimeout = null;
+        SendEvent(new { @event = "workspaceExit", phase = "failed" });
+        workspaceFailureShowing = true;
+        // A modal dialog must not run inside WebView2's synchronous message
+        // callback; queue it after that callback has returned.
+        PostToUi(() =>
+        {
+            var response = MessageBox.Show(this, message + "\n当前窗口会保留，创作不会因本次退出丢失。",
+                "工作区尚未保存", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning);
+            workspaceFailureShowing = false;
+            if (response == DialogResult.Retry) _ = RequestWorkspaceExitAsync(intent.Value);
+        });
     }
 
     private void ShowWriteInProgress() => MessageBox.Show(this,

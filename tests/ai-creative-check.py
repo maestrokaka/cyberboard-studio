@@ -142,7 +142,7 @@ class CreativeChecks(unittest.TestCase):
         r = ai.generate(self.payload(), opener=op, progress=lambda a,b: events.append(a))
         self.assertEqual((len(r['design']['frames']),r['design']['speed_ms']), (100,40))
         meta = r['design']['ai']
-        self.assertEqual(meta['promptVersion'], 4)
+        self.assertEqual(meta['promptVersion'], 5)
         self.assertEqual(meta['timing']['source'],'brief')
         self.assertTrue(meta['quality']['passed'])
         self.assertIn('ai_quality',events)

@@ -2,19 +2,21 @@
 
 [简体中文](README.md) · **English**
 
-**A third-party desktop tool for Angry Miao CYBERBOARD R4 and CYBERBOARD R6 keyboards, available for macOS and Windows.**
+**A third-party Angry Miao keyboard tool for CYBERBOARD R4 / CYBERBOARD R6, on macOS and Windows.**
 
-Create animations for the top LED matrix and per-key backlighting with Kimi, MiniMax or DeepSeek. Start with a prompt and optional reference images, preview your design on real keyboard photos, then sync it to the keyboard through the bundled CLI.
+Create top-matrix and key-backlight animations through a dedicated AI conversation with Kimi, MiniMax or DeepSeek. Compare versions on real keyboard photographs, then adjust and synchronize a chosen version to a specific slot in the lighting workbench.
 
-[Download & release notes](https://github.com/maestrokaka/cyberboard-studio/releases) · [Full user guide — Chinese](docs/USER_GUIDE.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues) · [Support the author](#support-the-author)
+[Download and release history](https://github.com/maestrokaka/cyberboard-studio/releases) · [Full user guide (Chinese)](docs/USER_GUIDE.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues) · [Support the author](#support-the-author)
 
-This README is in English. The desktop app interface and full user guide are currently in Chinese; the quick start below includes the Chinese button labels to help you follow along.
+The current build is **1.0.0-rc.1**, a release candidate for testing. Windows native GUI / USB and R4 writes still need hardware acceptance testing. See the [candidate notes](docs/RELEASE_1.0.0_RC1.md) for the current scope. The app interface remains in Chinese.
 
 ## See it in action
 
-A 77-second walkthrough: switch keyboard appearances and lighting effects, create a new design with Kimi `k3` and a reference image, then sync it to slot 03. Generation and transfer waits are sped up. The final scene shows the effect on a real CYBERBOARD R6. Previously recorded on macOS, with Chinese narration and captions. It demonstrates the workflow; the workbench screenshots and preset list below are updated for v0.4.1.
+This 77-second demo shows appearance selection, lighting previews, Kimi k3 creation with a reference image and synchronization to slot 03, ending with footage of the R6 keyboard. Generation and transfer waits are sped up. The video uses an earlier interface; the candidate separates AI creation, the workbench and keyboard appearances into dedicated pages.
 
 https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
+
+[Candidate packages and notes](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1)
 
 ## Built-in lighting GIFs
 
@@ -43,134 +45,78 @@ Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photog
 
 ## Screenshots
 
-The workbench and library screenshots show the v0.4.1 interface in a separate demo workspace with no keyboard connected. Mac and Windows share this interface. Model, device and appearance images retain the corresponding v0.3.0 pages. The appearance comparison uses the same preview engine, design and animation frame for every keyboard.
+The primary workflow is **AI creation → lighting workbench → device sync**. Screenshots use a separate demonstration workspace with no personal keys or device records.
+
+### AI creation
+
+The conversation is the main surface, alongside a collapsible photo preview and independent versions. Choose a fixed base version and modify both regions, only the top matrix or only the backlight. History and search live inside this page. A generated version enters the library only when you explicitly save it.
+
+![AI conversation, reference images and immutable versions](docs/screenshots/create-v100rc1.png)
 
 ### Lighting workbench
 
-AI creation stays on the workbench alongside the preview, lighting controls and three slot drafts. Click a keyboard thumbnail to change the appearance without changing your design or writing to the device.
+The large photo preview, brightness / timing controls and all three slot drafts share one page. Selecting a slot chooses an assignment target; its Preview action loads its contents, and Undo Draft removes the local draft. Switching conversations does not clear slot drafts.
 
-![Lighting workbench with AI creation and slot drafts](docs/screenshots/workbench-v041.jpg)
-
-### Model connections
-
-Configure Kimi Code, Kimi Open Platform, MiniMax or DeepSeek, with separate provider, region, model and API key settings. Keys are hidden by default; use the Show / Hide button to view them. Keys are stored in per-provider local files, without additional system authorization prompts, and are excluded from exported lighting JSON.
-
-![Model connections and API key controls, v0.3.0 screenshot](docs/screenshots/model-services-v030.png)
+![Workbench with full preview and three slot drafts](docs/screenshots/workbench-v100rc1.png)
 
 ### Keyboard appearances
 
-Eight appearances share a front view with the background removed:
+Eight front-view photo cards can be filtered by R4 / R6 and compared using the same design and frame. Appearance selection changes the preview only; the connected device is identified separately by a manual USB check.
 
-| Model | Finish | Photo source |
-| --- | --- | --- |
-| CYBERBOARD R6 | Vision | User-provided photo |
-| CYBERBOARD R4 | Fluo Free | Angry Miao official store |
-| CYBERBOARD R4 | Bebop | Angry Miao official store |
-| CYBERBOARD R4 | Gangstar | Angry Miao official store |
-| CYBERBOARD R4 | Cloud White V2 | Angry Miao official store |
-| CYBERBOARD R4 | Stone Face | Angry Miao official store |
-| CYBERBOARD R4 | Paisley | Angry Miao official store |
-| CYBERBOARD R4 | Vision | Angry Miao official product page |
+![Eight calibrated front-view appearances](docs/screenshots/appearances-v100rc1.png)
 
-The collection includes official photos of sold-out finishes. These are preview options, independent of current stock. [Photo sources](data/photos/official-photo-sources.json)
+The catalog contains **R6「Vision」** and **R4「Fluo Free」「Bebop」「Gangstar」「Cloud White V2」「Stone Face」「Paisley」「Vision」**. R6 uses the earliest provided photograph; R4 photos come from Angry Miao's official site or store, including qualifying photos of sold-out colorways. [Sources and calibration](data/photos/official-photo-sources.json)
 
-![Eight keyboard appearances showing the same design and frame, v0.3.0 materials](docs/screenshots/appearance-gallery-v030.png)
-
-### Lighting library
-
-Ten built-in designs cover cyberpunk lighting, EVA awakening, Mario, a cat chasing fireflies and three Kaká variations. Browse palettes and loop lengths, or return to the workbench to preview them. All designs can be moved to the trash, restored or permanently deleted after confirmation; custom designs can also be renamed.
-
-Search the library by name or description, then open any preset in the full-keyboard preview.
-
-![v0.4.1 lighting library](docs/screenshots/library-v041.jpg)
-
-### Devices and configuration
-
-Read the configuration JSON, choose the built-in modes you want to restore, review the changes and backup, then confirm synchronization. This screenshot shows the controls in a demo workspace with no keyboard connected.
-
-![Device slots and configuration controls, v0.3.0 screenshot](docs/screenshots/device-configuration-v030.png)
+Model connections have their own page. Devices provides sub-tabs for slots, read-only keymaps and sync records. The library retains search, naming, trash and restoration; all ten built-in designs can be removed locally.
 
 ## Download and install
 
-The current release is [v0.4.2 Preview](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.2). Find the packages and their SHA-256 files under **Assets**. [v0.4.1](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v0.4.1) remains available as a previous release.
-
-| Package | Platform | Installation |
+| Package | Target | Installation |
 | --- | --- | --- |
-| `Cyberboard-Studio-0.4.2-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13 or later | Extract, move `Cyberboard Studio.app` to Applications, then open it. |
-| `Cyberboard-Studio-0.4.2-Windows-x64.zip` | Windows 11 x64; eligible Windows 10 LTSC / Enterprise systems supported by the bundled .NET runtime | Extract the entire folder and open `Cyberboard Studio.exe`. Keep its DLLs and `resources` folder together. |
-| `Cyberboard-Studio-0.4.2-Windows10-Compatibility-x64.zip` | Older Windows 10 x64 systems with a diagnosed CET startup compatibility error | Extract separately. This package removes the app's CET marker; the standard package keeps it. |
+| `Cyberboard-Studio-1.0.0-rc.1-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13+ | Extract and move `Cyberboard Studio.app` to Applications |
+| `Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip` | Windows 11 x64; some .NET 10-supported Windows 10 LTSC / Enterprise editions | Extract everything and run `Cyberboard Studio.exe`; retain DLLs and `resources` |
+| `Cyberboard-Studio-1.0.0-rc.1-Windows10-Compatibility-x64.zip` | Older Windows 10 with a confirmed CET startup error | Extract separately; only this package removes the app CET marker |
 
-All packages include the CLI and its runtime. You do not need to install Python separately. If Windows is missing WebView2, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` from the package with an internet connection.
+Download ZIPs and SHA-256 files from [v1.0.0-rc.1 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.1). CLI and runtime components are bundled. Windows needs WebView2; if missing, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` with an internet connection. Intel Mac, 32-bit Windows and native Windows ARM64 packages are not available.
 
-Use the standard Windows package first. For a startup failure, run `诊断启动.cmd` to collect diagnostics; the compatibility package is intended for failures identified as CET-related. It does not change Windows security settings.
+The Mac package uses an ad-hoc signature and has no Apple Developer ID signature or notarization. See [Apple's instructions for opening apps](https://support.apple.com/en-gb/102445). Windows native launch, key-file operations and USB still need acceptance testing for this candidate. For Unknown Hard Error, run the bundled startup diagnostic before choosing the compatibility package; use it only when the logs identify CET. Updating Windows and using the standard package is preferred.
 
-The Mac app uses an ad-hoc signature and is not yet signed with an Apple Developer ID or notarized. See [Apple's guidance on opening apps](https://support.apple.com/en-gb/102445) if macOS blocks it. An Intel Mac build is not currently available.
+Previous releases remain available in [Releases](https://github.com/maestrokaka/cyberboard-studio/releases). Close the old app before updating. On the first successful save of the new workspace, `workspace-before-1.0.json` preserves the previous workspace. Existing works, trash, removal records and slot drafts remain. Updating does not write to the keyboard.
 
 ## Quick start
 
-Version 0.4.2 removes legacy Keychain / DPAPI access and migration. Model connections use only per-provider local key files, with the same default-hidden Show / Hide controls. Existing local-file keys continue to work; if a key exists only in the old system store, paste and save it again in the app. The app no longer reads or decrypts those old entries.
+1. In Model connections, select a provider, region and permitted model, then paste your API key and save. Keys are hidden by default, with a Show / Hide button; each provider uses a plain local key file.
+2. Open AI creation. Write a description, add up to three images, or use both. For example: “Orange-red flames rise from below, with ember-like backlights, on a four-second loop.”
+3. Send and create, then preview a completed version. For the next turn, choose the base and region: “Only change the backlights to pure yellow; keep the top unchanged.”
+4. Explicitly save the chosen version to the library, or open it in the workbench. Assign a slot draft, review the sync plan, then confirm the write.
 
-Version 0.4.1 includes the final ten-design collection: the original three presets, expanded EVA Awakening, Glitch Override, Mario, Cat Chasing Fireflies and three Kaká variations. Each preset has a complete GIF preview above. Built-in and custom designs support local deletion, trash, restoration and confirmed permanent deletion; the deletion state persists across restarts. These library actions do not change lighting already written to the keyboard.
+Kimi Code defaults to `k3`, Kimi Open Platform to `kimi-k3`, new MiniMax connections to `MiniMax-M3.1-Flash-Preview`, and DeepSeek to `deepseek-flash`. Existing saved model choices remain. M3.1 Flash needs the appropriate plan; image support and access depend on the account and model.
 
-Version 0.4.0 introduced the three Kaká designs, the original EVA design and a glitch wordmark. It improves portrait proportions, clean text holds and dark head silhouettes, and carries these lessons into the creation prompts. Complex subjects can use a bounded canvas up to 40×64 with proportional scrolling through the real 40×5 display. Color checks reduce unintended weak lighting and color washout; API keys stay in local per-provider files with simple Show / Hide controls. [Design iteration and prompt notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
+Generation sends the current description, selected normalized images, a short text history and an explicitly chosen base recipe. It excludes the full workspace, keymap and device configuration. Another work's style is included only when opted into. Local checks allow at most one repair request; cancellation, failure and repairs may still consume credits. Preview the full loop before saving or syncing.
 
-1. **Connect your keyboard by USB.** Use **Check connection（检查连接）** and verify the keyboard model before preparing a sync.
-2. **Set up a model.** Open **Model configuration（模型配置）**, choose the service, region and model, enter your own API key, then click **Save and use（保存并使用）**. Kimi Code defaults to `k3`.
-3. **Create a design.** Return to **Lighting workbench（灯效工作台）**. Describe the effect, or attach up to three images with **Add reference images（添加参考图）** and describe how they should move. Images require a model that supports them. Click the AI creation button, which displays the selected provider.
-4. **Preview and adjust.** Try different keyboard appearances, pause or scrub the animation, and adjust brightness and frame timing. To try another palette, choose a color scheme and use **More tools（更多工具） → Generate template variant（生成模板变体）** to create a new design. The preview simulates hardware colors; the physical keyboard may look different.
-5. **Choose the destination.** Select slot **01**, **02** or **03**, then use **Place in slot（放入槽位）** or update that slot's draft. Clicking a slot card only selects the target; its separate **Preview（预览）** button previews the assigned design.
-6. **Review and sync.** Click **Sync slot 03（同步槽位 03）**, or the equivalent button for your chosen slot. Review the plan and backup, then confirm **Sync to keyboard（同步到键盘）**. Keep USB connected until transfer and verification finish. Other pending slot drafts remain available.
-
-Creating or previewing a design does not automatically write to the keyboard. You can create, preview and export lighting without a device connected.
-
-Kimi Code and Kimi Open Platform use separate API keys and quotas. Code access is subject to the provider's client requirements; see the [official Kimi Code documentation](https://www.kimi.com/code/docs/).
-
-### Start with a simple description
-
-- **Without an image:** try “Orange-red flames rising from below, ember-like key lighting, a 4-second loop.” You do not need to specify pixels, frame counts or animation parameters.
-- **With images:** attach one to three references and add a short direction, such as “Make this cat blink, keep its orange and white colors, and let the key lighting breathe softly.” Image-only creation is also available.
-
-Timing is arranged automatically for the new design. You can request a total duration, such as “a 4-second loop”; the current preview's playback speed does not constrain the new creation. By default, the previous design's name, description and palette are not sent. Enable **Use current design style（使用当前作品风格）** under **More tools（更多工具）** only when you want that reference; your new description and images remain the priority.
-
-For tall subjects, the prompt favors a proportionally enlarged silhouette across roughly 34–38 columns, a quick continuous pass and a clear hold for identity features or text. Static designs, subtle motions and abstract effects are not forced to scroll. The app checks compiled lighting data and basic visibility, with at most one additional repair request for invalid or clearly invisible output. These checks do not judge aesthetics or guarantee image fidelity. Watch the entire top-matrix and key-lighting loop before syncing. Creation never assigns a slot or writes to USB automatically; repair is an additional model call, and submitted requests may use quota even if cancelled or unsuccessful.
-
-### Existing configuration and first-time setup
-
-The CLI cannot read LED animation pixels back from the keyboard. To preserve existing lighting and other slots, migrate a trusted complete CLI record from **the same keyboard**. The configuration view combines the last successfully saved local record with a fresh read of the device's current keymap.
-
-If no trusted record exists, **Prepare first configuration（准备首次配置）** lets you review and explicitly initialize a replacement configuration. This cannot back up or recover unknown previous lighting. It preserves the 1,400 currently readable keycodes, but cannot preserve separate macro or key-swap tables; special key functions may need reconfiguration. Selected custom slots receive the chosen designs; unselected custom slots are disabled. The standard template enables battery, mosaic and clock modes, and disables text and flowing-light modes. This is a common template, not a readback of your keyboard's factory configuration.
-
-To restore selected built-in modes, open **Devices and slots（设备与槽位）**, choose **Read configuration JSON（读取配置 JSON）**, select the modes, then **Prepare modification plan（准备修改计划）**. Review the changes and backup before confirming. Other modes, custom slots, current keycodes and local slot drafts are preserved.
-
-A single-slot sync changes only the selected slot's lighting within a merged full configuration. Before writing, the app checks device identity and current keycodes; after the device acknowledges the transfer, it verifies all 1,400 keycodes. LED pixels are not read back for verification.
-
-For record migration, first-time initialization and troubleshooting, see the [full guide in Chinese](docs/USER_GUIDE.md#baseline).
+For first-time setup, the app needs a trusted complete record from a previous successful CLI write to **the same physical keyboard**. JSON artwork import does not establish this device baseline. With no baseline, initialization preserves and verifies the current 1,400 keycodes but replaces unknown lighting and other modes; independent macros, swapped keys and remap tables cannot be preserved. Read the [first-time setup instructions](docs/USER_GUIDE.md#first-setup) before confirming.
 
 ## Features and current scope
 
-- AI creation from text and reference images, using separate top-matrix and backlight animation sequences.
-- Kimi Code / Open Platform, MiniMax and DeepSeek connections. Image support depends on the selected model; text-only models cannot accept reference images.
-- Eight front-view keyboard appearances, thumbnail selection, playback controls, palette variants, brightness and timing adjustments.
-- Ten built-in designs: Neon Rift（裂隙超载）, Data Storm（数据暴雨）, Redline Rush（红线竞速）, EVA Awakening（EVA初号机 · 觉醒序列）, Glitch Override（故障字标 · 终端夺权）, Mario（马里奥 · 红帽闯关）, Cat Chasing Fireflies（猫逐萤火）and three Kaká designs（红黑22 / 极速突破 / 圣西罗之夜）. JSON import / export, custom names, and trash / restore / confirmed permanent deletion for all designs.
-- Three slot drafts, synchronization of a chosen slot or all pending drafts, backups and local history.
-- R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization. Clock synchronization currently uses **Asia/Shanghai (UTC+8)**.
+- Persistent conversations, reference images, drafts and immutable lighting versions; fixed-base, scoped editing, retry, stop, comparison and selected-version export / save.
+- Kimi, MiniMax and DeepSeek connections. DeepSeek separates useful-output, reasoning and transport limits; MiniMax accepts a complete `stop` when the stream closes and uses revised M3 thinking parameters. Incomplete output is still rejected.
+- Ten built-in designs and eight calibrated front-view photo appearances. No model key is required to preview presets.
+- Brightness, timing, palette variants, JSON import / export, naming, search, trash and confirmed permanent deletion.
+- Three independent slot drafts, single-slot or explicit all-pending sync, backups and local records.
+- R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization using Asia/Shanghai (UTC+8).
 
-Firmware updates, key remapping, general image generation and video export are not currently included.
-
-The v0.4.2 native macOS app was opened and its model settings page loaded twice. It recognized an existing local key without a Keychain authorization prompt. This check did not call a model or write to USB.
-
-The v0.4.0–v0.4.1 preset and prompt changes were checked offline and reviewed in animated previews. This round did not make live model API calls or write to USB. Earlier on macOS, Kimi Code `k3` creation with a reference image and synchronization to R6 slot 03 have been tested on real hardware, including device acknowledgment and full keycode verification. The physical result appears in the demo.
-
-The Windows packages are cross-compiled and pass offline checks. This release's Windows GUI, local key storage and USB communication still need Windows hardware testing. Live MiniMax / DeepSeek generation, R4 writes, first-time initialization and built-in-mode restoration also await their respective account or hardware validation. Shared logic, model protocols, image handling, animation compilation and package contents have offline coverage.
+Firmware updates, key remapping, general image generation and video export are not included. Offline checks and earlier live-provider tests do not establish Windows hardware compatibility or R4 USB acceptance; the [candidate notes](docs/RELEASE_1.0.0_RC1.md) distinguish these results.
 
 ## Local data
 
 | Data | macOS | Windows |
 | --- | --- | --- |
-| Designs, drafts, trash, plans, backups and non-secret model settings | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
+| Conversations, versions, images, works, drafts, trash, plans and backups | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
 | CLI device records | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
 
-API keys are stored directly in `ai-keys/<provider>.key` under the Studio data directory on both platforms. Existing local-file keys remain usable. Legacy Keychain / DPAPI entries are no longer read, decrypted, migrated or deleted; if a key exists only there, paste and save it again in the app. Reference images are kept only for the current session. Generation sends your prompt and selected images to the configured provider; the current design's style is included only when you opt in. Device configuration and keymaps are excluded.
+The v2 `workspace.json` keeps conversations, normalized images and full versions locally. The upgrade backup `workspace-before-1.0.json` is private data too. Saving must finish before success is reported; exit and reload wait for pending saves. Limits are 20 conversations, 12 versions and 60 turns per conversation, and 32 MiB for the full workspace. Export useful versions before deleting old records; records are never silently evicted.
+
+Keys are stored directly in `ai-keys/<provider>.key`, separately from `ai-settings.json`, works and workspace files. Legacy Keychain / DPAPI entries are never read, decrypted, migrated or deleted; paste the key again if it exists only there. Keys, private images, device records and workspace backups stay out of source commits and release packages.
 
 ## Building and contributing
 

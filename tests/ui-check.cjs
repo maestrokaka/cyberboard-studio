@@ -36,6 +36,12 @@ class Element {
   get innerHTML() { return this._html || this.children.map(serialize).join(''); }
   set innerHTML(value) { this._html = String(value); this.children = []; if (this.tagName === 'SELECT') this._value = undefined; parse(this._html, this); }
   appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  append(...children) { children.forEach(child=>this.appendChild(child)); }
+  after(child) { if(this.parent){child.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,child);} }
+  remove() { if(this.parent)this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null; }
+  removeAttribute(name) { delete this.attributes[name]; }
+  closest(selector) { let el=this;while(el){if(matches(el,selector))return el;el=el.parent;}return null; }
+  querySelector(selector) { return this.querySelectorAll(selector)[0]||null; }
   insertAdjacentHTML(position, html) { if (position === 'beforeend') { this._html += html; parse(html, this); } else if (position === 'afterend') { parse(html, this.parent); } else throw Error('Unsupported test insertion: ' + position); }
   addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); }
   async click() { if (this.disabled) return; if (this.tagName === 'INPUT' && this.getAttribute('type') === 'checkbox') { this.checked = !this.checked; if (this.onchange) await this.onchange({ target: this }); } if (this.onclick) await this.onclick({ target: this }); for (const callback of this.listeners.click || []) await callback({ target: this }); }
@@ -50,6 +56,7 @@ function serialize(el) {
 }
 function descendants(el) { return el.children.flatMap(child => [child, ...descendants(child)]); }
 function matches(el, selector) {
+  if(selector.includes(','))return selector.split(',').some(part=>matches(el,part.trim()));
   if (selector.startsWith('.')) return el.classList.contains(selector.slice(1));
   if (selector.startsWith('#')) return el.id === selector.slice(1);
   const attribute = /^\[([^=\]]+)(?:=["']?([^"'\]]*)["']?)?\]$/.exec(selector);
@@ -72,19 +79,21 @@ function harness(options = {}) {
   const fixture = syntheticConfig();
   const documentRoot = new Element('document'); parse(read('index.html'), documentRoot);
   const document = { getElementById: id => descendants(documentRoot).find(el => el.id === id) || null,
+    querySelector: selector => documentRoot.querySelector(selector),
     querySelectorAll: selector => documentRoot.querySelectorAll(selector), createElement: tag => new Element(tag),
     addEventListener() {} };
   documentRoot.ownerDocument = document;
   const calls = [], timers = new Map(); let timerID = 0; let executeReply;
   const control = { importValue: null, detectValue: null, detectError: null, workspace: options.workspace || null, executionResult: options.executionResult || null, planKeymap: null, planPreservation: options.planPreservation || {source:'live',comparedKeycodes:1400,differentFromStored:0,differentPhysicalBindings:0,differentInternalKeycodes:0,refreshApplied:false} };
   const window = { KeyboardPreview: class {
-    constructor(container, options) { this.container = container; this.onFrame = options.onFrame; this.design = options.design; this.speedMs = options.design.speed_ms; this.playing = true; this.ready = Promise.resolve(this); }
+    constructor(container, options) { this.container = container; this.onFrame = options.onFrame; this.design = options.design; this.speedMs = options.design.speed_ms; this.view=options.view||'front';this.playing = true; this.ready = Promise.resolve(this); }
     setDesign(d) { assert.ok(d); this.design = d; return this; }
     setBrightness(v) { this.brightness = v; return this; }
     setSpeed(v) { this.speedMs = v; return this; }
     setView(v) { this.view = v; } setFraming(v) { this.framing = v; } setRenderer(v) { this.renderer = v; } setKeyMode(v) { this.keyMode = v; }
     drawAppearanceThumbnail(canvas, viewId) { (this.thumbnailCalls ||= []).push({ canvas, viewId }); canvas.thumbnailViewId = viewId; return true; }
     pause() { this.playing = false; } play() { this.playing = true; } seek(v) { this.frame = v; }
+    destroy() { this.destroyed=true;this.pause(); }
   }};
   const postMessage = message => {
     calls.push(clone(message));
@@ -112,7 +121,7 @@ function harness(options = {}) {
     else window.webkit = { messageHandlers: { studio: { postMessage } } };
   }
   const context = { window, document, console, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
-  vm.createContext(context); ['data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
+  vm.createContext(context); ['data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', ...(options.chat?['chat-client.js']:[]), 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
   return { window, document, calls, control, get app() { return window.StudioApp; }, el: id => document.getElementById(id),
     async flushSave() { for (const [id, item] of [...timers]) if (item.ms <= 250) { timers.delete(id); await item.fn(); } await settle(); },
     replyExecute(value) { assert.ok(executeReply, 'execute must have an explicit click'); executeReply(value); executeReply = null; } };
@@ -132,7 +141,7 @@ if(require.main===module)(async () => {
   for (const id of ['page-branding','brandReviewBtn','settingsBrandBtn','logoGrid']) assert.equal(h.el(id), null, 'temporary logo review is removed from the product');
   assert.equal(h.window.StudioBrandReview, undefined);assert.equal(h.document.querySelectorAll('.name-editor')[0].hidden,true,'fixed built-in names do not occupy the parameter editor');
   for (const id of ['inspectorParametersTab','inspectorAITab','inspectorParametersPanel','inspectorAIPanel']) assert.equal(h.el(id), null, 'AI creation remains visible on the workbench');
-  assert.equal(h.document.querySelectorAll('.composer').length,1,'AI creation stays in the central workbench');
+  assert.equal(h.document.querySelectorAll('.creation-chat').length,1,'AI creation has a standalone page');
   assert.equal(h.el('syncSingleBtn').disabled, true,'an offline keyboard cannot receive a draft');
   assert.equal(h.el('syncBtn').hidden, true,'the all-drafts action is reserved for multiple drafts');
   const initialLighting = JSON.stringify({selected:state.selected,brightness:state.brightness,speedMs:state.speedMs,pending:[...state.pending]});

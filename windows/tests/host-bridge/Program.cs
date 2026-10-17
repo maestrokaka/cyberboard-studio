@@ -64,6 +64,24 @@ internal static class Program
         File.Copy(Path.Combine(AppContext.BaseDirectory, "fake-bridge.py"), HostPaths.Backend);
         try
         {
+            await Run("workspace exit save barrier rejects reentry and stale replies after failure/retry", () =>
+            {
+                var gate = new WorkspaceExitGate();
+                Check(!gate.IsPending, "Exit gate starts pending.");
+                var first = gate.Begin(WorkspaceExitIntent.CloseWindow)!;
+                Check(gate.IsPending && gate.Intent == WorkspaceExitIntent.CloseWindow, "Barrier intent lost.");
+                Check(gate.Begin(WorkspaceExitIntent.Reload) is null, "Reentry started duplicate save.");
+                Check(gate.Finish("wrong") is null && gate.IsPending, "Unrelated reply approved close.");
+                Check(gate.Finish(first) == WorkspaceExitIntent.CloseWindow && !gate.IsPending, "Saved close did not release.");
+                Check(gate.Finish(first) is null, "Duplicate ready approved another close.");
+                var timedOut = gate.Begin(WorkspaceExitIntent.CloseWindow)!;
+                Check(gate.Finish(timedOut) == WorkspaceExitIntent.CloseWindow, "Failure did not release.");
+                var retry = gate.Begin(WorkspaceExitIntent.Reload)!;
+                Check(retry != timedOut, "Retry reused stale token.");
+                Check(gate.Finish(timedOut) is null && gate.IsPending, "Delayed success closed retry.");
+                Check(gate.Finish(retry) == WorkspaceExitIntent.Reload, "Retry lost its intent.");
+                return Task.CompletedTask;
+            });
             await Run("startup probe reports missing package files without accessing user state", () =>
             {
                 var messages = HostLog.Messages.Count;
@@ -448,6 +466,7 @@ internal static class Program
                 var profiles = publicSettings.GetProperty("profiles");
                 Check(profiles.GetProperty("kimi-code").GetProperty("model").GetString() == "k3-256k", "Kimi custom model lost.");
                 Check(profiles.GetProperty("minimax").GetProperty("baseUrl").GetString() == "https://api.minimax.io/v1", "MiniMax region lost.");
+                Check(profiles.GetProperty("minimax").GetProperty("model").GetString() == "MiniMax-M3", "Saved MiniMax choice replaced by the new default.");
                 Check(profiles.GetProperty("deepseek").GetProperty("hasKey").GetBoolean() && !profiles.GetProperty("deepseek").GetProperty("supportsImages").GetBoolean(), "DeepSeek capabilities wrong.");
                 Check(!publicSettings.GetRawText().Contains("-key") && !File.ReadAllText(Path.Combine(directory, "ai-settings.json")).Contains("-key"), "Profile metadata leaked credentials.");
                 await Fails(() => { reopened.Inject(Payload(new { provider = "minimax" })); return Task.CompletedTask; }, "已切换");
@@ -471,7 +490,7 @@ internal static class Program
                 foreach (var provider in new[] { "minimax", "deepseek" })
                     foreach (var baseUrl in new[] { "http://api.deepseek.com", "https://api.minimax.cn.evil/v1", "https://api.deepseek.com/v1?key=x", "https://user@api.minimax.cn/v1", "https://api.kimi.com/coding/v1" })
                         await Fails(() => { AISettings.Validate(Payload(new { provider, baseUrl })); return Task.CompletedTask; }, "官方 HTTPS");
-                Check(AISettings.Validate(Payload(new { provider = "minimax" })).Model == "MiniMax-M3", "MiniMax default wrong.");
+                Check(AISettings.Validate(Payload(new { provider = "minimax" })).Model == "MiniMax-M3.1-Flash-Preview", "MiniMax default wrong.");
                 Check(AISettings.SupportsImages(AISettings.Validate(Payload(new { provider = "deepseek" }))), "DeepSeek Flash image support missing.");
             });
 

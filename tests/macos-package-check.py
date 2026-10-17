@@ -48,7 +48,7 @@ def local_credentials_only(native):
     for token in ("SecItem", "SecKeychain", "kSec", "Keychain", "Security", "legacyCredentialRead",
                   "readLegacyKey", "legacyChecked", "legacyUnavailable", "Cyberboard Studio.Kimi"):
         require(token not in source, "Native source contains forbidden system credential access: " + token)
-    require("Security" not in (ROOT / "native/build.sh").read_text(encoding="utf-8"),
+    require("-framework Security" not in (ROOT / "native/build.sh").read_text(encoding="utf-8"),
             "Native build explicitly links the system credential framework")
     dependencies = run(["/usr/bin/otool", "-L", str(native)]).stdout
     symbols = run(["/usr/bin/nm", "-u", str(native)]).stdout
@@ -102,8 +102,9 @@ def bundle_structure(app):
     contents = app / "Contents"
     resources = contents / "Resources"
     info = plistlib.loads((contents / "Info.plist").read_bytes())
-    require(info.get("CFBundleShortVersionString") == "0.4.2", "App version differs from this release")
-    require(info.get("CFBundleVersion") == "11", "App build number differs from this release")
+    require(info.get("CFBundleShortVersionString") == "1.0.0", "App version differs from this release")
+    require(info.get("CFBundleVersion") == "1.0.0", "App build number differs from this release")
+    require(info.get("CyberboardDisplayVersion") == "1.0.0-rc.1", "Candidate display version differs from this release")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
     native = contents / "MacOS" / info["CFBundleExecutable"]
@@ -132,7 +133,7 @@ def bundle_structure(app):
     require(not (resources / "backend/bridge.py").exists(), "Source/development backend is included in the release")
     for removed in ("assets/desk.jpg", "assets/photos/r4-cloud-perspective.jpg", "assets/photos/r6-launch-front.png"):
         require(not (resources / "web" / removed).exists(), "Excluded-angle photo remains in the package: " + removed)
-    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
+    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
                 "Packaged web source is missing or stale: " + name)
     # --help exits before Bridge/CLI initialization. A fresh web tree alone must
@@ -216,7 +217,7 @@ def relocated_offline_checks(app):
 
         payload = {"designs": [], "pending": [], "selectedId": None, "targetSlot": 2,
                    "brief": "搬移后的离线工作台 保存检查", "palette": "original", "brightness": 63,
-                   "speedMs": 40, "exportFormat": "design"}
+                   "speedMs": 40, "exportFormat": "design", "conversations": [], "activeConversationId": None}
         saved = call_backend(binary, resources, state, cli_store, temporary, "saveWorkspace", payload)
         require(saved.get("saved") is True and saved.get("designCount") == 0 and saved.get("pendingCount") == 0,
                 "Offline saveWorkspace failed")
@@ -224,7 +225,7 @@ def relocated_offline_checks(app):
         require(workspace_file.is_file(), "Workspace did not persist in the explicit temporary state directory")
         workspace = json.loads(workspace_file.read_text(encoding="utf-8"))
         require(all(workspace.get(key) == value for key, value in payload.items()), "Persisted workspace payload changed")
-        require(workspace.get("version") == 1 and isinstance(workspace.get("savedAt"), str), "Workspace metadata is missing")
+        require(workspace.get("version") == 2 and isinstance(workspace.get("savedAt"), str), "Workspace metadata is missing")
         restored = call_backend(binary, resources, state, cli_store, temporary, "bootstrap", {})
         require(restored.get("workspace") == {key: value for key, value in workspace.items() if key != "version"},
                 "Relocated bootstrap did not restore the persisted workspace")

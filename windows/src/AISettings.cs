@@ -29,7 +29,7 @@ internal sealed class AISettings
         ["deepseek"] = ["https://api.deepseek.com", "https://api.deepseek.com/v1"]
     };
     private static readonly Dictionary<string, string> DefaultModels = new(StringComparer.Ordinal)
-    { ["kimi-code"] = "k3", ["kimi-open"] = "kimi-k3", ["minimax"] = "MiniMax-M3", ["deepseek"] = "deepseek-flash" };
+    { ["kimi-code"] = "k3", ["kimi-open"] = "kimi-k3", ["minimax"] = "MiniMax-M3.1-Flash-Preview", ["deepseek"] = "deepseek-flash" };
     internal static bool SupportsImages(AIConfiguration config) => config.Provider switch
     {
         "minimax" => config.Model is "MiniMax-M3" or "MiniMax-M3.1-Flash-Preview",

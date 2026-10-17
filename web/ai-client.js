@@ -6,8 +6,8 @@
   'minimax':{china:'https://api.minimax.cn/v1',global:'https://api.minimax.io/v1'},
   'deepseek':{china:'https://api.deepseek.com',global:'https://api.deepseek.com/v1'}
  };
- const defaults={'kimi-code':'k3','kimi-open':'kimi-k3',minimax:'MiniMax-M3',deepseek:'deepseek-flash'};
- const models={'kimi-code':['k3','k3-256k','kimi-for-coding','kimi-for-coding-highspeed'],'kimi-open':['kimi-k3'],minimax:['MiniMax-M3','MiniMax-M3.1-Flash-Preview','MiniMax-M2.7'],deepseek:['deepseek-flash','deepseek-v4-pro','deepseek-v4-flash-vision-exp']};
+ const defaults={'kimi-code':'k3','kimi-open':'kimi-k3',minimax:'MiniMax-M3.1-Flash-Preview',deepseek:'deepseek-flash'};
+ const models={'kimi-code':['k3','k3-256k','kimi-for-coding','kimi-for-coding-highspeed'],'kimi-open':['kimi-k3'],minimax:['MiniMax-M3.1-Flash-Preview','MiniMax-M3','MiniMax-M2.7'],deepseek:['deepseek-flash','deepseek-v4-pro','deepseek-v4-flash-vision-exp']};
  const labels={'kimi-code':'Kimi Code','kimi-open':'Kimi',minimax:'MiniMax',deepseek:'DeepSeek'};
  const notes={'kimi-code':'Kimi Code 使用会员编程配额，需遵守官方客户端接入限制。接口拒绝时可以改用开放平台。','kimi-open':'Kimi 开放平台使用独立 API Key 和 API 额度，与 Code 会员密钥分开。',minimax:'MiniMax 开放平台使用独立 API Key。M3 支持参考图；M3.1 Flash Preview 仅限具备 MPlan / Coding Plan 权限的账户。',deepseek:'DeepSeek 使用独立 API Key。Flash 支持参考图；V4 Pro 用于文字创作。模型可用性以账户权限为准。'};
  function providerName(provider){return labels[provider]||'AI';}
@@ -30,7 +30,7 @@
   function formIsSaved(){const form=formSettings(),saved=selectedProfile();return form.baseUrl===saved.baseUrl&&form.model===saved.model&&(!$('aiApiKey').value.trim()||unchangedRevealedKey());}
   function capabilityNote(){const form=formSettings(),saved=selectedProfile(),known=form.model===saved.model&&form.baseUrl===saved.baseUrl?saved:form;return supportsImages(known)?'支持文字与参考图创作；图片只在你点击制作时发送。':models[form.provider].includes(form.model)?'此模型仅支持文字创作。参考图会保留，但制作前需要移除图片或换用支持图片的模型。':'自定义模型的图片能力尚未确认，仅开放文字创作。';}
   function refresh(){
-   const busy=state.aiBusy,configured=selectedProfile().hasKey===true,credentialError=credentialProblem(),name=providerName(settings?.provider||'kimi-code');
+   const busy=state.aiBusy||state.closing,configured=selectedProfile().hasKey===true,credentialError=credentialProblem(),name=providerName(settings?.provider||'kimi-code');
    $('generateAIBtn').disabled=busy||state.executing||state.hardwareBusy||settingsBusy||imageImporting||keyRevealBusy;
    $('generateAIBtn').textContent=busy?providerName(activeRequest?.provider||settings?.provider)+' 正在制作…':loaded?'用 '+name+' 制作灯效':'制作 AI 灯效';
    $('cancelAIBtn').hidden=!busy;$('cancelAIBtn').disabled=!!activeRequest?.cancelRequested;
@@ -48,7 +48,7 @@
    $('aiApiKey').placeholder=credentialError?'重新输入 Key 后可直接保存':configured?'已保存；输入新密钥可替换':'输入你的 API Key';
    $('aiCredentialNote').textContent=credentialError?'旧 Key 暂时无法读取；输入新的 Key 可直接保存。':'Key 仅保存在本机；默认隐藏，点击「显示」查看。';
    $('aiModelCapability').textContent=capabilityNote();
-   $('aiActiveConnection').textContent=loaded?'工作台当前使用：'+name+' · '+settings.model+'。服务和模型修改后，点击「保存并使用」生效。':'每个服务分别保存模型、接口与密钥，切换不会删除已有连接。';
+   $('aiActiveConnection').textContent=loaded?'AI 创作当前使用：'+name+' · '+settings.model+'。服务和模型修改后，点击「保存并使用」生效。':'每个服务分别保存模型、接口与密钥，切换不会删除已有连接。';
    $('aiSendHint').textContent='描述'+(images.length?'和 '+images.length+' 张参考图':'与所选参考图')+'发送给 '+(loaded?name:'已保存的创作服务')+'。节奏自动编排，可在描述里指定时长；预览后再同步。';
   }
   function setBusy(value){state.aiBusy=value;refresh();onBusy();}
@@ -143,13 +143,13 @@
    if(credentialProblem()&&!replacementKey()){settingsStatus('旧 Key 暂时无法读取，重新输入 Key 后可直接保存。',true);return;}
    const payload=formSettings(),key=$('aiApiKey').value.trim();if(!payload.model){settingsStatus('请填写官方模型 ID，或选择已有模型。',true);return;}if(key&&!unchangedRevealedKey())payload.apiKey=key;
    settingsBusy=true;refresh();settingsStatus('正在保存连接…');
-   try{applySettings(await api('saveAISettings',payload));loaded=true;settingsStatus(providerName(settings.provider)+' 连接已保存，工作台将使用此服务，可继续测试连接。');toast(providerName(settings.provider)+' 连接已保存。');}
+   try{applySettings(await api('saveAISettings',payload));loaded=true;settingsStatus(providerName(settings.provider)+' 连接已保存，AI 创作将使用此服务，可继续测试连接。');toast(providerName(settings.provider)+' 连接已保存。');}
    catch(error){settingsStatus(message(error),true);}finally{settingsBusy=false;refresh();}
   }
   async function testConnection(){
    if(settingsBusy||state.aiBusy||keyRevealBusy||!selectedProfile().hasKey||!native||!formIsSaved())return;
    const provider=$('aiProvider').value;settingsBusy=true;refresh();settingsStatus('正在检查 '+providerName(provider)+' 服务和凭据…');
-   try{const result=await api('testAIConnection',{provider,requestId:'ai-test-'+Date.now().toString(36)+'-'+(++sequence)});if(result.success===false||result.needsGenerationTest||result.requiresGenerationTest){settingsStatus(result.message||'此服务未提供独立连接检测，尚未确认模型权限。请在工作台主动制作一次进行验证。',true);return;}settingsStatus('服务与凭据检查通过。模型权限以实际制作为准。');}
+   try{const result=await api('testAIConnection',{provider,requestId:'ai-test-'+Date.now().toString(36)+'-'+(++sequence)});if(result.success===false||result.needsGenerationTest||result.requiresGenerationTest){settingsStatus(result.message||'此服务未提供独立连接检测，尚未确认模型权限。请在 AI 创作主动制作一次进行验证。',true);return;}settingsStatus('服务与凭据检查通过。模型权限以实际制作为准。');}
    catch(error){settingsStatus(message(error),true);}finally{settingsBusy=false;refresh();}
   }
   async function removeKey(){
@@ -199,10 +199,18 @@
   $('addAIImagesBtn').onclick=addImages;
   document.querySelectorAll('[data-ai-example]').forEach(button=>button.onclick=()=>{if(state.aiBusy)return;$('creativeBrief').value=button.dataset.aiExample;options.saveBrief?.();});
   $('saveAISettingsBtn').onclick=saveSettings;$('testAIConnectionBtn').onclick=testConnection;$('removeAIKeyBtn').onclick=removeKey;$('toggleAIKeyBtn').onclick=toggleKeyVisibility;
-  $('aiProvider').onchange=()=>{showProfile(selectedProfile());refresh();settingsStatus(credentialProblem()||'已载入该服务的本机连接。点击「保存并使用」后，工作台才会切换服务。',!!credentialProblem());};
+  $('aiProvider').onchange=()=>{showProfile(selectedProfile());refresh();settingsStatus(credentialProblem()||'已载入该服务的本机连接。点击「保存并使用」后，AI 创作才会切换服务。',!!credentialProblem());};
   $('aiRegion').onchange=()=>{refresh();settingsStatus(credentialProblem()||'接口选项已修改，保存后生效。',!!credentialProblem());};$('aiModel').onchange=()=>{modelChanged();refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiCustomModel').oninput=()=>{refresh();settingsStatus(credentialProblem()||'模型已修改，保存后生效。',!!credentialProblem());};$('aiApiKey').oninput=()=>{revealedKey=null;refresh();const problem=credentialProblem();settingsStatus(replacementKey()?'新的 Key 尚未保存，点击「保存并使用」即可。':problem||'密钥尚未保存，点击「保存并使用」后生效。',!!problem&&!replacementKey());};
   $('aiApiKey').type='password';providerChanged();refresh();
-  return {loadSettings,refresh,progress,showCreation,generate,cancel,pageChanged};
+  // Conversation UI receives connection metadata and normalized images, never a Key.
+  async function pickImages(){
+   const result=native?await api('importAIImages'):await browserImages();
+   if(result?.cancelled)return [];
+   if(!Array.isArray(result?.images))return [];
+   return result.images.map(validImage);
+  }
+  return {loadSettings,refresh,progress,showCreation,generate,cancel,pageChanged,
+   getSettings:()=>settings?{...settings}:null,supportsImages,pickImages};
  }
  global.StudioAI={create,providerName,isAIWork};
 })(typeof window!=='undefined'?window:globalThis);

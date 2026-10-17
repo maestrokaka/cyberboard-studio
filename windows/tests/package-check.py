@@ -13,7 +13,7 @@ import zipfile
 APP = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-0.4.2-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-1.0.0-rc.1-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -43,7 +43,7 @@ class PackageChecks(unittest.TestCase):
                     "resources/backend/bridge.py", "resources/backend/migrate-config.py",
                     "resources/backend/kimi_ai.py", "resources/backend/lighting_recipe.py", "resources/backend/ai_images.py",
                     "resources/backend/ai_quality.py",
-                    "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/library-client.js", "迁移原配置.cmd",
+                    "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/chat-client.js", "resources/web/creation.css", "resources/web/library-client.js", "迁移原配置.cmd",
                     "检查运行环境.cmd", "诊断启动.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
         for name in required:
             self.assertTrue((PACKAGE / name).is_file(), name)
@@ -54,7 +54,7 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "0.4.2")
+        self.assertEqual(release["version"], "1.0.0-rc.1")
         self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
         self.assertEqual(release["managedHostSha256"], digest(PACKAGE / "Cyberboard Studio.dll"))
         self.assertEqual(release["hostSourceSha256"],
@@ -64,16 +64,16 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(release["credentialStore"], "provider-local-plain-files")
         self.assertIs(release["systemCredentialAccess"], False)
         host_source = (APP / "windows/src/StudioForm.cs").read_text(encoding="utf-8")
-        self.assertIn('version = "0.4.2"', host_source)
-        self.assertIn('Cyberboard Studio 0.4.2', host_source)
-        self.assertIn('Cyberboard Studio 0.4.2'.encode("utf-16-le"),
+        self.assertIn('ReleaseVersion = "1.0.0-rc.1"', host_source)
+        self.assertIn('version = ReleaseVersion', host_source)
+        self.assertIn('1.0.0-rc.1'.encode("utf-16-le"),
                       (PACKAGE / "Cyberboard Studio.dll").read_bytes())
         self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
         self.assertIs(release["includesDeviceBaseline"], False)
         self.assertIs(release["startupAccessesUSB"], False)
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 0.4.2"))
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 1.0.0-rc.1"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
-        for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
+        for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
         self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
         for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py"):
@@ -92,7 +92,7 @@ class PackageChecks(unittest.TestCase):
     def test_app_credentials_have_no_system_vault_or_encryption_routes(self):
         # Scan only our own managed host. WebView2 and the .NET runtime can use
         # Windows system APIs for unrelated browser/runtime behavior.
-        source = (APP / "windows/src/AISettings.cs").read_text(encoding="utf-8")
+        source = "\n".join(path.read_text(encoding="utf-8") for path in (APP / "windows/src").glob("*.cs"))
         assembly = (PACKAGE / "Cyberboard Studio.dll").read_bytes()
         forbidden = ("DPAPI", "ProtectedData", "CryptProtectData", "CryptUnprotectData",
                      "CredRead", "CredWrite", "VaultEnumerate", "crypt32.dll")
@@ -217,7 +217,10 @@ class PackageChecks(unittest.TestCase):
             self.assertIn(name, backend)
         for name in ("initializationAcknowledged", "initializePlan", "confirmInitialization", "live-keymap-only"):
             self.assertIn(name, web)
-        self.assertIn("首次配置（没有这把键盘的完整记录）", (PACKAGE / "使用说明.txt").read_text())
+        guide = (PACKAGE / "使用说明.txt").read_text(encoding="utf-8")
+        self.assertIn("没有可信记录时可准备首次配置", guide)
+        self.assertIn("不是旧完整配置备份", guide)
+        self.assertIn("不盲目再次初始化", guide)
         self.assertFalse((PACKAGE / "resources/python/devices").exists())
 
     def test_official_builtin_modes_template_and_targeted_workflow_are_shipped(self):

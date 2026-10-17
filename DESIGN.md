@@ -1,134 +1,88 @@
-# Cyberboard Studio
+# Cyberboard Studio · 1.0
 
-Desktop lighting studio for macOS and Windows, with restrained charcoal surfaces
-and a layout informed by the Linear design language.
+A desktop lighting studio for macOS and Windows. The interface follows restrained charcoal surfaces and the Linear design language. The keyboard is the subject: real calibrated front photographs show the selected design, while sparse lavender controls guide creation and delivery. LED colors come from the artwork data.
 
-The keyboard is the subject. Real calibrated photography occupies the main canvas;
-interface chrome uses quiet charcoal surfaces and sparse lavender actions. LED colors
-belong to the design data and never to a decorative UI gradient.
+## Tokens and platform behavior
 
-## Tokens
+Canvas `#010102`; sidebar `#0f1011`; panel `#141516`; hover `#18191a`; hairline `#23252a`; strong border `#34343a`; text `#f7f8f8`; secondary `#8a8f98`; tertiary `#62666d`; primary `#5e6ad2`; primary hover `#828fff`; verified success `#27a644`.
 
-Canvas #010102; sidebar #0f1011; panels #141516; hover #18191a.
-Hairline #23252a; strong border #34343a; text #f7f8f8;
-secondary #8a8f98; tertiary #62666d; primary #5e6ad2;
-primary hover #828fff; verified success #27a644.
+Use SF Pro on macOS and Segoe UI on Windows. Core content is 13px, controls and metadata 11–13px, page titles 20–24px. Reserve smaller type for optional decoration. Use SF Mono / Menlo for time, frames, hex and device identifiers. A 4px spacing unit, 6–8px controls and 12px panels keep the rhythm consistent. No decorative atmospheric gradients.
 
-System SF Pro on macOS and Segoe UI on Windows, 13px body / 12px metadata / 22px page title.
-SF Mono or Menlo only for time, frame, hex and device identifiers.
-4px spacing unit; 6–8px controls; 12px panels; no atmospheric gradients.
-Sidebar 184px, inspector 280px. Native titlebar with real window controls.
-Preview/photo keeps its calibrated aspect ratio. Minimum window 1120×760;
-prioritize a single-screen workbench at this size and wider desktop windows.
-Long content and narrow layouts may scroll within their regions rather than
-clipping controls. Narrow inspector becomes 250px.
+Sidebar 184px, workbench inspector approximately 250–280px. Use a native titlebar and real platform controls. Minimum window 1120×760. Preview, common parameters and three slots should fit a normal desktop window; complex conversations, long lists and smaller windows may scroll within their own regions rather than hide controls. Controls have at least 32px targets. Focus uses a 2px lavender outline. Reduced motion pauses players by default and removes ornamental transitions.
 
-## Components and behavior
+The approved icon is the orange tile containing a white, proportionate keyboard enclosure with the correct display opening and cat paw. Only the paw is rotated 180 degrees. The same raster asset drives the sidebar, macOS ICNS and Windows ICO; no Logo review destination is included.
 
-Navigation: six destinations, active lifted surface, descriptive icon and label.
-Preview: isolated front keyboard photo, separate top and key LED canvas, frame
-scrubber, reference-appearance thumbnail rail and LED rendering controls.
-Inspector: compact work parameters edit real brightness, speed and naming,
-with a read-only target slot and fixed assignment/sync actions.
-Changes require explicit assignment to the selected target's draft before sync.
-Slots: three cards below the main preview, showing name, real 40×5 frame, frame
-count, pending or last-sync status. Clicking a card selects the assignment target
-without loading a different work. A secondary Preview action loads that slot's
-content; pending cards offer Undo Draft. Keep advanced actions on the device page.
-Single-slot sync uses the selected target's prepared draft. The workbench shows
-Sync All only when multiple drafts are pending; untouched slots never join it.
-Sync sheet: concrete merged plan before execution; measured transfer progress;
-device acknowledgement and keymap verification are separate claims.
-AI composer: always visible in the workbench beneath the main preview, beside
-the three-slot region on desktop. Keep the editable brief, reference images,
-exportable prompt and template variants directly available. Model status is
-explicit. No simulated AI service or simulated USB success.
+## Information hierarchy
 
-Keyboard focus uses 2px lavender outline. Buttons have at least 32px height.
-Reduced motion pauses the player by default and removes ornamental transitions.
-Source labels distinguish bundled examples, CLI last-written data and live keymap.
-Imported files contribute LED frames only and do not replace keyboard bindings.
+Application navigation, conversation history and lighting versions are separate levels.
 
-## Visual refinement · 2026-10-12
+| Navigation group | Destinations |
+| --- | --- |
+| 创作 | AI 创作, 灯效工作台, 灯效作品库 |
+| 键盘 | 键盘与外观, 设备与槽位 |
+| 设置 | 模型配置 |
 
-The front whole-keyboard preview uses the enclosure outline to clip the three canvas
-layers, removing surroundings and reflection without editing the photograph or
-LED data. A flat #111315 stage centers the keyboard and fits its full enclosure
-to the available width and height, limiting side whitespace without stretching
-or cropping the physical keyboard. All selectable appearances use this clean
-front presentation.
+The device destination provides internal tabs for slots / configuration, read-only keymaps and sync records. Studio preferences and optional support remain secondary destinations. The global sidebar never becomes a conversation list.
 
-Frequently used preview controls are 11–12px, with secondary metadata at 10px.
-The inspector retains major group separators rather than drawing a rule under
-every control block. Remove the Logo review page, candidate selectors and temporary
-sidebar-logo actions; keep the approved formal brand and native application icon.
+## AI creation
 
-The formal icon is an orange rounded tile with a white, proportionate keyboard
-enclosure, a correctly placed display opening, and the approved cat paw. Only
-the paw is rotated 180 degrees; the keyboard and tile keep their orientation.
-The same approved raster asset drives the sidebar, macOS ICNS, and Windows ICO.
+AI creation has a dedicated page. The main column is a conversation with a stable title, model status, History and New Conversation actions. History opens internally and supports search; choosing a conversation closes it. The secondary column contains a collapsible calibrated keyboard preview, version selection and delivery actions. It must not repeat a full set of save / workbench actions under every old message.
 
-## Interaction and visual review · 2026-10-14
+The composer accepts a concise description and up to three reference images, shows the saved model, and provides an explicit base-version choice and scope: both regions, only the top matrix, or only the backlight. Images remain visible in their input / sent-message context. Images and conversation drafts persist locally. Model requests occur only on an explicit Send/Create action; no simulated AI response or USB completion is permitted.
 
-The workbench center contains the large preview above a lower row with the always
-visible AI composer and three-slot region side by side on desktop; allot roughly
-60% of this row to AI creation and 40% to slots. The right inspector holds compact
-parameters and fixed assignment/sync actions. Keep ordinary preview, creation and
-assignment operations in one screen at the 1120×760 desktop minimum and wider.
-Long content, added references and narrow windows can use contained scrolling.
-Avoid positional nth-of-type styling: groups retain explicit borders.
-Common controls use at least 32px targets; ordinary small text uses #858b94 or
-lighter on charcoal surfaces. Long names and dual-stream progress may wrap.
-Frame labels distinguish top, key LEDs and the common loop when lengths differ.
-The common 10–100ms slider sits beside an exact 1–32767ms number input; imported
-timings are never silently clamped. AI generation retains its narrower range.
+Each accepted result becomes a complete immutable version. Sending a modification locks the chosen base version at request start. Scoped edits preserve the other region's full RGB frames and timing; a malformed or unverified edit is rejected. Old results stay selectable after errors, cancellation and new turns. The preview always identifies its selected version. Comparison lets the user select two versions, synchronize playback or inspect corresponding loop phases.
 
-Modal sheets have fixed headings and actions, a scrolling body, contained Tab
-focus and return focus on dismissal. Background content is inert while open.
-Reduced-motion behavior and the approved product icon remain unchanged.
+Generation does not automatically create a library entry or slot draft. The user explicitly exports a version, saves that version to the library, or opens a copy in the workbench. Workbench changes never mutate the old conversation version. Empty conversations disable export, save and workbench delivery rather than exposing an earlier result.
 
-Support is an optional page below the primary navigation. Use the approved
-orange icon and a short, static amber pixel line, with restrained charcoal
-surfaces and generous space. The original payment JPEG stays byte-exact; crop
-only through CSS and keep a white quiet zone around the QR. Display the author
-as Kakà and the contact as maestrokaka@gmail.com. No payment amount, tracking or
-automatic transaction belongs in the app. The README ends with the original QR
-and playful copy, without an App screenshot or support entries in release notes.
+Stop, provider errors, format errors, interruption and disk-save errors are distinct states with useful next actions. Retry restores the original description, references, base, scope and model; changing to another saved model requires an explicit choice. Do not silently swap a provider or fall back to a local template. Preserve the unfinished brief and old results. Persistence success is reported only after the file write completes.
 
-## Model services and official appearances · 2026-10-14
+## Lighting workbench
 
-Model configuration supports Kimi Code, Kimi Open Platform, MiniMax and DeepSeek.
-Each service keeps its own endpoint, model and system-protected credential.
-Selecting a form option does not change the active creative service until saved.
-The API Key field starts hidden. An adjacent Show/Hide action reveals the current
-typed value or explicitly reads the selected service's saved key, without another
-confirmation step. Switching services or leaving model configuration restores the
-hidden state; hiding preserves a newly typed draft. Existing system credential
-storage remains unchanged.
-Show model-specific reference-image support and real credential errors; a failed
-or unavailable model-list check must never imply successful generation access.
-Creation and library labels identify the actual service while retaining old Kimi works.
+The workbench concentrates on large photo preview, real parameters, JSON and device delivery. AI chat and the appearance picker live on their separate pages. Show all three slot cards below the large preview, with the target, content, frame counts, last-written / pending status and separate Preview and Undo Draft actions.
 
-The preview has a reference-appearance thumbnail rail on the left of the main
-keyboard canvas. Each choice shows a small, background-free front keyboard photo
-and a short one-line label such as "R6「Vision」" or "R4「Fluo Free」", omitting
-the repeated CYBERBOARD prefix. Use 11px labels and a 160px rail at regular desktop
-widths. Keep full names in the catalog and main preview. Clicking a
-choice switches the main preview. Use a restrained
-lavender border and selected marker for the current choice, with distinct hover
-and keyboard-focus states. The rail scrolls independently, keeping all eight
-choices reachable; at narrow widths it becomes a horizontally scrolling image
-strip. Show the current photo model and source with the main preview. Do not use
-a text dropdown for appearance selection. Original photos and official R4/R6 photos retain their
-pixels. Offer eight appearances named exactly "CYBERBOARD R6「Vision」",
-"CYBERBOARD R4「Fluo Free」", "CYBERBOARD R4「Bebop」", "CYBERBOARD R4「Gangstar」",
-"CYBERBOARD R4「Cloud White V2」", "CYBERBOARD R4「Stone Face」",
-"CYBERBOARD R4「Paisley」" and "CYBERBOARD R4「Vision」". Keep R4 and R6 Vision
-as separate model-specific choices. The R6 appearance uses the user's earliest
-front photograph; seven R4 appearances use official site or store images,
-including qualified images of sold-out colorways. Each shows the entire keyboard from the
-front, clipped along the physical enclosure on the same quiet stage. Do not offer
-desk, oblique, scene-background or alternate-framing controls. Opaque keycaps
-receive restrained light in the key gaps,
-while transparent keycaps retain their transmission treatment. Remember the
-selected appearance without changing LED data, slot drafts or connected-device identity.
+Clicking a slot selects an assignment target without changing the work being designed. Its Preview action loads that slot's content. The inspector names the target and distinguishes assigning or updating its local draft from actual synchronization. Parameter changes require explicit reassignment before they affect the prepared draft. Conversation switches, new conversations and appearance choices never clear drafts.
+
+Single-slot sync uses only the selected target's prepared draft. Show Sync All only when several drafts are pending; untouched slots do not join the request. Keep advanced configuration actions on the device page. The sync sheet shows a concrete merged plan before execution, measured transfer progress, device acknowledgement, full keymap verification and record-saving status as separate claims.
+
+Brightness acts on original RGB and slot brightness without rewriting the source artwork. The common timing slider covers 10–100ms beside an exact 1–32767ms number input; imported timings remain exact. Frame labels distinguish top, backlight and the common loop when sequence lengths differ. Preview-only rendering and backlight visibility controls do not alter exported LED data.
+
+## Keyboard appearances
+
+A dedicated card gallery supplies eight front-view appearances with R4 / R6 filtering. Compare using the same design and same frame. The selected card has a restrained lavender border and accessible pressed state; hover and keyboard focus remain distinct. Short, one-line labels omit the repeated CYBERBOARD prefix. Full names and photo source are available with the main preview.
+
+The catalog names are exactly:
+
+- CYBERBOARD R6「Vision」
+- CYBERBOARD R4「Fluo Free」
+- CYBERBOARD R4「Bebop」
+- CYBERBOARD R4「Gangstar」
+- CYBERBOARD R4「Cloud White V2」
+- CYBERBOARD R4「Stone Face」
+- CYBERBOARD R4「Paisley」
+- CYBERBOARD R4「Vision」
+
+R4 and R6 Vision are distinct model choices. R6 uses the earliest provided front photograph; R4 uses qualified official site / store images, including sold-out colorways. Preserve the photographs' original pixels and use calibrated screen / backlight projections. Clip photo and canvases along the physical enclosure on a quiet `#111315` stage. Keep the full enclosure proportional, without stretching, cropping the keyboard or adding fictional colorways. Only the clean front view is offered.
+
+Opaque keycaps receive restrained light in key gaps; transparent keycaps retain transmission. Selection is remembered and changes only preview appearance, never the artwork, slot drafts or connected-device identity. Clearly separate the photo model from the manually detected USB identity. Photo composition is an approximation, not a real-time camera feed or hardware color measurement.
+
+## Model configuration and local data
+
+Kimi Code / Open Platform, MiniMax and DeepSeek keep independent saved endpoints, models and keys. Changing a form value does not activate a service until Save. New Kimi Code uses k3; new MiniMax uses M3.1 Flash Preview, while existing manually saved model choices are retained. Show image capabilities and account errors accurately; a model-list check never implies generation permission.
+
+API keys use ordinary per-provider local files. The field is hidden by default with a direct Show / Hide action. Service switches and leaving this page restore masking. There is no additional reveal confirmation, Keychain / DPAPI encryption, system authorization or legacy credential lookup / migration. Existing plain-file keys remain usable; users with only legacy system records paste and save again. Never add system credential access as a compatibility fallback.
+
+The v2 private workspace holds conversations, normalized reference images, immutable versions, library state, removed built-ins and independent slot drafts. Before the first v2 save, retain the prior workspace as `workspace-before-1.0.json`. Await disk persistence before success and before ordinary exit / reload. A failure leaves the app open for export or retry. Respect 20 conversations, 12 versions and 60 turns per conversation, and a 32MiB workspace cap without silently evicting old results.
+
+Keys stay outside workspace, designs, exports, logs, public assets, commits and packages. Device configuration / keymaps are excluded from AI requests. A selected base recipe and bounded creative history are explicit request inputs. The image payload is normalized locally, and artwork export omits the reference images and transcript.
+
+## Library, dialogs and support
+
+All ten approved built-ins and custom works support local trash, restore and confirmed permanent deletion. Removed built-ins stay removed after restart / upgrade. Restoring a work does not restore its discarded slot drafts. Keep custom names and JSON import / export. Source labels distinguish bundled examples, local CLI records and live keymap reads; imported configuration contributes artwork rather than replacing bindings.
+
+Modal sheets have fixed headings and actions, a scrollable body, contained Tab focus and focus return on dismissal. Background content is inert while open. Close actions obey real device-commit protection; progress completion is not a substitute for acknowledgement and verification.
+
+Support is optional. Preserve the approved icon, restrained charcoal layout and original payment artwork with a white QR quiet zone. Display author Kakà and contact maestrokaka@gmail.com. No amount, tracking or automatic transaction belongs in the app. The README ends with the original QR and playful copy, rather than an app screenshot; release notes contain product changes and validation.
+
+## Candidate acceptance
+
+1.0.0-rc.1 is a prerelease. Reviews cover the full flow and retained functions, not only the new screen. Distinguish offline tests, live-provider tests, native host checks and USB acceptance. Never label Windows / R4 stable on the basis of cross-compilation or shared mocks. Package only public resources and an empty / explicitly isolated demonstration workspace; private tests and screenshots stay in ignored build directories.

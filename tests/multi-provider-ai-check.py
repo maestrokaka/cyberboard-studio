@@ -22,7 +22,7 @@ class MultiProviderChecks(unittest.TestCase):
                 "requestId": "offline-multi", "brief": "橙蓝几何转场", "frameCount": 12, "speedMs": 40}
 
     def test_provider_defaults_and_strict_official_endpoints(self):
-        self.assertEqual(ai.configuration(self.payload("minimax")["ai"]).model, "MiniMax-M3")
+        self.assertEqual(ai.configuration(self.payload("minimax")["ai"]).model, "MiniMax-M3.1-Flash-Preview")
         self.assertEqual(ai.configuration(self.payload("deepseek")["ai"]).model, "deepseek-flash")
         for provider in ("minimax", "deepseek"):
             for url in ai.BASE_URLS[provider]:
@@ -47,13 +47,15 @@ class MultiProviderChecks(unittest.TestCase):
             self.assertNotIn("private reasoning", json.dumps(result))
             self.assertEqual(body["stream_options"], {"include_usage": True})
             if provider == "minimax":
-                self.assertEqual(body["max_completion_tokens"], 16000)
+                self.assertEqual(body["max_completion_tokens"], 24000)
                 self.assertTrue(body["reasoning_split"])
                 self.assertNotIn("max_tokens", body)
-                self.assertNotIn("reasoning_effort", body)
+                self.assertEqual(body["reasoning_effort"], "medium")
+                self.assertNotIn("thinking", body)
             else:
                 self.assertEqual(body["thinking"], {"type": "enabled"})
-                self.assertEqual(body["reasoning_effort"], "high")
+                self.assertEqual(body["reasoning_effort"], "low")
+                self.assertEqual(body["max_tokens"], 24000)
                 self.assertEqual(body["response_format"], {"type": "json_object"})
 
     def test_reference_images_use_valid_detail_and_no_private_metadata(self):

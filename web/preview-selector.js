@@ -8,6 +8,7 @@
   const gallery=$('appearanceGallery'),cards=new Map();
   gallery.innerHTML='';
   let current=null;
+  let snapshot=null,filter='all';
   const viewFor=appearance=>appearance.viewIds.includes(appearance.defaultViewId)&&allowed(appearance.defaultViewId)?appearance.defaultViewId:appearance.viewIds.find(allowed);
   function selectView(id){
    if(!current?.viewIds.includes(id)||!allowed(id))return false;
@@ -53,7 +54,8 @@
    name.className='appearance-name';
    name.textContent=appearance.name.replace(/^CYBERBOARD\s+/,'');
    button.appendChild(canvas);button.appendChild(name);gallery.appendChild(button);
-   cards.set(appearance.id,{button,canvas});
+   const source=document.createElement('small');source.className='appearance-source';source.textContent=appearance.source||'正面整机';button.appendChild(source);
+   cards.set(appearance.id,{button,canvas,renderer:null,root:null});
    button.onclick=()=>selectAppearance(appearance.id);
    button.onkeydown=event=>{
     const directions={ArrowUp:-1,ArrowLeft:-1,ArrowDown:1,ArrowRight:1};
@@ -83,7 +85,22 @@
    button.classList.add('thumbnail-unavailable');
    button.setAttribute('data-thumbnail-status','unavailable');
   }));
-  return {selectAppearance,selectView,get appearanceId(){return current.id;}};
+  function applyFilter(){cards.forEach(({button},id)=>{const model=entries.find(a=>a.id===id).model||'';button.hidden=filter!=='all'&&!model.includes(filter);});document.querySelectorAll('[data-appearance-model]').forEach(button=>{const selected=button.dataset.appearanceModel===filter;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));});}
+  document.querySelectorAll('[data-appearance-model]').forEach(button=>button.onclick=()=>{filter=button.dataset.appearanceModel;applyFilter();});
+  function refreshGallery(design,tick=0,options={}){
+   if(!design)return;snapshot={design,tick:Math.max(0,Number(tick)||0),options};
+   if($('appearanceComparisonNote'))$('appearanceComparisonNote').textContent=design.name+' · 同一帧 '+(snapshot.tick+1);
+   cards.forEach((card,id)=>{
+    const appearance=entries.find(a=>a.id===id),view=viewFor(appearance);
+    if(!card.renderer){const container=document.createElement('div');container.className='appearance-preview';container.style.width='100%';card.button.insertBefore?.(container,card.canvas);if(!container.parentNode&&!container.parent)card.button.appendChild(container);card.root=container;
+     try{card.renderer=new global.KeyboardPreview(container,{views:{[view]:views[view]},view,design});card.renderer.pause();Promise.resolve(card.renderer.ready).then(()=>{card.canvas.hidden=true;card.button.setAttribute('data-thumbnail-status','ready');paint(card);}).catch(()=>{card.root.hidden=true;card.canvas.hidden=false;card.button.setAttribute('data-thumbnail-status','unavailable');});}
+     catch{card.root.hidden=true;card.canvas.hidden=false;return;}
+    }
+    paint(card);
+   });applyFilter();
+  }
+  function paint(card){if(!snapshot||!card.renderer)return;card.renderer.pause();card.renderer.setDesign(snapshot.design);card.renderer.setBrightness(snapshot.options.brightness??100);card.renderer.setRenderer(preview.renderer||'editor');card.renderer.seek(snapshot.tick);}
+  return {selectAppearance,selectView,refreshGallery,get appearanceId(){return current.id;}};
  }
  global.StudioPreviewSelector={create};
 })(typeof window!=='undefined'?window:globalThis);

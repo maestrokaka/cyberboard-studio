@@ -38,6 +38,16 @@ done
 }
 [[ -z "$dev_python" || -x "$dev_python" ]] || { print -u2 "Development Python is not executable: $dev_python"; exit 1; }
 
+# Reject forbidden credential routes before building any candidate bundle.
+/usr/bin/python3 - "$native_dir/Studio.swift" <<'PY'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
+for marker in ('SecItem', 'SecKeychain', 'kSec', 'Keychain', 'import Security',
+               'legacyCredentialRead', 'readLegacyKey', 'Cyberboard Studio.Kimi'):
+    if marker in source:
+        raise SystemExit('System credential interface is forbidden: ' + marker)
+PY
+
 # Only sanitized preview assets may enter a distributable .app. Inspect the
 # source without modifying it; test fixtures and local records stay outside.
 /usr/bin/python3 - "$web_dir/data.js" <<'PY'
@@ -61,6 +71,14 @@ mkdir -p "$contents_dir/MacOS" "$contents_dir/Resources" "$build_dir"
   -module-cache-path "$build_dir/swift-module-cache" \
   -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers \
   "$native_dir/Studio.swift" -o "$contents_dir/MacOS/CyberboardStudio"
+/usr/bin/python3 - "$contents_dir/MacOS/CyberboardStudio" <<'PY'
+import pathlib, subprocess, sys
+binary = pathlib.Path(sys.argv[1])
+dependencies = subprocess.check_output(['/usr/bin/otool', '-L', str(binary)], text=True)
+symbols = subprocess.check_output(['/usr/bin/nm', '-u', str(binary)], text=True)
+if 'Security.framework' in dependencies or any(marker in symbols for marker in ('SecItem', 'SecKeychain')):
+    raise SystemExit('Packaged host imports a forbidden system credential interface.')
+PY
 /bin/cp "$native_dir/Info.plist" "$contents_dir/Info.plist"
 if [[ -n "$dev_python" ]]; then
   /usr/bin/plutil -insert CyberboardDevelopmentPythonPath -string "$dev_python" "$contents_dir/Info.plist"
