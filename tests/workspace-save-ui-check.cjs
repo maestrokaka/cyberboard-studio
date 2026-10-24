@@ -23,7 +23,12 @@ function make(platform,extra={}){
  }});
  return {h,queue,commits,set automatic(value){automatic=value;},get active(){return active;},get maximum(){return maximum;},next(){const item=queue.find(item=>!item.finished);assert.ok(item,'expected a queued offline write');return item;}};
 }
-function input(h,text){h.el('creativeBrief').value=text;h.el('creativeBrief').oninput({target:h.el('creativeBrief')});}
+function input(h,text){
+ h.el('creativeBrief').value=text;h.el('creativeBrief').oninput({target:h.el('creativeBrief')});
+ // Draft edits are debounced. Advance the harness's mocked save timer;
+ // settling promises alone never runs setTimeout callbacks in this harness.
+ void h.flushSave();
+}
 async function finishWrites(store,predicate){
  for(let i=0;i<30&&!predicate();i++){await settle();const item=store.queue.find(item=>!item.finished);if(item)item.finish();}
  await until(predicate,'all save callers complete after committed writes');

@@ -146,6 +146,7 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   const frames = [];
   const preview = new h.window.KeyboardPreview(h.container, { views, design: designs[0], onFrame: value => frames.push(value) });
   await preview.ready;
+  const initialIsolatedBackground = crypto.createHash('sha256').update(h.log.neutral.at(-1).data).digest('hex');
   assert.equal(h.container.children.length, 3);
   const beforeThumbnails = digest({view:preview.view,framing:preview.framing,frame:preview.frame,
     keyFrame:preview.keyFrame,tick:preview._tick,playing:preview.playing,design:preview.design});
@@ -308,7 +309,8 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
   assert.throws(() => preview.setView('desk'), /未知照片视角/, 'desk views are removed from the gallery');
   assert.throws(() => preview.setView('r4-cloud-perspective'), /未知照片视角/, 'angled cloud views are removed from the gallery');
   preview.setView('front').setFraming('keyboard');
-  assert.equal(h.log.photoClips.at(-1).length, 1, 'returning to front close-up restores transparent surroundings');
+  assert.equal(crypto.createHash('sha256').update(h.log.neutral.at(-1).data).digest('hex'), initialIsolatedBackground,
+    'returning to front close-up restores the exact isolated background pixels, including cached alpha');
   const projectedTop = views.front.quad.map(([x, y]) => [
     (x - views.front.crop[0]) * preview.background.width / views.front.crop[2],
     (y - views.front.crop[1]) * preview.background.height / views.front.crop[3]]);
@@ -385,7 +387,8 @@ const digest = data => crypto.createHash('sha256').update(JSON.stringify(data)).
     }
     preview.setFraming('full');
     assert.equal(preview._keyboardOutline.length, 0, 'full official image keeps its original scene and source lettering');
-    assert.equal(h.log.photoClips.at(-1).length, 0);
+    assert.equal(h.container.attributes['data-preview-background'], 'photo',
+      'a cached full-photo background restores its scene framing without requiring another JPEG draw');
   }
   preview.setView('front').setFraming('keyboard');
   assert.equal(digest(views), viewDigest, 'isolating the photo must not mutate calibration coordinates');

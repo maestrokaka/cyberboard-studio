@@ -101,6 +101,26 @@ class WorkspaceConversationChecks(unittest.TestCase):
         self.assertEqual(value, original, "Normalizing and validating must not mutate caller state")
         self.assertEqual(result["pendingCount"], 1)
 
+    def test_theme_persists_without_changing_artwork_or_slot_drafts(self):
+        original = self.workspace()
+        for theme in ("dark", "island", "dark"):
+            value = copy.deepcopy(original)
+            value["uiTheme"] = theme
+            self.backend.saveWorkspace(value)
+            restored, warning = self.restart().load_workspace()
+            self.assertIsNone(warning)
+            self.assertEqual(restored["uiTheme"], theme)
+            for field in ("designs", "pending", "conversations", "keymapDraft"):
+                if field in original:
+                    self.assertEqual(restored[field], original[field])
+        self.backend.saveWorkspace(original)
+        restored, _ = self.restart().load_workspace()
+        self.assertEqual(restored["uiTheme"], "dark")
+        for invalid in (None, True, "auto", "<script>", [], {}):
+            value = copy.deepcopy(original)
+            value["uiTheme"] = invalid
+            self.expect_rejected(value)
+
     def test_new_or_switched_conversation_never_clears_delivery_drafts(self):
         value = self.workspace()
         empty = {"id": "new-dialog", "title": "新对话", "createdAt": STAMP, "updatedAt": STAMP,

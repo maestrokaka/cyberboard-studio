@@ -43,7 +43,7 @@ internal sealed class BackendClient : IDisposable
     private const int DiagnosticLimit = 65536;
 
     public async Task<JsonElement> RunAsync(string action, JsonElement payload, Action<JsonElement> onEvent,
-        CancellationToken cancellationToken = default, string? secret = null)
+        CancellationToken cancellationToken = default, string? secret = null, bool suppressDiagnostics = false)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token, cancellationToken);
         var cancellation = linked.Token;
@@ -121,7 +121,7 @@ internal sealed class BackendClient : IDisposable
                 await input;
                 var diagnosticText = await diagnostics;
                 // AI subprocess diagnostics are never copied to host logs: SDK/network errors may contain credentials.
-                if (secret is null && !string.IsNullOrWhiteSpace(diagnosticText)) HostLog.Write("backend " + action, diagnosticText);
+                if (secret is null && !suppressDiagnostics && !string.IsNullOrWhiteSpace(diagnosticText)) HostLog.Write("backend " + action, diagnosticText);
                 if (parseError is not null) throw new IOException(parseError);
                 if (final is null) throw new IOException($"后台没有返回操作结果（{process.ExitCode}）。");
                 var safeFinal = secret is null ? final.Value : AISettings.Redact(final.Value, secret);

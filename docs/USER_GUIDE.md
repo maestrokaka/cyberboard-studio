@@ -1,6 +1,8 @@
 # Cyberboard Studio 完整使用说明
 
-适用版本：**v1.0.0-rc.2 候选版** · macOS / Windows
+适用范围：**Beta 14 公开测试版（macOS）** 的灯效基础功能，以及 **历史 RC2（Windows）**。部分截图与页面称谓保留 RC2 示例。
+
+Beta 14 下载：[macOS 最新公开包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public)。新功能入口：「设置 → 界面风格」切换双风格；独立「键位编辑」和 AI 输入框语音见[键位与语音说明](KEYMAP_VOICE_LOCAL.md)；物理按键、桌面喵娘和限定 Codex 任务见[喵唤说明](MIAOCALL_BETA.md)。下文 Windows RC2 包不包含这些新增功能。
 
 Cyberboard Studio 是第三方怒喵键盘软件，面向 CYBERBOARD R4 / R6。你可以离线预览预设，或在独立 AI 对话中连接 Kimi、MiniMax、DeepSeek，以文字和参考图创作、逐版修改；再到工作台调整参数，放入指定槽位，核对计划后同步。候选版供正式版前试用，Windows 原生操作和 R4 写入等尚需实机验收，见[候选版说明](RELEASE_1.0.0_RC2.md)。
 
@@ -28,11 +30,11 @@ Cyberboard Studio 是第三方怒喵键盘软件，面向 CYBERBOARD R4 / R6。�
 
 ## 1. 下载与安装
 
-在 [v1.0.0-rc.2 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
+在 [macOS Beta 14 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public) 或 [Windows 历史 RC2 下载页](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) 的 **Assets** 中选择对应 ZIP。旁边的 `.zip.sha256` 是校验文件，不是安装包。GitHub 的 `Source code` 是源码，普通使用请下载下表的软件包。
 
 | 电脑 | 下载文件 | 当前适用范围 |
 | --- | --- | --- |
-| Mac | `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
+| Mac · Beta 14 | `Cyberboard-Studio-1.0.0-miaocall.beta.14-macOS-Apple-Silicon.zip` | Apple Silicon（M 系列芯片），macOS 13 及以上 |
 | Windows | `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise |
 | Windows 10 兼容包 | `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | 旧 Windows 10 明确出现 CET 启动兼容错误时单独测试，详见[故障处理](#faq) |
 
@@ -487,15 +489,17 @@ macOS 已完成 R6 第 3 槽的一次实际同步，取得设备确认，并核�
 
 ## 10. 查看键位与同步时间
 
+Beta 14 提供独立「键位编辑」页面，可修改本机草稿、准备并审核专用写入计划；步骤和完整键码核对条件见[键位编辑说明](KEYMAP_VOICE_LOCAL.md#键位编辑)。历史 Windows RC2 只提供键位查看。喵唤和语音连接见[Beta 使用说明](MIAOCALL_BETA.md)。
+
 ### 查看 7 层键位
 
-1. 进入「键位查看」，点击「读取设备键位」。
+1. Beta 14 进入「键位编辑」（历史 RC2 为「键位查看」），点击「读取设备键位」。
 2. 使用层切换按钮查看基础层、Fn 层及其余层。
 3. 点击实体按键，查看它在各层的绑定、矩阵位置与原始键码。
 
 图中展示 81 个实体键，设备的完整矩阵每层有 200 个位置。未知厂家功能会保留原始键码或显示名称未确认，不会凭名称替换真实数据。
 
-未连接时可能显示上次记录；没有记录时显示尚未读取。请检查页面的数据来源提示。当前页面用于查看，**不能编辑、重映射或写入键位**。
+未连接时可能显示上次记录；没有记录时显示尚未读取。请检查页面的数据来源提示。历史 RC2 的「键位查看」页面只读；Beta 14 的键位编辑与写入需按上方专用说明核对，不因查看缓存而直接改动键盘。
 
 ### 同步键盘时间
 

@@ -1,0 +1,42 @@
+/* Theme previews contain decorative UI shapes only; artwork RGB stays in the preview engine. */
+.island-icon,.island-welcome-mark{display:none}
+[data-island-ui] .classic-icon{display:none}
+[data-island-ui] .island-icon{display:inline-block}
+.theme-settings{grid-column:1/-1}
+.theme-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px;max-width:760px}
+.theme-option{display:flex;flex-direction:column;align-items:stretch;text-align:left;padding:12px;border:2px solid var(--strong);border-radius:16px;background:var(--surface);color:var(--text);gap:5px;min-width:0}
+.theme-option:hover{border-color:var(--muted)}
+.theme-option[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.theme-option strong{font-size:14px;margin-top:6px}
+.theme-option small{font-size:12px;color:var(--muted)}
+.theme-swatch{height:105px;border-radius:12px;display:grid;grid-template-columns:25% 1fr;gap:8px;padding:10px;pointer-events:none;overflow:hidden}
+.theme-swatch>i{display:block;border-radius:7px}
+.theme-swatch>span{display:grid;grid-template-columns:1.35fr 1fr;gap:7px;padding:5px 0}
+.theme-swatch b,.theme-swatch em{display:block;border-radius:8px;position:relative}
+.theme-swatch b::after{content:'';position:absolute;bottom:8px;left:8px;right:8px;height:14px;border-radius:5px}
+.theme-swatch-dark{background:#090a0d;border:1px solid #363942}
+.theme-swatch-dark>i,.theme-swatch-dark b,.theme-swatch-dark em{background:#24252d}
+.theme-swatch-dark b::after{background:#7885e4}
+.theme-swatch-island{background:#f8f8f0;border:1px solid #d9ceb7}
+.theme-swatch-island>i{background:#eee7cd}
+.theme-swatch-island b,.theme-swatch-island em{background:#fffdf5;border:1px solid #e4dac5;border-radius:12px}
+.theme-swatch-island b::after{background:#19c8b9;border-radius:50px}
+#themeStatus{font-size:12px;color:var(--muted);min-height:18px}
+@media(max-width:700px){.theme-options{grid-template-columns:1fr}}
+
+/* Shared control contract: selected text can never enter the arrow hit area.
+   Logical end padding is intentionally invariant across dense page-specific shorthands. */
+select{--select-end-space:34px;padding-inline-end:var(--select-end-space)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+[data-island-ui] select{--select-end-space:38px}
+#rendererSelect{min-width:120px}
+.button{white-space:nowrap}
+.chat-scope-control,.chat-base-control{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.chat-scope-control{margin-left:auto;flex-shrink:0}
+.chat-compose-options .chat-scope-control label{margin-left:0;white-space:nowrap}
+.chat-compose-options #aiScope{min-width:116px;max-width:none;flex-shrink:0}
+.chat-base-control>label{white-space:nowrap;flex-shrink:0}
+.chat-base-control #aiBaseVersion{min-width:112px;max-width:240px}
+#speedNumber{min-width:84px;width:84px;font-variant-numeric:tabular-nums}
+.version{white-space:nowrap;gap:6px;font-size:9px}
+.version span{font-size:9px}
+@media(max-width:1250px){.chat-scope-control{margin-left:0}.chat-base-control{flex:0 1 auto}.chat-base-control #aiBaseVersion{max-width:205px}}

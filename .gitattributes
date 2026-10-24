@@ -1,0 +1,3 @@
+
+# Preserve the bundled upstream font-license notices byte for byte.
+web/assets/island/fonts/*-OFL.txt -whitespace

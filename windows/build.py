@@ -21,7 +21,7 @@ APP = WINDOWS.parent
 CACHE = APP / ".tools/windows-build"
 OUTPUT = APP / "build/windows/Cyberboard Studio"
 ARCHIVE = APP / "build/Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip"
-LOGO = APP / "web/assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png"
+LOGO = APP / "web/assets/branding/product-icon/cyberboard-studio-approved-am-paw-v10.png"
 SYSTEM_CREDENTIAL_MARKERS = ("DPAPI", "ProtectedData", "CryptProtectData", "CryptUnprotectData",
                              "CredRead", "CredWrite", "VaultEnumerate", "crypt32.dll")
 
@@ -96,7 +96,7 @@ def assemble(nuget, dotnet, bootstrapper, windows10_compat=False):
     shutil.copytree(runtime, resources / "python", dirs_exist_ok=True, ignore=ignore)
     backend = resources / "backend"
     backend.mkdir(parents=True, exist_ok=True)
-    for module in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py"):
+    for module in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py", "speech_input.py", "keymap_codec.py"):
         shutil.copy2(APP / "backend" / module, backend / module)
     shutil.copy2(WINDOWS / "migrate-config.py", backend / "migrate-config.py")
 

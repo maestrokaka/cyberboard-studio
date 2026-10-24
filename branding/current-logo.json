@@ -1,12 +1,15 @@
 {
   "name": "Cyberboard Studio",
-  "status": "formal",
-  "approved_source": "product-icon/cyberboard-studio-photo-contour-v6-paw-180.png",
-  "approved_source_sha256": "6e7bef50c2e57a65d0db9098e29a6a97154e2bb59637c434e7f16718b48932f1",
-  "paw_rotation_degrees": 180,
+  "status": "user-approved-local",
+  "approved_source": "product-icon/cyberboard-studio-approved-am-paw-v10.png",
+  "approved_source_sha256": "78d31843f87bbd33f763a09e93d33201364e90b3a831be54a8466c1244775b58",
   "keyboard_rotation_degrees": 0,
-  "web_asset": "web/assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png",
+  "web_asset": "web/assets/branding/product-icon/cyberboard-studio-approved-am-paw-v10.png",
   "native_icon": "AppIcon.icns",
   "native_export": "仅将橙砖外的演示画布设为透明；正式图形 RGB 保持原样。",
-  "bundled_web_logo_matches": true
+  "bundled_web_logo_matches": true,
+  "paw_alignment": "As selected by the user; no symmetry, rotation, corner or shape edits.",
+  "generated_source": "generated_images/01a11eaf-b901-7fa3-9cfb-bb6fdc91b525/exec-85019eac-8f64-4b6d-8fff-9912995b17f8.png",
+  "generated_source_sha256": "78d31843f87bbd33f763a09e93d33201364e90b3a831be54a8466c1244775b58",
+  "source_copy": "Exact original generated PNG bytes; no redraw or image modification."
 }

@@ -1,0 +1,32 @@
+/* Theme changes must not become creative, recording or USB operations. */
+const assert=require('assert/strict');
+const {harness,settle,clone}=require('./ui-check.cjs');
+const button=(h,theme)=>h.document.querySelectorAll('[data-theme]').find(b=>b.dataset.theme===theme);
+(async()=>{
+ const h=harness({chat:true});await settle();
+ assert.equal(h.window.StudioTheme.get(),'dark');
+ const before=clone({designs:h.app.state.designs,pending:[...h.app.state.pending],selected:h.app.state.selected,conversations:h.app.state.conversations});
+ h.el('creativeBrief').value='保留这条尚未发送的描述';
+ await button(h,'island').click();await settle();
+ assert.equal(h.window.StudioTheme.get(),'island');
+ assert.equal(h.document.documentElement.getAttribute('data-island-ui'),'');
+ assert.equal(button(h,'island').getAttribute('aria-pressed'),'true');
+ assert.equal(h.control.workspace.uiTheme,'island');
+ assert.equal(h.el('creativeBrief').value,'保留这条尚未发送的描述');
+ assert.deepEqual(clone({designs:h.app.state.designs,pending:[...h.app.state.pending],selected:h.app.state.selected,conversations:h.app.state.conversations}),before);
+ const restored=harness({chat:true,themeCache:'dark',workspace:clone(h.control.workspace)});await settle();
+ assert.equal(restored.window.StudioTheme.get(),'island','the saved workspace beats a stale first-paint cache');
+ await button(restored,'dark').click();await settle();
+ assert.equal(restored.document.documentElement.getAttribute('data-island-ui'),null);
+ assert.equal(restored.control.workspace.uiTheme,'dark');
+ const corrupt=harness({themeCache:'unknown'});await settle();assert.equal(corrupt.window.StudioTheme.get(),'dark');
+ assert.throws(()=>corrupt.window.StudioTheme.apply('unknown'));
+ const failure=harness({handlers:{saveWorkspace:()=>{throw Error('offline disk-full fixture');}}});await settle();
+ await button(failure,'island').click();await settle();
+ assert.equal(failure.window.StudioTheme.get(),'dark','failed durable save restores the previous style');
+ assert.equal(button(failure,'dark').getAttribute('aria-pressed'),'true');
+ assert.match(failure.el('toast').textContent,/风格未能保存/);
+ assert.equal(button(failure,'dark').disabled,false);
+ for(const instance of [h,restored,corrupt,failure])assert.ok(instance.calls.every(c=>!['execute','detect','plan','setTime','generateAI','startVoiceRecording','transcribeVoice'].includes(c.action)));
+ console.log('Theme checks passed: instant change, cache validation, durable restart, save-failure rollback and unchanged artwork/drafts. No model, microphone or USB accessed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

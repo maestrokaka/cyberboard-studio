@@ -2,7 +2,7 @@
 """Verify a signed macOS release and its relocated, offline frozen backend.
 
 This never launches the UI, detects devices, or performs USB operations. Backend
-calls are limited to bootstrap and saveWorkspace, using temporary CLI/App stores.
+calls are limited to runtimeHealth, bootstrap and saveWorkspace, using temporary CLI/App stores.
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-LOGO = Path("assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png")
-ALLOWED_ACTIONS = frozenset({"bootstrap", "saveWorkspace"})
+LOGO = Path("assets/branding/product-icon/cyberboard-studio-approved-am-paw-v10.png")
+ALLOWED_ACTIONS = frozenset({"runtimeHealth", "bootstrap", "saveWorkspace"})
 
 
 def require(condition, message):
@@ -79,7 +79,7 @@ def preview_data(web):
 def official_artwork(resources):
     source = ROOT / "web" / LOGO
     packaged = resources / "web" / LOGO
-    master = ROOT / "branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png"
+    master = ROOT / "branding/product-icon/cyberboard-studio-approved-am-paw-v10.png"
     require(sha256(source) == sha256(packaged), "Packaged formal Logo differs from approved source PNG")
     icon = resources / "AppIcon.icns"
     require(icon.is_file() and icon.read_bytes()[:4] == b"icns", "macOS AppIcon is missing or invalid")
@@ -104,9 +104,14 @@ def bundle_structure(app):
     info = plistlib.loads((contents / "Info.plist").read_bytes())
     require(info.get("CFBundleShortVersionString") == "1.0.0", "App version differs from this release")
     require(info.get("CFBundleVersion") == "1.0.0", "App build number differs from this release")
-    require(info.get("CyberboardDisplayVersion") == "1.0.0-rc.2", "Candidate display version differs from this release")
+    expected_info = plistlib.loads((ROOT / "native/Info.plist").read_bytes())
+    require(info.get("CyberboardDisplayVersion") == expected_info["CyberboardDisplayVersion"], "Candidate display version differs from reviewed source")
+    require(info.get("CFBundleIdentifier") == expected_info["CFBundleIdentifier"], "App identity differs from this branch")
     require(info.get("LSMinimumSystemVersion") == "13.0", "App deployment minimum changed")
     require("CyberboardDevelopmentPythonPath" not in info, "Release App records a development Python path")
+    require(isinstance(info.get("NSMicrophoneUsageDescription"), str) and info["NSMicrophoneUsageDescription"],
+            "Explicit microphone usage description is missing")
+    require("NSSpeechRecognitionUsageDescription" not in info, "App unexpectedly requests system speech recognition")
     native = contents / "MacOS" / info["CFBundleExecutable"]
     require(run(["/usr/bin/lipo", "-archs", str(native)]).stdout.strip() == "arm64", "Native App is not arm64")
     local_credentials_only(native)
@@ -133,7 +138,7 @@ def bundle_structure(app):
     require(not (resources / "backend/bridge.py").exists(), "Source/development backend is included in the release")
     for removed in ("assets/desk.jpg", "assets/photos/r4-cloud-perspective.jpg", "assets/photos/r6-launch-front.png"):
         require(not (resources / "web" / removed).exists(), "Excluded-angle photo remains in the package: " + removed)
-    for name in ("index.html", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
+    for name in ("index.html", "theme.js", "themes.css", "island-theme.css", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "keymap-client.js", "keymap.css", "voice-input.js", "voice-input.css", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
                 "Packaged web source is missing or stale: " + name)
     # --help exits before Bridge/CLI initialization. A fresh web tree alone must
@@ -143,6 +148,8 @@ def bundle_structure(app):
     require(action_list is not None, "Frozen backend does not advertise its action contract")
     advertised = set(action_list.group(1).split(","))
     configuration_actions = {"readConfiguration", "builtInPlan", "initializePlan", "plan", "execute"}
+    configuration_actions |= {"keymapCatalog", "keymapPlan", "voiceSettings", "saveVoiceSettings",
+                              "revealVoiceKey", "deleteVoiceKey", "transcribeVoice"}
     require(configuration_actions <= advertised, "Frozen backend lacks the configuration/default-mode fixes")
     native_source = (ROOT / "native/Studio.swift").read_text(encoding="utf-8")
     transport = re.search(r"backendActions:\s*Set<String>\s*=\s*\[(.*?)\]", native_source, re.S)
@@ -153,8 +160,8 @@ def bundle_structure(app):
             [bool(page["valid"]) for page in defaults["pages"]] == [True, True, True, False, False],
             "Bundled standard modes must enable battery, mosaic and clock")
     require(any((backend / "_internal").rglob("_imagingcms*.so")), "Color conversion native module is missing")
-    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "pyvenv.cfg", ".operation.lock"}
-    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "test-fixtures"}
+    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "voice-settings.json", "pyvenv.cfg", ".operation.lock"}
+    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "voice-keys", "test-fixtures"}
     for path in app.rglob("*"):
         require(path.name.lower() not in forbidden_names, "Private/development file bundled: " + str(path.relative_to(app)))
         require(not (path.is_dir() and path.name.lower() in forbidden_directories),
@@ -165,6 +172,11 @@ def bundle_structure(app):
     preview_data(ROOT / "web")
     packaged = preview_data(resources / "web")
     require(packaged == preview_data(ROOT / "web"), "Packaged preview differs from sanitized source data")
+    for relative in ("assets/island/ANIMAL-ISLAND-UI-LICENSE.txt", "assets/island/NAIVE-ICONS-LICENSE.txt",
+                     "assets/island/fonts/nunito-OFL.txt", "assets/island/fonts/notosanssc-OFL.txt"):
+        require((resources / "web" / relative).is_file(), "Theme license notice is missing: " + relative)
+    require(all((resources / "web/assets/island/icons" / (name + ".svg")).is_file()
+                for name in ("paintbrush", "key", "bulb", "settings", "flower")), "Theme icon resource is missing")
     official_artwork(resources)
     signature(app)
     print("PASS arm64 binaries, frozen runtime/licenses, release privacy and strict signature")
@@ -206,6 +218,29 @@ def relocated_offline_checks(app):
         state = temporary / "临时 工作台状态"
         cli_store = temporary / "临时 CLI 空存储"
         cli_store.mkdir()
+        health = call_backend(binary, resources, state, cli_store, temporary, "runtimeHealth", {})
+        require(health.get("tlsReady") and health.get("hostnameVerification") and health.get("certificateVerification")
+                and health.get("caCertificates", 0) > 0, "Relocated runtime cannot create verified HTTPS connections")
+        require(not state.exists(), "TLS self-check unexpectedly created application state")
+        print("PASS relocated verified TLS initialization without network, credentials or application state")
+        manifest = json.loads((binary.parent / "backend-build-manifest.json").read_text(encoding="utf-8"))
+        require(manifest.get("relocated_offline_tls") == "passed", "Release runtime did not pass its build-time TLS check")
+        for name, expected_hash in manifest.get("tls_policy_resources", {}).items():
+            resource = binary.parent / "_internal" / name
+            require(resource.is_file() and sha256(resource) == expected_hash, "TLS policy resource is missing or altered")
+            held = temporary / name
+            resource.rename(held)
+            try:
+                check = subprocess.run([str(binary), "--action", "runtimeHealth", "--state-dir", str(state),
+                                        "--resource-dir", str(resources)], input="{}", text=True,
+                                       capture_output=True, cwd=temporary, timeout=30)
+                error = json.loads(check.stdout.strip()).get("error", {})
+                require(check.returncode != 0 and error.get("code") == "runtime_tls_incomplete",
+                        "Incomplete TLS runtime was not rejected")
+                require(not state.exists(), "Failed TLS self-check unexpectedly created application state")
+            finally:
+                held.rename(resource)
+        print("PASS required TLS policy hashes and deliberate missing-file regression")
         bootstrap = call_backend(binary, resources, state, cli_store, temporary, "bootstrap", {})
         require(bootstrap.get("cliVersion") == "0.1.2", "Relocated backend cannot load the bundled CLI")
         require(bootstrap.get("history") == [] and bootstrap.get("config") is None and bootstrap.get("workspace") is None,
@@ -245,7 +280,7 @@ def main():
     require(os.uname().sysname == "Darwin", "macOS package checks require a Mac")
     bundle_structure(app)
     relocated_offline_checks(app)
-    print("macOS package checks passed. Only bootstrap/saveWorkspace ran; UI and USB were not accessed.")
+    print("macOS package checks passed. Only runtimeHealth/bootstrap/saveWorkspace ran; network, UI and USB were not accessed.")
 
 
 if __name__ == "__main__":

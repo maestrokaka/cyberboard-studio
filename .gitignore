@@ -28,6 +28,8 @@
 **/ai-settings.json
 **/credentials/
 **/ai-keys/
+**/voice-settings.json
+**/voice-keys/
 .env
 .env.*
 !.env.example

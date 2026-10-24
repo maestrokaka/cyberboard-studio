@@ -1,24 +1,70 @@
-# Cyberboard Studio
+# Cyberboard Studio · MiaoCall Beta 14
 
 [简体中文](README.md) · **English**
 
-**A third-party Angry Miao keyboard tool for CYBERBOARD R4 / CYBERBOARD R6, on macOS and Windows.**
+A third-party **CYBERBOARD R4 / R6** studio: create lighting through AI conversations, compare versions on real keyboard photographs, and review a plan before syncing. The optional MiaoCall beta turns a held key and a voice instruction into a limited local Codex task.
 
-Create top-matrix and key-backlight animations through a dedicated AI conversation with Kimi, MiniMax or DeepSeek. Compare versions on real keyboard photographs, then adjust and synchronize a chosen version to a specific slot in the lighting workbench.
+**[Download Beta 14 · macOS Apple Silicon](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public)** · [Release notes](docs/RELEASE_NOTES_MIAOCALL_BETA14.md) · [User guide — Chinese](docs/USER_GUIDE.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-[Download and release history](https://github.com/maestrokaka/cyberboard-studio/releases) · [Full user guide (Chinese)](docs/USER_GUIDE.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues) · [Support the author](#support-the-author)
+This is a **public preview** of the previously separate MiaoCall development version. It includes dictation, keymap editing, both interface styles and fixes through Beta 14. The new downloadable package is macOS-only. Windows RC2 packages remain available as explicitly older builds.
 
-The current build is **1.0.0-rc.2**, a release candidate for testing. Windows native GUI / USB and R4 writes still need hardware acceptance testing. See the [candidate notes](docs/RELEASE_1.0.0_RC2.md) for the current scope. The app interface remains in Chinese.
+## What's included
 
-## See it in action
+- **AI lighting:** Kimi, MiniMax and DeepSeek connections; text and up to three reference images; saved conversations, immutable versions and scoped edits.
+- **Lighting workbench:** photo-composited previews, brightness / timing / palette controls, three independent slot drafts and reviewed sync plans. Ten removable presets work without a model key.
+- **Keyboard appearances:** eight calibrated front photographs, with the same design and moment shown across them. Beta 14 specifically improves AI Creation → Appearances: the page paints first, preparation yields and can be cancelled, and each card compiles only its displayed frame.
+- **Two styles:** Classic Dark and Warm Island Light, switchable in Settings and retained after restart without changing artwork RGB or slot drafts.
+- **Keymap editor:** readable functions for 81 physical keys across seven layers, local drafts and a separate reviewed write plan. Unknown raw codes are preserved.
+- **AI dictation:** separately configure a supported MiniMax, Qwen or OpenAI ASR model, review the transcript, then explicitly send it to create lighting.
+- **MiaoCall beta:** hold the physical `·` key on macOS to speak. A draggable catgirl overlay shows listening and task progress. The shortcut starts off and is registered only when enabled.
 
-This 77-second demo shows appearance selection, lighting previews, Kimi k3 creation with a reference image and synchronization to slot 03, ending with footage of the R6 keyboard. Generation and transfer waits are sped up. The video uses an earlier interface; the candidate separates AI creation, the workbench and keyboard appearances into dedicated pages.
+## Screenshots
 
-https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
+### Warm Island Light · AI creation
 
-[Candidate packages and notes](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2)
+![AI creation in Warm Island Light](docs/screenshots/create-beta14-light.png)
+
+### Classic Dark · lighting workbench
+
+![Classic Dark workbench, keyboard preview and slot overview](docs/screenshots/workbench-beta14-dark.png)
+
+### Appearance selection
+
+![Eight appearances compared at one lighting instant](docs/screenshots/appearances-beta14-light.png)
+
+Screenshots use a separate interface demonstration environment with no personal keys, conversations or device records. Keyboard photographs are composited with the source lighting; this is not hardware color calibration.
+
+## Downloads
+
+| Platform / version | Download | Scope |
+| --- | --- | --- |
+| **macOS · Beta 14** | [Current public package and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public) | Apple Silicon, macOS 13+; CLI and runtime included |
+| Windows · **older RC2** | [RC2 standard x64 / Windows 10 compatibility packages](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | Earlier lighting build, without the new UI, dictation or MiaoCall; native GUI / USB still need hardware testing |
+
+On Mac, download `Cyberboard-Studio-1.0.0-miaocall.beta.14-macOS-Apple-Silicon.zip`, extract it and move the app to Applications. GitHub's Source code archive is for development; `.zip.sha256` is the checksum file. No separate Python installation is required. There is no new Intel Mac, 32-bit Windows or native Windows ARM64 package.
+
+The Mac app is ad-hoc signed, without Apple Developer ID signing or notarization. Follow [Apple's app-opening instructions](https://support.apple.com/en-gb/102445). Microphone, global-key and Spotify automation access are requested when the corresponding feature is explicitly enabled. Quit the old app before upgrading and retain one fixed signed copy. [Setup and permission guide — Chinese](docs/MIAOCALL_BETA.md)
+
+## Quick start
+
+1. Open the workbench and preview a built-in effect without a model key.
+2. Configure Kimi, MiniMax or DeepSeek under Model Configuration.
+3. Start an AI conversation with text or reference images, such as “orange flames rising from below, ember-like key lighting, four-second loop.”
+4. Choose a base version and edit scope, such as “only make the key backlight pure yellow; keep the top unchanged.” Earlier versions remain intact.
+5. Save the chosen version or open it in the workbench, prepare a slot draft, inspect the device and plan, then confirm the write.
+
+Requests send your description and selected reference images only when you click Create. Provider keys are stored in ordinary local files, masked by default with a Show / Hide control. Legacy Keychain / DPAPI records are never accessed or migrated.
+
+## MiaoCall: hold a key and speak
+
+Install and sign in to local Codex and Spotify. Separately configure an ASR service such as MiniMax `asr-1.0`, using the region that matches your key. In MiaoCall, provide a track title, artist and Spotify share link, apply the configuration, then enable the shortcut. Hold `·`, speak and release; the transcript is confirmed before execution by default.
+
+Codex uses the official local app-server with an **independent temporary task**. This beta exposes only configured-track Spotify playback and status tools, and verifies the target track, playing state and progress before reporting success. It does not search the whole catalog or execute arbitrary desktop tasks. WorkBuddy, Qwen Office and Doubao Work are placeholders, not connected agents.
+
+When disabled, the key types normally. The global shortcut never starts automatically and is released on exit. Desktop voice / overlay support is currently macOS-only. [Full setup and troubleshooting — Chinese](docs/MIAOCALL_BETA.md) · [Keymap and dictation guide — Chinese](docs/KEYMAP_VOICE_LOCAL.md)
 
 ## Built-in lighting GIFs
+
 
 I've created and refined **ten lighting designs with AI**, and included them in the app. You can preview and use them without configuring a model, then sync your favorites to the keyboard.
 
@@ -43,86 +89,21 @@ Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photog
 
 </details>
 
-## Screenshots
+## Earlier lighting demo
 
-The primary workflow is **AI creation → lighting workbench → device sync**. Screenshots use a separate demonstration workspace with no personal keys or device records.
+This 77-second video shows appearance selection, reference-based creation and slot-03 synchronization, ending with R6 hardware footage. Generation and transfer waits are sped up. It uses an earlier interface; the screenshots above show the current layout. The MiaoCall desktop-recording demo is not included.
 
-### AI creation
+https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-The conversation is the main surface, alongside a collapsible photo preview and independent versions. Choose a fixed base version and modify both regions, only the top matrix or only the backlight. History and search live inside this page. A generated version enters the library only when you explicitly save it.
+## Data and validation scope
 
-![AI conversation, reference images and immutable versions](docs/screenshots/create-v100rc2.png)
+Works, conversations, reference images, drafts, keys and device records stay outside the installation directory and release assets. Recordings are limited to 60 seconds and start only after an explicit action; temporary audio is cleaned up and is not stored in works or the workspace. Lighting sync and keymap writes use separate reviewed plans. Starting the app, selecting a photograph or upgrading does not write to the keyboard.
 
-### Lighting workbench
-
-The large photo preview, brightness / timing controls and all three slot drafts share one page. Selecting a slot chooses an assignment target; its Preview action loads its contents, and Undo Draft removes the local draft. Switching conversations does not clear slot drafts.
-
-![Workbench with full preview and three slot drafts](docs/screenshots/workbench-v100rc2.png)
-
-### Keyboard appearances
-
-Eight front-view photo cards can be filtered by R4 / R6 and compared using the same design and frame. Appearance selection changes the preview only; the connected device is identified separately by a manual USB check.
-
-![Eight calibrated front-view appearances](docs/screenshots/appearances-v100rc2.png)
-
-The catalog contains **R6「Vision」** and **R4「Fluo Free」「Bebop」「Gangstar」「Cloud White V2」「Stone Face」「Paisley」「Vision」**. R6 uses the earliest provided photograph; R4 photos come from Angry Miao's official site or store, including qualifying photos of sold-out colorways. [Sources and calibration](data/photos/official-photo-sources.json)
-
-Model connections have their own page. Devices provides sub-tabs for slots, read-only keymaps and sync records. The library retains search, naming, trash and restoration; all ten built-in designs can be removed locally.
-
-## Download and install
-
-| Package | Target | Installation |
-| --- | --- | --- |
-| `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon Mac, macOS 13+ | Extract and move `Cyberboard Studio.app` to Applications |
-| `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64; some .NET 10-supported Windows 10 LTSC / Enterprise editions | Extract everything and run `Cyberboard Studio.exe`; retain DLLs and `resources` |
-| `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | Older Windows 10 with a confirmed CET startup error | Extract separately; only this package removes the app CET marker |
-
-Download ZIPs and SHA-256 files from [v1.0.0-rc.2 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2). CLI and runtime components are bundled. Windows needs WebView2; if missing, run `Dependencies/MicrosoftEdgeWebview2Setup.exe` with an internet connection. Intel Mac, 32-bit Windows and native Windows ARM64 packages are not available.
-
-The Mac package uses an ad-hoc signature and has no Apple Developer ID signature or notarization. See [Apple's instructions for opening apps](https://support.apple.com/en-gb/102445). Windows native launch, key-file operations and USB still need acceptance testing for this candidate. For Unknown Hard Error, run the bundled startup diagnostic before choosing the compatibility package; use it only when the logs identify CET. Updating Windows and using the standard package is preferred.
-
-Previous releases remain available in [Releases](https://github.com/maestrokaka/cyberboard-studio/releases). Close the old app before updating. On the first successful save of the new workspace, `workspace-before-1.0.json` preserves the previous workspace. Existing works, trash, removal records and slot drafts remain. Updating does not write to the keyboard.
-
-## Quick start
-
-1. In Model connections, select a provider, region and permitted model, then paste your API key and save. Keys are hidden by default, with a Show / Hide button; each provider uses a plain local key file.
-2. Open AI creation. Write a description, add up to three images, or use both. For example: “Orange-red flames rise from below, with ember-like backlights, on a four-second loop.”
-3. Send and create, then preview a completed version. For the next turn, choose the base and region: “Only change the backlights to pure yellow; keep the top unchanged.”
-4. Explicitly save the chosen version to the library, or open it in the workbench. Assign a slot draft, review the sync plan, then confirm the write.
-
-Kimi Code defaults to `k3`, Kimi Open Platform to `kimi-k3`, new MiniMax connections to `MiniMax-M3.1-Flash-Preview`, and DeepSeek to `deepseek-flash`. Existing saved model choices remain. M3.1 Flash needs the appropriate plan; image support and access depend on the account and model.
-
-Generation sends the current description, selected normalized images, a short text history and an explicitly chosen base recipe. It excludes the full workspace, keymap and device configuration. Another work's style is included only when opted into. Local checks allow at most one repair request; cancellation, failure and repairs may still consume credits. Preview the full loop before saving or syncing.
-
-For first-time setup, the app needs a trusted complete record from a previous successful CLI write to **the same physical keyboard**. JSON artwork import does not establish this device baseline. With no baseline, initialization preserves and verifies the current 1,400 keycodes but replaces unknown lighting and other modes; independent macros, swapped keys and remap tables cannot be preserved. Read the [first-time setup instructions](docs/USER_GUIDE.md#first-setup) before confirming.
-
-## Features and current scope
-
-- Persistent conversations, reference images, drafts and immutable lighting versions; fixed-base, scoped editing, retry, stop, comparison and selected-version export / save.
-- Kimi, MiniMax and DeepSeek connections. DeepSeek separates useful-output, reasoning and transport limits; MiniMax accepts a complete `stop` when the stream closes and uses revised M3 thinking parameters. Incomplete output is still rejected.
-- Ten built-in designs and eight calibrated front-view photo appearances. No model key is required to preview presets.
-- Brightness, timing, palette variants, JSON import / export, naming, search, trash and confirmed permanent deletion.
-- Three independent slot drafts, single-slot or explicit all-pending sync, backups and local records.
-- R4 / R6 identification, read-only inspection of 81 physical keys across seven layers, and clock synchronization using Asia/Shanghai (UTC+8).
-
-Firmware updates, key remapping, general image generation and video export are not included. Offline checks and earlier live-provider tests do not establish Windows hardware compatibility or R4 USB acceptance; the [candidate notes](docs/RELEASE_1.0.0_RC2.md) distinguish these results.
-
-## Local data
-
-| Data | macOS | Windows |
-| --- | --- | --- |
-| Conversations, versions, images, works, drafts, trash, plans and backups | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
-| CLI device records | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
-
-The v2 `workspace.json` keeps conversations, normalized images and full versions locally. The upgrade backup `workspace-before-1.0.json` is private data too. Saving must finish before success is reported; exit and reload wait for pending saves. Limits are 20 conversations, 12 versions and 60 turns per conversation, and 32 MiB for the full workspace. Export useful versions before deleting old records; records are never silently evicted.
-
-Keys are stored directly in `ai-keys/<provider>.key`, separately from `ai-settings.json`, works and workspace files. Legacy Keychain / DPAPI entries are never read, decrypted, migrated or deleted; paste the key again if it exists only there. Keys, private images, device records and workspace backups stay out of source commits and release packages.
+Beta 14 passed fourteen UI / preview groups, byte-identical photo and 83-mask checks, cold and warm appearance-entry tests, relocated signed macOS startup and workspace restoration. The packaged speech-runtime TLS-file omission is fixed while certificate and hostname verification remain enabled. Windows GUI / USB, additional firmware and corresponding R4 writes still need hardware acceptance. This is not a stable 1.0 release.
 
 ## Building and contributing
 
-The repository includes vendored `cyberboard-cli` 0.1.2 with R6 and cross-platform patches. See [CLI provenance and licenses](vendor/README.md).
-
-Mac builds require Python 3.12, Node.js and Xcode Command Line Tools:
+The repository includes vendored `cyberboard-cli` 0.1.2 with R6 and cross-platform patches. See [CLI provenance and licenses](vendor/README.md). Mac builds require Python 3.12, Node.js and Xcode Command Line Tools:
 
 ```sh
 python3 scripts/setup-cli.py --env-dir .tools/macos-build --with-pyinstaller
@@ -131,24 +112,12 @@ python3 scripts/prepare-data.py
 native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 ```
 
-The resulting app is `build/Cyberboard Studio.app`. Windows builds use .NET 10 SDK; see the [Windows runtime build notes](windows/runtime-readme.txt) and [package build instructions in Chinese](README.md#从源码构建).
+The app is generated at `build/Cyberboard Studio.app`. Windows development notes are in [the runtime guide](windows/runtime-readme.txt); this public preview does not publish a new Windows build. Offline checks use synthetic devices and HTTP substitutes, without USB or model credits. See the [offline checks](README.md#离线验证).
 
-Optionally rebuild the ten photo-composited GitHub GIFs using Python with Pillow installed, Node.js and `@napi-rs/canvas`. From the repository root:
-
-```sh
-npm install --prefix .tools/gif-render @napi-rs/canvas
-python scripts/build-preset-gifs.py
-```
-
-The renderer checks `.tools/gif-render/node_modules` by default; use `STUDIO_CANVAS_MODULE` to select another Canvas module. It uses the app's preview engine and writes temporary PNGs only under `build/`, which stays out of uploads. This is a publishing tool, not an app video-export feature.
-
-Tests use synthetic device configurations and HTTP substitutes. They do not access USB or consume model credits. See the [offline checks](README.md#离线验证). Personal device records, credentials, backups and workspace data must stay out of commits and release packages.
-
-For bugs or suggestions, [open an issue](https://github.com/maestrokaka/cyberboard-studio/issues) with your app version, operating system, keyboard model and steps to reproduce the problem.
-
----
+This public `main` contains the current Beta 14 source snapshot and public assets. Earlier private development history, test audio and desktop-recording materials are not included in this promotion. Existing RC2 tags and downloads remain unchanged. For feedback, include your app version, operating system, keyboard model and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio/issues).
 
 ## Support the author
+
 
 **Your keyboard is glowing. My coffee cup could use a refill. ☕**
 

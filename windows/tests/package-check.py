@@ -42,7 +42,7 @@ class PackageChecks(unittest.TestCase):
                     "resources/python/python312.dll", "resources/python/python312.zip",
                     "resources/backend/bridge.py", "resources/backend/migrate-config.py",
                     "resources/backend/kimi_ai.py", "resources/backend/lighting_recipe.py", "resources/backend/ai_images.py",
-                    "resources/backend/ai_quality.py",
+                    "resources/backend/ai_quality.py", "resources/backend/speech_input.py", "resources/backend/keymap_codec.py",
                     "resources/web/index.html", "resources/web/data.js", "resources/web/ai-client.js", "resources/web/chat-client.js", "resources/web/creation.css", "resources/web/library-client.js", "迁移原配置.cmd",
                     "检查运行环境.cmd", "诊断启动.cmd", "使用说明.txt", "Dependencies/MicrosoftEdgeWebview2Setup.exe"]
         for name in required:
@@ -73,10 +73,10 @@ class PackageChecks(unittest.TestCase):
         self.assertIs(release["startupAccessesUSB"], False)
         self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 1.0.0-rc.2"))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
-        for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
+        for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "keymap-client.js", "keymap.css", "voice-input.js", "voice-input.css", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
         self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
-        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py"):
+        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py", "speech_input.py", "keymap_codec.py"):
             self.assertEqual(digest(PACKAGE / "resources/backend" / name), digest(APP / "backend" / name), name)
 
     def test_executable_and_native_dependencies_are_windows_x64(self):
@@ -163,16 +163,17 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(layout["keys"], data["keyLayout"])
         for path in PACKAGE.rglob("*"):
             if path.is_file():
-                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json"})
+                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json", "voice-settings.json"})
                 self.assertNotIn("/credentials/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/ai-keys/", path.relative_to(PACKAGE).as_posix())
+                self.assertNotIn("/voice-keys/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/history/", path.relative_to(PACKAGE).as_posix())
         self.assertNotIn("/Users/sheva", source)
         self.assertFalse((PACKAGE / "resources/python/pyvenv.cfg").exists())
 
     def test_photo_and_approved_logo_resources_are_preserved(self):
         web = PACKAGE / "resources/web"
-        logo = "assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png"
+        logo = "assets/branding/product-icon/cyberboard-studio-approved-am-paw-v10.png"
         self.assertEqual(digest(web / logo), digest(APP / "web" / logo))
         for source in (APP / "web/assets").glob("*.jpg"):
             self.assertEqual(digest(web / "assets" / source.name), digest(source))

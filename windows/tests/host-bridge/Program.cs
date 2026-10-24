@@ -64,6 +64,12 @@ internal static class Program
         File.Copy(Path.Combine(AppContext.BaseDirectory, "fake-bridge.py"), HostPaths.Backend);
         try
         {
+            await Run("voice recording request ownership, PCM/WAV duration, exact limits and stop/cancel/exit release", () =>
+            { VoiceChecks.Lifecycle(); return Task.CompletedTask; });
+            await Run("voice capture start/read failures and raw byte upper bound", () =>
+            { VoiceChecks.Failures(); return Task.CompletedTask; });
+            await Run("WinMM pointer buffers preserve ordering, drain once, reset before unprepare and clean partial start", () =>
+            { VoiceChecks.NativeBuffers(); return Task.CompletedTask; });
             await Run("workspace exit save barrier rejects reentry and stale replies after failure/retry", () =>
             {
                 var gate = new WorkspaceExitGate();
@@ -123,6 +129,14 @@ internal static class Program
                 Check(result.GetProperty("state").GetString() == HostPaths.State, "Space/Unicode state argv changed.");
                 Check(result.GetProperty("resource").GetString() == HostPaths.Resources, "Space/Unicode resource argv changed.");
                 Check(HostLog.Messages.Last().Message.Contains("中文 stderr"), "Unicode stderr was not logged.");
+            });
+            await Run("voice diagnostic suppression retains explicit local credential reveal without logging stderr", async () =>
+            {
+                using var client = new BackendClient();
+                var messages = HostLog.Messages.Count;
+                var result = await client.RunAsync("echo", Payload(new { apiKey = "synthetic-voice-key" }), _ => { }, suppressDiagnostics: true);
+                Check(result.GetProperty("payload").GetProperty("apiKey").GetString() == "synthetic-voice-key", "Suppression removed explicit reveal response.");
+                Check(HostLog.Messages.Count == messages, "Sensitive voice stderr entered logs.");
             });
             await Run("payload and action shell characters remain literal, no command execution", async () =>
             {
@@ -577,6 +591,24 @@ internal static class Program
                 Check((await other).GetProperty("payload").GetProperty("lane").GetString() == "device", "AI cancellation interrupted the unrelated backend.");
                 var next = await ai.RunAsync("echo", Payload(new { after = true }), _ => { });
                 Check(next.GetProperty("payload").GetProperty("after").GetBoolean(), "AI lane was unusable after cancellation.");
+            });
+            await Run("voice cancellation kills only its child and preserves concurrent AI/device requests", async () =>
+            {
+                using var voice = new BackendClient();
+                using var ai = new BackendClient();
+                using var device = new BackendClient();
+                using var cancellation = new CancellationTokenSource();
+                var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var active = voice.RunAsync("cancel", Payload(new { requestId = "voice-cancel" }), _ => started.TrySetResult(), cancellation.Token, suppressDiagnostics: true);
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var aiReply = ai.RunAsync("queue", Payload(new { lane = "ai" }), _ => { }, secret: "synthetic-ai-key");
+                var deviceReply = device.RunAsync("queue", Payload(new { lane = "device" }), _ => { });
+                cancellation.Cancel();
+                try { await active.WaitAsync(TimeSpan.FromSeconds(5)); throw new Exception("Expected voice cancellation."); }
+                catch (OperationCanceledException) { }
+                Check((await aiReply).GetProperty("payload").GetProperty("lane").GetString() == "ai" &&
+                      (await deviceReply).GetProperty("payload").GetProperty("lane").GetString() == "device", "Voice cancellation interrupted another request.");
+                Check((await voice.RunAsync("echo", Payload(new { after = true }), _ => { }, suppressDiagnostics: true)).GetProperty("payload").GetProperty("after").GetBoolean(), "Voice backend remained blocked after cancellation.");
             });
             await Run("resource origin, document and external-link policy", () =>
             {

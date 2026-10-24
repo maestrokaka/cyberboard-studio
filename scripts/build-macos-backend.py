@@ -35,6 +35,22 @@ def main():
     tools = vendor / "cyberboard/_tools"
     work = ROOT / ".tools/macos-build-work"
     work.mkdir(parents=True, exist_ok=True)
+    # Some supported Python runtimes require an adjacent public TLS policy
+    # certificate when SSLContext is constructed. PyInstaller does not infer
+    # data files referenced via ssl.__file__; preserve that policy unchanged.
+    ssl_runtime = json.loads(subprocess.check_output([str(python), "-c",
+        "import inspect,json,ssl; from pathlib import Path; "
+        "p=Path(ssl.__file__).with_name('codex-rejected-cas.pem'); "
+        "print(json.dumps({'path':str(p),'required':'codex-rejected-cas.pem' in inspect.getsource(ssl.SSLContext),'exists':p.is_file()}))"], text=True))
+    tls_resources = []
+    if ssl_runtime["required"]:
+        resource = Path(ssl_runtime["path"])
+        if not ssl_runtime["exists"]:
+            raise SystemExit("The build Python runtime is missing its required TLS policy certificate.")
+        raw = resource.read_bytes()
+        if b"PRIVATE KEY" in raw or not any(marker in raw for marker in (b"BEGIN TRUSTED CERTIFICATE", b"BEGIN CERTIFICATE")):
+            raise SystemExit("TLS policy resource must contain public certificates only.")
+        tls_resources.append(resource)
     command = [str(python), "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
         "--name", NAME, "--target-arch", "arm64", "--distpath", str(dist), "--workpath", str(work / "work"), "--specpath", str(work),
         "--paths", str(vendor), "--paths", str(tools), "--paths", str(ROOT / "backend"),
@@ -42,7 +58,10 @@ def main():
         "--add-data", str(ROOT / "vendor/licenses") + ":licenses",
         "--copy-metadata", "cyberboard-cli", "--hidden-import", "serial.tools.list_ports_osx",
         "--hidden-import", "kimi_ai", "--hidden-import", "lighting_recipe", "--hidden-import", "ai_images",
-        "--hidden-import", "ai_quality"]
+        "--hidden-import", "ai_quality", "--hidden-import", "speech_input", "--hidden-import", "keymap_codec",
+        "--hidden-import", "miao_call"]
+    for resource in tls_resources:
+        command += ["--add-data", str(resource) + ":."]
     for file in sorted(tools.glob("*.py")):
         if file.stem != "cb_keymap_tui":
             command += ["--hidden-import", file.stem]
@@ -141,6 +160,27 @@ def main():
         value = record.get("result", {})
         if value.get("cliVersion") != "0.1.2" or value.get("config") is not None or value.get("history") != []:
             raise SystemExit("Unexpected offline bootstrap result: " + checked.stdout)
+        tls_check = subprocess.run([str(moved / NAME), "--action", "runtimeHealth", "--state-dir", str(temp / "unused"),
+            "--resource-dir", str(ROOT)], input="{}", text=True, capture_output=True, env=env, cwd=temp, timeout=30)
+        tls_result = json.loads(tls_check.stdout.strip()).get("result", {}) if tls_check.returncode == 0 else {}
+        if not tls_result.get("tlsReady") or not tls_result.get("hostnameVerification") or not tls_result.get("certificateVerification"):
+            raise SystemExit("Relocated backend cannot initialize verified TLS. No network request was made.")
+        if (temp / "unused").exists():
+            raise SystemExit("TLS self-check unexpectedly created application state.")
+        for resource in tls_resources:
+            packaged_resource = moved / "_internal" / resource.name
+            if not packaged_resource.is_file() or packaged_resource.read_bytes() != resource.read_bytes():
+                raise SystemExit("Required TLS policy certificate is missing or altered in the frozen runtime.")
+            held = temp / resource.name
+            packaged_resource.rename(held)
+            try:
+                missing = subprocess.run([str(moved / NAME), "--action", "runtimeHealth", "--state-dir", str(temp / "unused"),
+                    "--resource-dir", str(ROOT)], input="{}", text=True, capture_output=True, env=env, cwd=temp, timeout=30)
+                missing_error = json.loads(missing.stdout.strip()).get("error", {})
+                if missing.returncode == 0 or missing_error.get("code") != "runtime_tls_incomplete":
+                    raise SystemExit("TLS self-check did not reject a deliberately incomplete runtime.")
+            finally:
+                held.rename(packaged_resource)
         if any(p.name in ("current.json", "history", "pyvenv.cfg") for p in bundle.rglob("*")):
             raise SystemExit("Private state or development venv was included in the release backend.")
     manifest = {"name": NAME, "target": "macos-" + platform.machine(), "python": subprocess.check_output([str(python), "--version"], text=True).strip(),
@@ -148,6 +188,8 @@ def main():
         "depends_on_system_python": False, "usb_accessed_during_build_or_test": False}
     manifest["mach_o_minimum_macos"] = ".".join(map(str, maximum))
     manifest["declared_app_minimum_macos"] = "13.0"
+    manifest["relocated_offline_tls"] = "passed"
+    manifest["tls_policy_resources"] = {file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in tls_resources}
     manifest["mach_o_binaries"] = machos
     # Bind the frozen runtime to the reviewed source, so release checks catch
     # same-version bundles whose action names match but implementation is old.
@@ -159,7 +201,7 @@ def main():
         for file in source_files
     }
     (bundle / "backend-build-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print("Relocated offline bootstrap passed; no USB or user device state.")
+    print("Relocated offline bootstrap and verified TLS initialization passed; no network, USB or user device state.")
     print(executable)
 
 

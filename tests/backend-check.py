@@ -166,10 +166,232 @@ class BackendChecks(unittest.TestCase):
         self.target = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "target.json")
         return result
 
+    def keymap_payload(self, changes=None):
+        return {"expectedKeymapHash": bridge.hashlib.sha256(bridge.matrix(self.live)).hexdigest(),
+                "expectedProductId": self.identity.product_id, "expectedFirmware": self.identity.version,
+                "keyChanges": changes or [{"layer": 1, "matrixIndex": 1, "code": "#00920102"}]}
+
+    def prepared_keymap(self, payload=None):
+        result = self.backend.keymapPlan(payload or self.keymap_payload())
+        self.target = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "target.json")
+        return result
+
+    def keymap_draft(self):
+        return {"schemaVersion": 1, "baseHash": bridge.hashlib.sha256(bridge.matrix(self.live)).hexdigest(),
+                "device": {"productId": self.identity.product_id, "firmware": self.identity.version},
+                "base": [layer["layer"][:] for layer in self.live["layer_data"]],
+                "changes": self.keymap_payload()["keyChanges"], "updatedAt": "2026-10-18T10:11:12.345Z"}
+
     def expect_error(self, code, callback):
         with self.assertRaises(bridge.BridgeError) as result:
             callback()
         self.assertEqual(result.exception.code, code)
+
+    def test_keymap_catalog_is_offline_and_reuses_all_cli_tokens(self):
+        import keycode
+        catalog = self.backend.keymapCatalog({})
+        self.assertEqual(len(catalog["entries"]), len(keycode.CODE_TO_NAME) + 1)
+        entries = {entry["code"]: entry for entry in catalog["entries"]}
+        self.assertEqual(len(entries), len(catalog["entries"]))
+        for (page, usage), token in keycode.CODE_TO_NAME.items():
+            self.assertEqual(entries[f"#00{page:02X}{usage:04X}"]["token"], token)
+        self.assertEqual(entries["#00920C0B"]["short"], "Fn2")
+        self.assertIn("顶部灯屏亮度", entries["#00920102"]["name"])
+        self.assertEqual(entries["#00920900"]["category"], "backlight")
+        self.assertEqual([item["mask"] for item in catalog["modifiers"]], [1, 2, 4, 8, 16, 32, 64, 128])
+        catalog["entries"][0]["name"] = "changed-copy"
+        self.assertEqual(self.backend.keymapCatalog({})["entries"][0]["name"], "未绑定")
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_keymap_decode_combination_and_unknown_codes_are_lossless(self):
+        combined = self.backend.decode_binding("#03070004")
+        self.assertIn("Ctrl", combined["name"])
+        self.assertIn("Shift", combined["name"])
+        self.assertEqual(combined["baseCode"], "#00070004")
+        self.assertEqual(combined["code"], "#03070004")
+        for code in ("#01000000", "#00910C0B", "#FF950123"):
+            binding = self.backend.decode_binding(code)
+            self.assertEqual(binding["code"], code)
+            self.assertEqual(binding["category"], "unknown")
+            self.assertIn(code, binding["name"])
+        self.assertEqual(self.backend.decode_binding("#00000000")["name"], "未绑定")
+
+    def test_keymap_bootstrap_cached_labels_hash_never_use_usb(self):
+        self.baseline["key_layer"]["layer_data"][1]["layer"][1] = "#00920102"
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        result = self.backend.bootstrap({})
+        self.assertEqual(result["keymap"]["source"], "cached")
+        self.assertIn("亮度", result["keymap"]["keys"][1]["bindings"][1]["name"])
+        self.assertEqual(result["keymap"]["keymapHash"], bridge.hashlib.sha256(bridge.matrix(self.baseline["key_layer"])).hexdigest())
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_keymap_draft_workspace_roundtrip_preserves_raw_base_and_other_work(self):
+        self.live["layer_data"][4]["layer"][199] = "#01920c0b"
+        draft = self.keymap_draft()
+        payload = {"designs": [self.design()], "keymapDraft": draft}
+        self.backend.saveWorkspace(payload)
+        loaded, warning = self.backend.load_workspace()
+        self.assertIsNone(warning)
+        self.assertEqual(loaded["keymapDraft"], draft)
+        self.assertEqual(loaded["keymapDraft"]["base"][4][199], "#01920c0b")
+        self.assertEqual(loaded["designs"], payload["designs"])
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_invalid_keymap_draft_keeps_previously_saved_workspace(self):
+        self.backend.saveWorkspace({"keymapDraft": self.keymap_draft()})
+        path = self.backend.state_dir / "workspace.json"
+        previous = path.read_bytes()
+        bad = []
+        changed = self.keymap_draft(); changed["baseHash"] = "0" * 64; bad.append(changed)
+        changed = self.keymap_draft(); changed["base"][0].pop(); bad.append(changed)
+        changed = self.keymap_draft(); changed["changes"] *= 2; bad.append(changed)
+        changed = self.keymap_draft(); changed["changes"][0]["matrixIndex"] = 199; bad.append(changed)
+        changed = self.keymap_draft(); changed["device"]["firmware"] = ""; bad.append(changed)
+        changed = self.keymap_draft(); changed["updatedAt"] = "2026-99-18T10:11:12Z"; bad.append(changed)
+        changed = self.keymap_draft(); changed["extra"] = "not accepted"; bad.append(changed)
+        for draft in bad:
+            self.expect_error("invalid_workspace", lambda: self.backend.saveWorkspace({"keymapDraft": draft}))
+            self.assertEqual(path.read_bytes(), previous)
+        self.backend.saveWorkspace({"keymapDraft": None})
+        self.assertIsNone(self.backend.load_workspace()[0]["keymapDraft"])
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_keymap_plan_uses_exact_live_base_preserves_led_extensions_and_internal_raw(self):
+        self.live["layer_data"][0]["layer"][0] = "#01000000"
+        self.live["layer_data"][6]["layer"][199] = "#01920C0B"
+        result = self.prepared_keymap()
+        self.assertEqual(result["kind"], "keymap")
+        self.assertEqual(result["changedSlots"], [])
+        self.assertEqual(result["keyChangeCount"], 1)
+        self.assertEqual(result["keymap"]["keymapHash"], self.keymap_payload()["expectedKeymapHash"])
+        self.assertEqual(result["targetKeymap"]["keys"][1]["bindings"][1]["code"], "#00920102")
+        self.assertIn("顶部灯屏亮度", result["keyChanges"][0]["after"]["name"])
+        self.assertEqual(result["keyChanges"][0]["before"]["code"], "#00070004")
+        self.assertEqual(self.target["page_data"], self.baseline["page_data"])
+        self.assertEqual(self.target["extraPreserved"], self.baseline["extraPreserved"])
+        self.assertEqual(self.target["key_layer"]["layer_data"][0]["layer"][0], "#01000000")
+        self.assertEqual(self.target["key_layer"]["layer_data"][6]["layer"][199], "#01920C0B")
+        backup = bridge.load_json(result["backupPath"])
+        self.assertEqual(backup["key_layer"], self.live)
+        self.assertEqual(self.backend.stored_config("AM01R6"), self.baseline)
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_plan_preserves_encoded_exchange_and_swap_tables(self):
+        self.baseline.update(exchange_num=1, exchange_key=[{"exchange_index": 0, "input_key": ["#00070004"], "out_key": ["#00070005"]}],
+                             swap_key_num=1, swap_key=[{"swap_key_index": 0, "input_key": "#00070006", "out_key": "#00070007"}])
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        result = self.prepared_keymap()
+        for field in ("exchange_num", "exchange_key", "swap_key_num", "swap_key"):
+            self.assertEqual(self.target[field], self.baseline[field])
+        self.assertEqual(result["keyChangeCount"], 1)
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_plan_keeps_authored_unknown_raw_codes_without_name_roundtrip(self):
+        changes = [{"layer": 0, "matrixIndex": 0, "code": "#01000000"},
+                   {"layer": 2, "matrixIndex": 2, "code": "#01920C0B"},
+                   {"layer": 6, "matrixIndex": 3, "code": "#ff950abc"}]
+        result = self.prepared_keymap(self.keymap_payload(changes))
+        for change in changes:
+            code = self.target["key_layer"]["layer_data"][change["layer"]]["layer"][change["matrixIndex"]]
+            self.assertEqual(code, change["code"].upper())
+        self.assertEqual(result["keyChangeCount"], 3)
+        self.assertEqual(result["keyChanges"][0]["after"]["code"], "#01000000")
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_plan_rejects_invalid_scope_and_changes_before_usb(self):
+        for extra in ({"assignments": []}, {"preserveCurrentKeymap": True}, {"snapshotId": "anything"}):
+            self.expect_error("invalid_keymap_plan", lambda: self.backend.keymapPlan({**self.keymap_payload(), **extra}))
+        for changes in ([], [{"layer": 7, "matrixIndex": 1, "code": "#00070004"}],
+                        [{"layer": 1, "matrixIndex": 199, "code": "#00070004"}],
+                        [{"layer": 1, "matrixIndex": 1, "code": "#bad"}],
+                        [{"layer": True, "matrixIndex": 1, "code": "#00070004"}],
+                        self.keymap_payload()["keyChanges"] * 2):
+            self.expect_error("invalid_key_change", lambda: self.backend.keymapPlan({**self.keymap_payload(), "keyChanges": changes}))
+        self.expect_error("keymap_snapshot_required", lambda: self.backend.keymapPlan({"keyChanges": self.keymap_payload()["keyChanges"]}))
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
+
+    def test_keymap_plan_wrong_device_or_firmware_never_reads_or_writes(self):
+        for extra in ({"expectedProductId": "CB04"}, {"expectedFirmware": "other-firmware"}):
+            self.expect_error("device_changed", lambda: self.backend.keymapPlan({**self.keymap_payload(), **extra}))
+        self.assertEqual(self.reads + self.serial_opens, 0)
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_plan_stale_draft_never_refreshes_or_creates_plan(self):
+        payload = self.keymap_payload()
+        self.live["layer_data"][6]["layer"][199] = "#00070005"
+        self.expect_error("keymap_changed", lambda: self.backend.keymapPlan(payload))
+        self.assertFalse((self.backend.state_dir / "plans").exists())
+        self.assertEqual(self.backend.stored_config("AM01R6"), self.baseline)
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_plan_requires_led_baseline_and_rejects_unencoded_features(self):
+        self.real_cli["cb_store"].current_path("AM01R6").unlink()
+        self.expect_error("baseline_missing", lambda: self.backend.keymapPlan(self.keymap_payload()))
+        self.baseline["Fn_key"] = [{"input_key": "#00070004", "out_key": "#00070005"}]
+        self.real_cli["cb_store"].save_current("AM01R6", self.baseline, version="test-r6")
+        self.expect_error("unsupported_config_features", lambda: self.backend.keymapPlan(self.keymap_payload()))
+        self.assertEqual(self.reads + self.serial_opens, 0)
+
+    def test_keymap_plan_ignores_noops_and_rejects_empty_full_write(self):
+        changes = [{"layer": 0, "matrixIndex": 0, "code": "#00070004"}, *self.keymap_payload()["keyChanges"]]
+        self.assertEqual(self.prepared_keymap(self.keymap_payload(changes))["keyChangeCount"], 1)
+        self.expect_error("empty_keymap_plan", lambda: self.backend.keymapPlan(self.keymap_payload(changes[:1])))
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_execute_returns_verified_new_view_after_complete_readback(self):
+        result = self.prepared_keymap()
+        report = self.backend.execute({"token": result["token"]})
+        self.assertTrue(report["success"] and report["keymapMatch"] and report["stateStored"])
+        self.assertEqual(report["kind"], "keymap")
+        self.assertEqual(report["keymap"]["source"], "live")
+        self.assertTrue(report["keymap"]["verifiedReadback"])
+        self.assertEqual(report["keymap"]["keys"][1]["bindings"][1]["code"], "#00920102")
+        self.assertEqual(report["config"]["key_layer"], self.target["key_layer"])
+        self.assertEqual(report["readbackAttempts"][0]["completeKeycodes"], 1400)
+        self.assertEqual(report["keyChanges"], result["keyChanges"])
+        self.assertEqual(self.recorded, [self.target])
+
+    def test_keymap_execute_stale_base_blocks_full_write(self):
+        result = self.prepared_keymap()
+        self.live["layer_data"][6]["layer"][199] = "#00070005"
+        self.expect_error("keymap_changed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.recorded, [])
+
+    def test_keymap_execute_tampered_scope_summary_or_missing_kind_is_rejected(self):
+        for mutation in ("led", "internal", "summary", "kind", "layer-meta"):
+            result = self.prepared_keymap()
+            folder = self.backend.state_dir / "plans" / result["token"]
+            metadata = bridge.load_json(folder / "plan.json")
+            target = bridge.load_json(folder / "target.json")
+            if mutation == "led": target["page_data"][0]["lightness"] = 77
+            if mutation == "internal": target["key_layer"]["layer_data"][6]["layer"][199] = "#00070005"
+            if mutation == "layer-meta": target["key_layer"]["valid"] = 2
+            if mutation == "summary": metadata["keyChanges"][0]["after"]["name"] = "forged"
+            if mutation == "kind":
+                metadata.pop("kind"); metadata.pop("keyChanges"); metadata["keyChangeCount"] = 0
+            metadata["targetHash"] = bridge.digest(target)
+            bridge.atomic_json(folder / "target.json", target)
+            bridge.atomic_json(folder / "plan.json", metadata)
+            self.expect_error("plan_tampered", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.sent, [])
+
+    def test_keymap_failed_ack_or_readback_never_records_success(self):
+        result = self.prepared_keymap()
+        self.bad_start_crc = True
+        self.expect_error("start_ack_failed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.recorded, [])
+        self.bad_start_crc = False
+        self.sent.clear()
+        result = self.prepared_keymap()
+        self.retry_mismatches = 99
+        self.expect_error("verification_failed", lambda: self.backend.execute({"token": result["token"]}))
+        self.assertEqual(self.recorded, [])
+        self.assertEqual(self.backend.stored_config("AM01R6"), self.baseline)
+
+    def test_lighting_plan_cannot_include_keys_without_dedicated_snapshot(self):
+        self.expect_error("invalid_keymap_policy", lambda: self.backend.plan({**self.payload(), "keyChanges": self.keymap_payload()["keyChanges"]}))
+        self.assertEqual(self.probes + self.reads + self.serial_opens, 0)
 
     def test_bootstrap_never_probes_or_claims_connected(self):
         result = self.backend.bootstrap({})

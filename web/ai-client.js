@@ -30,7 +30,7 @@
   function formIsSaved(){const form=formSettings(),saved=selectedProfile();return form.baseUrl===saved.baseUrl&&form.model===saved.model&&(!$('aiApiKey').value.trim()||unchangedRevealedKey());}
   function capabilityNote(){const form=formSettings(),saved=selectedProfile(),known=form.model===saved.model&&form.baseUrl===saved.baseUrl?saved:form;return supportsImages(known)?'支持文字与参考图创作；图片只在你点击制作时发送。':models[form.provider].includes(form.model)?'此模型仅支持文字创作。参考图会保留，但制作前需要移除图片或换用支持图片的模型。':'自定义模型的图片能力尚未确认，仅开放文字创作。';}
   function refresh(){
-   const busy=state.aiBusy||state.closing,configured=selectedProfile().hasKey===true,credentialError=credentialProblem(),name=providerName(settings?.provider||'kimi-code');
+   const busy=state.aiBusy||(state.voiceBusy||state.miaoCallBusy)||state.closing,configured=selectedProfile().hasKey===true,credentialError=credentialProblem(),name=providerName(settings?.provider||'kimi-code');
    $('generateAIBtn').disabled=busy||state.executing||state.hardwareBusy||settingsBusy||imageImporting||keyRevealBusy;
    $('generateAIBtn').textContent=busy?providerName(activeRequest?.provider||settings?.provider)+' 正在制作…':loaded?'用 '+name+' 制作灯效':'制作 AI 灯效';
    $('cancelAIBtn').hidden=!busy;$('cancelAIBtn').disabled=!!activeRequest?.cancelRequested;
@@ -160,7 +160,7 @@
    catch(error){settingsStatus(message(error),true);}finally{settingsBusy=false;refresh();}
   }
   async function generate(){
-   if(state.aiBusy||settingsBusy||imageImporting||keyRevealBusy)return;
+   if(state.aiBusy||(state.voiceBusy||state.miaoCallBusy)||settingsBusy||imageImporting||keyRevealBusy)return;
    if(!native){toast('AI 制作需要在 Cyberboard Studio 桌面 App 中使用。');return;}
    if(state.executing||state.hardwareBusy||state.preparingSync){toast('设备操作完成后再制作灯效。');return;}
    if(!$('syncModal').hidden){toast('请先关闭同步计划，再开始 AI 制作。');return;}

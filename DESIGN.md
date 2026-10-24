@@ -1,6 +1,6 @@
 # Cyberboard Studio · 1.0
 
-A desktop lighting studio for macOS and Windows. The interface follows restrained charcoal surfaces and the Linear design language. The keyboard is the subject: real calibrated front photographs show the selected design, while sparse lavender controls guide creation and delivery. LED colors come from the artwork data.
+A desktop lighting studio for macOS and Windows. The interface offers two persistent styles: Classic Dark (the existing restrained charcoal/Linear language) and Warm Island Light (adapted from Animal Island UI). The keyboard is the subject: real calibrated front photographs show the selected design, while sparse lavender controls guide creation and delivery. LED colors come from the artwork data.
 
 ## Tokens and platform behavior
 
@@ -12,6 +12,14 @@ Sidebar 184px, workbench inspector approximately 250–280px. Use a native title
 
 The approved icon is the orange tile containing a white, proportionate keyboard enclosure with the correct display opening and cat paw. Only the paw is rotated 180 degrees. The same raster asset drives the sidebar, macOS ICNS and Windows ICO; no Logo review destination is included.
 
+## Selectable interface styles
+
+Settings → Interface style offers exactly two visual cards: `dark` / 经典深色 and `island` / 暖岛浅色. Existing workspaces default to dark. Persist `uiTheme` with the workspace; a bounded local cache only avoids first-paint flashes. Failed saves restore the previous choice. Theme changes must never alter RGB, timing, conversation versions, drafts, keymaps or hardware state.
+
+Warm Island follows Animal Island UI v2.3.0 (MIT, source commit 279959f): cream #f8f8f0 and #fffdf5 surfaces, earth-brown text #794f27/#725d42, mint #19c8b9 actions, Nunito + Noto Sans SC local fonts, rounded/pill controls, and locally bundled naive-icons. It is an adaptation of the existing native/vanilla interface, not a React runtime migration. Complex native review sheets retain their accessible rectangular layout rather than adopting decorative blob clipping. Original dark tokens below remain scoped to the dark style. Mac titlebar and under-page colors follow the style; native settings dialogs use the platform appearance.
+
+The light photo stage uses a warm neutral surface. Preserve transparent photo contours and the exact shared contain geometry for all three canvas layers. Off LEDs, keycaps, photographs and source RGB are never recolored to fit the UI. Distinguish Appearance (paintbrush), Keymap (key), Model (bulb/chip) and Settings icons. Do not restore a temporary logo-review page, system credential prompts, fake AI results or sample-conversation data when integrating a visual trial.
+
 ## Information hierarchy
 
 Application navigation, conversation history and lighting versions are separate levels.
@@ -19,10 +27,10 @@ Application navigation, conversation history and lighting versions are separate 
 | Navigation group | Destinations |
 | --- | --- |
 | 创作 | AI 创作, 灯效工作台, 灯效作品库 |
-| 键盘 | 键盘与外观, 设备与槽位 |
+| 键盘 | 键盘与外观, 键位编辑, 设备与槽位 |
 | 设置 | 模型配置 |
 
-The device destination provides internal tabs for slots / configuration, read-only keymaps and sync records. Studio preferences and optional support remain secondary destinations. The global sidebar never becomes a conversation list.
+The device destination provides internal tabs for slots / configuration and sync records. Keymap editing is a separate destination: 81 physical keys, seven layers, readable vendor functions, searchable assignments, independent persistent drafts and a reviewed keymap-only plan. Unknown raw keycodes are retained exactly; lighting drafts never become keymap changes. Studio preferences and optional support remain secondary destinations. The global sidebar never becomes a conversation list.
 
 ## AI creation
 
@@ -61,7 +69,7 @@ The catalog names are exactly:
 - CYBERBOARD R4「Paisley」
 - CYBERBOARD R4「Vision」
 
-R4 and R6 Vision are distinct model choices. R6 uses the earliest provided front photograph; R4 uses qualified official site / store images, including sold-out colorways. Preserve the photographs' original pixels and use calibrated screen / backlight projections. Clip photo and canvases along the physical enclosure on a quiet `#111315` stage. Keep the full enclosure proportional, without stretching, cropping the keyboard or adding fictional colorways. Only the clean front view is offered.
+R4 and R6 Vision are distinct model choices. R6 uses the earliest provided front photograph; R4 uses qualified official site / store images, including sold-out colorways. Preserve the photographs' original pixels and use calibrated screen / backlight projections. Clip photo and canvases along the physical enclosure on a quiet `#111315` stage in dark mode, or the warm neutral photo stage in light mode. Keep the full enclosure proportional, without stretching, cropping the keyboard or adding fictional colorways. Only the clean front view is offered.
 
 Opaque keycaps receive restrained light in key gaps; transparent keycaps retain transmission. Selection is remembered and changes only preview appearance, never the artwork, slot drafts or connected-device identity. Clearly separate the photo model from the manually detected USB identity. Photo composition is an approximation, not a real-time camera feed or hardware color measurement.
 
@@ -73,7 +81,13 @@ API keys use ordinary per-provider local files. The field is hidden by default w
 
 The v2 private workspace holds conversations, normalized reference images, immutable versions, library state, removed built-ins and independent slot drafts. Before the first v2 save, retain the prior workspace as `workspace-before-1.0.json`. Await disk persistence before success and before ordinary exit / reload. A failure leaves the app open for export or retry. Respect 20 conversations, 12 versions and 60 turns per conversation, and a 32MiB workspace cap without silently evicting old results.
 
-Keys stay outside workspace, designs, exports, logs, public assets, commits and packages. Device configuration / keymaps are excluded from AI requests. A selected base recipe and bounded creative history are explicit request inputs. The image payload is normalized locally, and artwork export omits the reference images and transcript.
+API Keys stay outside workspace, designs, exports, logs, public assets, commits and packages. Device configuration / keymaps are excluded from AI requests. A selected base recipe and bounded creative history are explicit request inputs. The image payload is normalized locally, and artwork export omits the reference images and transcript.
+
+## Dictation and optional voice Agent
+
+The AI composer has an explicit voice-input button. ASR service and model are configured independently of lighting generation; only confirmed speech-to-text models are available. A click starts bounded recording, another finishes it, and recognized text enters the current draft for review. Recording never automatically submits a creative turn. Cancel, navigation races, context changes and exit cannot insert late text into another conversation. Raw audio is temporary and excluded from persisted workspace, logs and exports; ASR Keys follow the same ordinary local-file and show/hide policy.
+
+MiaoCall is a separate opt-in Beta destination on macOS. Its global shortcut starts disabled, is registered only after the user enables it, and is released on exit. The current Codex adapter uses an official local app-server ephemeral task with only configured Spotify playback/status tools. Do not claim completion from a model reply or app launch: require the official terminal event plus verified target track, playback state and progress. WorkBuddy, Qwen Office and Doubao Work remain future integrations.
 
 ## Library, dialogs and support
 
@@ -85,4 +99,32 @@ Support is optional. Preserve the approved icon, restrained charcoal layout and 
 
 ## Candidate acceptance
 
-1.0.0-rc.1 is a prerelease. Reviews cover the full flow and retained functions, not only the new screen. Distinguish offline tests, live-provider tests, native host checks and USB acceptance. Never label Windows / R4 stable on the basis of cross-compilation or shared mocks. Package only public resources and an empty / explicitly isolated demonstration workspace; private tests and screenshots stay in ignored build directories.
+MiaoCall Beta 14 is a public prerelease for macOS Apple Silicon. The separately available Windows RC2 packages are historical builds. Reviews cover the full flow and retained functions, not only the new screen. Distinguish offline tests, live-provider tests, native host checks and USB acceptance. Never label Windows / R4 stable on the basis of cross-compilation or shared mocks. Package only public resources and an empty / explicitly isolated demonstration workspace; private tests and screenshots stay in ignored build directories.
+
+
+## MiaoCall Beta
+
+MiaoCall is a separate opt-in destination. Use the approved orange/ivory catgirl, with charcoal surfaces and a restrained orange action accent. Listening, recognition, editable confirmation, Codex activity and playback verification have distinct states. Keep controls simple: switch, physical key hint, hold-to-test, cancel and voice settings. Song catalog edits require an explicit apply action before the global key uses them. WorkBuddy, Qwen Office and Doubao Work remain visibly unavailable until implemented.
+
+The native floating companion never activates or opens while idle. Preserve transparent character proportions; show bounded, actionable task information beside her. Allow the desktop character to be dragged across the desktop and remember its position; the settings-page illustration is not the floating companion. Success requires an official task terminal plus actual Spotify playback progress. The current public snapshot preserves the verified MiaoCall macOS identity and signed package. Do not merge earlier private development history, tags, test audio or desktop-recording materials into the public origin.
+
+
+## Shared control geometry
+
+Reserve an invariant end gutter for every select: 34px in Classic Dark and 38px in Warm Island. Context-specific spacing must not move selected text into the arrow area. Keep short options fully readable; truncate long titles within the text area. Group each label with its control when wrapping.
+
+Generic theme defaults use low-specificity selectors so component geometry wins. Primary buttons are flat, without a hard bottom shadow or positional transform; hover and active states use color feedback. Disabled buttons also have no shadow or positional transform. Pill links need explicit inline padding and a separate, non-shrinking icon. Review both themes at regular and compact desktop sizes across all destinations.
+
+
+## Content-sized slot cards and compact keymaps
+
+The workbench slot area sizes to its card contents instead of a fixed vertical budget. Keep slot metadata inside the rounded border and leave a clear gap before the action row. The keyboard preview takes the remaining space; never vertically center oversized card content into a compressed button.
+
+At compact desktop widths, stack the keymap inspector below the keyboard before key labels become cramped. Bound long function labels to two wrapped lines, preserve full labels in the inspector and tooltips, and never modify raw key codes for presentation. Review real text rectangles against clipping ancestors, including off-screen components within scrollable pages. Distinguish intentional ellipses, line clamps and closed disclosures from defects.
+
+
+## Responsive preview work
+
+Keep selected-card feedback immediate. Prepare gallery lighting incrementally, reuse identical comparison snapshots and cancel queued work when leaving the page. Thumbnail raster sizes may match their displayed size; the main preview keeps its existing precision and uniform photo/LED/key-light projection.
+
+Suspend hidden preview work while preserving the current frame and playback choice. Reuse bounded static photo/mask results only when calibration, crop, material and raster dimensions match; never cache or recolor artwork RGB. Release caches on destruction, and retain the durable workspace-save/exit contract.

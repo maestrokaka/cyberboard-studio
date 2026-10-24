@@ -82,7 +82,7 @@ function harness(options = {}) {
     querySelector: selector => documentRoot.querySelector(selector),
     querySelectorAll: selector => documentRoot.querySelectorAll(selector), createElement: tag => new Element(tag),
     addEventListener() {} };
-  documentRoot.ownerDocument = document;
+  documentRoot.ownerDocument = document;document.documentElement=documentRoot.querySelector('html');
   const calls = [], timers = new Map(); let timerID = 0; let executeReply;
   const control = { importValue: null, detectValue: null, detectError: null, workspace: options.workspace || null, executionResult: options.executionResult || null, planKeymap: null, planPreservation: options.planPreservation || {source:'live',comparedKeycodes:1400,differentFromStored:0,differentPhysicalBindings:0,differentInternalKeycodes:0,refreshApplied:false} };
   const window = { KeyboardPreview: class {
@@ -103,7 +103,10 @@ function harness(options = {}) {
       if (action === 'execute') { executeReply = value => window.StudioBridge.receive({ id, result: value }); return; }
       if (action === 'detect' && control.detectError) { window.StudioBridge.receive({ id, error: typeof control.detectError === 'string' ? { message: control.detectError } : clone(control.detectError) }); return; }
       switch (action) {
+        case 'setAppearance': result={theme:payload.theme};break;
         case 'bootstrap': result = { config: options.emptyBaseline ? null : clone(fixture), device: options.emptyBaseline ? clone(D.snapshot) : clone(syntheticDevice), history: [], cliVersion: 'offline-test', workspace: control.workspace }; break;
+        case 'keymapCatalog': { const entries=new Map();D.keyLayout.forEach(key=>key.bindings.forEach(binding=>entries.set(binding.code.toUpperCase(),{...binding,token:binding.short,category:'keyboard'})));result={schemaVersion:1,layerCount:7,physicalKeyCount:81,entries:[...entries.values()],modifiers:[]};break;}
+        case 'keymap': result={keymap:{...clone(fixture.key_layer),keymapHash:'b'.repeat(64),source:'live'},device:{...syntheticDevice,connected:true}};break;
         case 'getAISettings': result={provider:'kimi-code',baseUrl:'https://api.kimi.com/coding/v1',model:'k3',hasKey:false,credentialStore:'test'}; break;
         case 'saveWorkspace': control.workspace = clone(payload); result = { saved: true }; break;
         case 'detect': result = control.detectValue || { connected: true, device: { ...syntheticDevice, connected: true, port: '/dev/mock-board' }, keymap: clone(fixture.key_layer), config: clone(fixture) }; break;
@@ -120,8 +123,9 @@ function harness(options = {}) {
     if(options.platform === 'windows') window.StudioNative = { platform: 'windows', postMessage };
     else window.webkit = { messageHandlers: { studio: { postMessage } } };
   }
-  const context = { window, document, console, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
-  vm.createContext(context); ['data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', ...(options.chat?['chat-client.js']:[]), 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
+  const themeCache=new Map(options.themeCache?[['cyberboard-ui-theme',options.themeCache]]:[]);
+  const context = { window, document, console, localStorage:{getItem:key=>themeCache.get(key)||null,setItem:(key,value)=>themeCache.set(key,value)}, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
+  vm.createContext(context); ['theme.js','data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', 'keymap-client.js', ...(options.chat?['chat-client.js']:[]), 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
   return { window, document, calls, control, get app() { return window.StudioApp; }, el: id => document.getElementById(id),
     async flushSave() { for (const [id, item] of [...timers]) if (item.ms <= 250) { timers.delete(id); await item.fn(); } await settle(); },
     replyExecute(value) { assert.ok(executeReply, 'execute must have an explicit click'); executeReply(value); executeReply = null; } };
@@ -133,8 +137,10 @@ if(require.main===module)(async () => {
   assert.equal(h.window.STUDIO_DATA.baseConfig, null, 'production data never includes the test fixture or a device baseline');
   assert.equal(state.config._fixture, true, 'the mocked backend alone supplies synthetic configuration');
   assert.equal(state.workspaceLoaded, true); assert.equal(state.designs.length, builtinCount); assert.equal(state.pending.size, 0);
+  assert.equal(state.page, 'create', 'AI creation opens as the home page');
+  assert.ok(h.el('page-create').classList.contains('active'), 'the initial page must match the startup state');
   assert.equal(h.calls.filter(c => c.action === 'execute').length, 0, 'startup must never write');
-  const formalLogo = 'assets/branding/product-icon/cyberboard-studio-photo-contour-v6-paw-180.png';
+  const formalLogo = 'assets/branding/product-icon/cyberboard-studio-approved-am-paw-v10.png';
   assert.equal(h.el('brandMark').querySelectorAll('img').length, 1, 'the approved PNG remains the sidebar mark');
   assert.equal(h.el('brandMark').querySelectorAll('img')[0].getAttribute('src'), formalLogo);
   assert.ok(h.el('brandMark').classList.contains('brand-official-mark'));
@@ -209,7 +215,7 @@ if(require.main===module)(async () => {
   assert.equal(fresh.window.webkit, undefined, 'Windows must not depend on the macOS bridge');
   assert.equal(fresh.document.querySelectorAll('[data-key]').length, 81);
   assert.doesNotMatch(fresh.el('keyGrid').innerHTML, /#00000000/, 'unread keys display physical labels instead of fake zero bindings');
-  assert.deepEqual(fresh.calls.map(c => c.action), ['bootstrap'], 'fresh Windows launch performs no USB actions');
+  assert.deepEqual(fresh.calls.map(c => c.action), ['bootstrap','setAppearance'], 'fresh Windows launch only bootstraps and applies appearance; no USB actions');
   fresh.el('exportFormat').value='config'; await fresh.app.exportJSON();
   assert.match(fresh.el('toast').textContent, /缺少完整配置基线/);
   assert.equal(fresh.calls.filter(c=>c.action==='exportJSON').length,0);

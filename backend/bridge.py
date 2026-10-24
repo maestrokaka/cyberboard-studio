@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-shot JSON-lines bridge to the locally installed Cyberboard CLI.
 
-bootstrap/history are offline. detect/keymap are USB reads. plan/restorePlan
+bootstrap/history/keymapCatalog are offline. detect/keymap are USB reads. plan/restorePlan/keymapPlan
 prepare a reviewable full configuration; only execute writes that configuration.
 initializePlan prepares a new full configuration when no previous record exists.
 setTime writes the RTC only. LED state is always labelled last-written because
@@ -45,6 +45,8 @@ BUILTIN_NAMES = ("电量", "马赛克", "时钟", "文字", "流光")
 # Source importlib tests and isolated Windows Python need the sibling modules.
 if str(Path(__file__).parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).parent))
+
+import keymap_codec
 
 
 class BridgeError(Exception):
@@ -612,6 +614,15 @@ class Bridge:
         result = {"device": self.device_dict(product_id=pid), "config": self.provenance(config),
                 "history": self.history_items(pid), "cliVersion": self.cli_version,
                 "ledSource": "last-written" if config else "unknown", "workspace": workspace}
+        result["keymap"] = None
+        if config and isinstance(config.get("key_layer"), dict):
+            try:
+                validate_layers(config["key_layer"])
+                result["keymap"] = self.keymap_view(config["key_layer"], source="cached")
+            except BridgeError:
+                # Old/malformed records remain available under the existing
+                # config policy; do not present an incomplete editable matrix.
+                pass
         if workspace_warning:
             result["workspaceWarning"] = workspace_warning
         return result
@@ -734,6 +745,10 @@ class Bridge:
                      "removedBuiltinIds": copy.deepcopy(removed_builtins),
                      "selectedId": selected, "targetSlot": target, "brief": brief, "palette": copy.deepcopy(palette),
                      "brightness": brightness, "speedMs": speed_ms, "exportFormat": export_format}
+        ui_theme = payload.get("uiTheme", "dark")
+        require(isinstance(ui_theme, str) and ui_theme in ("dark", "island"),
+                "invalid_workspace", "界面风格无效。")
+        workspace["uiTheme"] = ui_theme
         conversations = copy.deepcopy(payload.get("conversations", []))
         require(isinstance(conversations, list) and len(conversations) <= 20,
                 "workspace_limit", "最多保留 20 个创作会话，请导出作品并整理会话。")
@@ -831,6 +846,8 @@ class Bridge:
                 "invalid_workspace", "当前创作会话不存在。")
         workspace["conversations"] = copy.deepcopy(conversations)
         workspace["activeConversationId"] = active_conversation
+        if "keymapDraft" in payload:
+            workspace["keymapDraft"] = self.validate_keymap_draft(payload["keymapDraft"])
         def has_credential(value):
             if isinstance(value, dict):
                 return any(str(key).lower() in ("apikey", "api_key", "authorization", "credential", "password") or
@@ -1007,31 +1024,19 @@ class Bridge:
                 "layout_invalid", "实体键盘布局资源无效。")
         return keys
 
-    def decode_binding(self, code, known):
-        code = code.upper()
-        if code in known:
-            return {**known[code], "code": code}
-        if code == "#00000000":
-            return {"short": "—", "name": "未绑定", "code": code}
-        mask, page, usage = int(code[1:3], 16), int(code[3:5], 16), int(code[5:9], 16)
-        if page == 0x92:
-            label, name = f"{usage:04X}", f"厂家功能 {usage:04X}（名称未确认）"
-        else:
-            table = self.cli["cb_keymap"].HID07 if page == 7 else self.cli["cb_keymap"].HID0C if page == 12 else {}
-            label = table.get(usage, f"{page:02X}:{usage:04X}")
-            name = label if usage in table else f"键码 {code}"
-        if mask:
-            label, name = "组合", f"修饰键 {mask:02X} + {name}"
-        return {"short": label, "name": name, "code": code}
+    def keymapCatalog(self, payload):
+        return keymap_codec.catalog()
 
-    def keymap_view(self, live):
+    def decode_binding(self, code, known=None):
+        return keymap_codec.decode(code)
+
+    def keymap_view(self, live, *, source="live"):
         keys = copy.deepcopy(self.layout())
-        known = {binding["code"].upper(): binding for key in keys for binding in key.get("bindings", [])
-                 if isinstance(binding, dict) and KEY_RE.fullmatch(binding.get("code", ""))}
         for key in keys:
-            key["bindings"] = [self.decode_binding(layer["layer"][key["matrix_index"]], known)
+            key["bindings"] = [self.decode_binding(layer["layer"][key["matrix_index"]])
                                for layer in live["layer_data"]]
-        return {**copy.deepcopy(live), "keys": keys, "source": "live", "physicalKeyCount": 81}
+        return {**copy.deepcopy(live), "keys": keys, "source": source, "physicalKeyCount": 81,
+                "keymapHash": hashlib.sha256(matrix(live)).hexdigest()}
 
     def detect(self, payload):
         identity = self.discover(payload)
@@ -1049,6 +1054,109 @@ class Bridge:
 
     def keymap(self, payload):
         return self.detect(payload)
+
+    def validated_key_changes(self, changes, *, allow_empty=False, error_code="invalid_key_change"):
+        require(isinstance(changes, list) and (allow_empty or bool(changes)) and len(changes) <= 81 * 7,
+                error_code, "请选择需要修改的实体键位。")
+        allowed = {key["matrix_index"] for key in self.layout()}
+        seen = set()
+        for change in changes:
+            require(isinstance(change, dict) and set(change) == {"layer", "matrixIndex", "code"},
+                    error_code, "键位修改字段无效。")
+            layer, index, code = change.get("layer"), change.get("matrixIndex"), change.get("code")
+            require(type(layer) is int and 0 <= layer <= 6 and type(index) is int and index in allowed and
+                    isinstance(code, str) and KEY_RE.fullmatch(code), error_code,
+                    "只能修改实体键的七层绑定，键码需要使用 #MMPPUUUU 格式。")
+            pair = (layer, index)
+            require(pair not in seen, error_code, "同一层的同一键位不能重复设置。")
+            seen.add(pair)
+        return copy.deepcopy(changes)
+
+    def validate_keymap_draft(self, draft):
+        if draft is None:
+            return None
+        require(isinstance(draft, dict) and set(draft) == {
+            "schemaVersion", "baseHash", "device", "base", "changes", "updatedAt"} and
+            type(draft.get("schemaVersion")) is int and draft["schemaVersion"] == 1,
+            "invalid_workspace", "键位草稿格式无效。")
+        device = draft.get("device")
+        require(isinstance(device, dict) and set(device) == {"productId", "firmware"} and
+                all(isinstance(device.get(field), str) and 0 < len(device[field]) <= 128 and
+                    device[field].strip() and not re.search(r"[\x00-\x1F\x7F]", device[field])
+                    for field in ("productId", "firmware")), "invalid_workspace", "键位草稿缺少设备身份。")
+        base = draft.get("base")
+        require(isinstance(base, list) and len(base) == 7 and all(isinstance(layer, list) for layer in base),
+                "invalid_workspace", "键位草稿需要完整的七层基底。")
+        fragment = {"layer_num": 7, "layer_data": [{"layer": layer} for layer in base]}
+        try:
+            baseline_hash = hashlib.sha256(matrix(fragment)).hexdigest()
+        except BridgeError:
+            raise BridgeError("invalid_workspace", "键位草稿基底不完整。") from None
+        require(draft.get("baseHash") == baseline_hash, "invalid_workspace", "键位草稿基底校验失败。")
+        self.validated_key_changes(draft.get("changes"), allow_empty=True, error_code="invalid_workspace")
+        stamp = draft.get("updatedAt")
+        require(isinstance(stamp, str) and len(stamp) <= 64 and
+                re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})", stamp),
+                "invalid_workspace", "键位草稿时间无效。")
+        try:
+            require(datetime.fromisoformat(stamp.replace("Z", "+00:00")).tzinfo is not None,
+                    "invalid_workspace", "键位草稿时间无效。")
+        except ValueError:
+            raise BridgeError("invalid_workspace", "键位草稿时间无效。") from None
+        # Preserve original raw strings/case. Labels are presentation only.
+        return copy.deepcopy(draft)
+
+    def keymap_change_summary(self, before, target):
+        validate_layers(before["key_layer"])
+        validate_layers(target["key_layer"])
+        physical = {key["matrix_index"]: key for key in self.layout()}
+        changes = []
+        for layer, (old_layer, new_layer) in enumerate(zip(before["key_layer"]["layer_data"], target["key_layer"]["layer_data"])):
+            for index, (old, new) in enumerate(zip(old_layer["layer"], new_layer["layer"])):
+                if old.upper() == new.upper():
+                    continue
+                require(index in physical, "plan_tampered", "键位计划只能修改实体键。")
+                key = physical[index]
+                changes.append({"layer": layer, "matrixIndex": index, "physical": key["physical"],
+                                "physicalName": key.get("physical_name", key["physical"]),
+                                "before": self.decode_binding(old), "after": self.decode_binding(new)})
+        return changes
+
+    def keymapPlan(self, payload):
+        require(isinstance(payload, dict) and set(payload) <= {
+            "expectedKeymapHash", "expectedProductId", "expectedFirmware", "keyChanges", "port"},
+            "invalid_keymap_plan", "键位计划不能混入灯效、历史恢复或其他配置修改。")
+        expected_hash = payload.get("expectedKeymapHash")
+        require(isinstance(expected_hash, str) and re.fullmatch(r"[a-f0-9]{64}", expected_hash),
+                "keymap_snapshot_required", "请先读取完整键位，再编辑并准备计划。")
+        require(all(isinstance(payload.get(field), str) and 0 < len(payload[field]) <= 128 and
+                    payload[field].strip() and not re.search(r"[\x00-\x1F\x7F]", payload[field])
+                    for field in ("expectedProductId", "expectedFirmware")),
+                "keymap_snapshot_required", "键位草稿缺少读取时的设备身份，请重新读取。")
+        changes = self.validated_key_changes(payload.get("keyChanges"))
+        identity = self.discover(payload)
+        require(identity is not None, "device_missing", "请通过 USB 连接键盘后准备键位计划。")
+        require(identity.product_id == payload["expectedProductId"] and identity.version == payload["expectedFirmware"],
+                "device_changed", "键位草稿对应的键盘或固件已变化，请重新读取并核对草稿。")
+        stored = self.stored_config(identity.product_id, required=True)
+        validate_config(stored, self.cli)
+        self.require_current_led_baseline(identity.product_id, stored)
+        live, raw = self.read_live(identity.port)
+        require(hashlib.sha256(matrix(live)).hexdigest() == expected_hash,
+                "keymap_changed", "当前键位与草稿基底不同，未刷新或写入键盘；请重新读取并核对修改。")
+        changes = [change for change in changes if
+                   live["layer_data"][change["layer"]]["layer"][change["matrixIndex"]].upper() != change["code"].upper()]
+        require(changes, "empty_keymap_plan", "键位草稿没有实际变化。")
+        result = self.prepare({"keyChanges": changes}, (identity, stored, live, raw))
+        folder = self.state_dir / "plans" / result["token"]
+        before, target = load_json(folder / "before.json"), load_json(folder / "target.json")
+        summary = self.keymap_change_summary(before, target)
+        metadata = load_json(folder / "plan.json")
+        metadata.update(kind="keymap", keyChanges=summary, expectedKeymapHash=expected_hash)
+        atomic_json(folder / "plan.json", metadata)
+        return {**result, "kind": "keymap", "keyChanges": summary,
+                "expectedKeymapHash": expected_hash, "keymapHash": expected_hash,
+                "targetKeymap": self.keymap_view(target["key_layer"], source="prepared")}
 
     def built_in_defaults(self):
         path = self.resource_dir / "web" / "assets" / "builtin-default-pages.json"
@@ -1309,6 +1417,8 @@ class Bridge:
                 "ledSource": "last-written", "status": "prepared"}
 
     def plan(self, payload):
+        require(payload.get("keyChanges", []) == [], "invalid_keymap_policy",
+                "灯效计划保留全部当前键位；请从独立键位页面准备键位修改。")
         return self.prepare(payload)
 
     def builtInPlan(self, payload):
@@ -1534,6 +1644,21 @@ class Bridge:
         require(digest(stored_before) == metadata.get("storedBaselineHash") and
                 digest(before) == metadata.get("beforeHash") and digest(target) == metadata.get("targetHash"),
                 "plan_tampered", "同步计划内容发生变化，请重新准备。")
+        if metadata.get("kind") == "keymap" or "keyChanges" in metadata:
+            key_summary = self.keymap_change_summary(before, target)
+            unchanged = copy.deepcopy(target)
+            for old, current in zip(before["key_layer"]["layer_data"], unchanged["key_layer"]["layer_data"]):
+                current["layer"] = copy.deepcopy(old["layer"])
+            require(metadata.get("kind") == "keymap" and key_summary and
+                    metadata.get("changedSlots") == [] and unchanged == before and
+                    type(metadata.get("keyChangeCount")) is int and metadata["keyChangeCount"] == len(key_summary) and
+                    metadata.get("keyChanges") == key_summary and
+                    metadata.get("expectedKeymapHash") == metadata.get("liveKeymapHash") ==
+                    hashlib.sha256(matrix(before["key_layer"])).hexdigest(),
+                    "plan_tampered", "键位计划包含未确认的键位或灯效修改，请重新准备。")
+        else:
+            require(metadata.get("keyChangeCount") == 0 and target.get("key_layer") == before.get("key_layer"), "plan_tampered",
+                    "灯效计划不能包含键位修改，请从独立键位页面重新准备。")
         builtin_artifact = folder / "builtin-defaults.json"
         if builtin_artifact.exists() or metadata.get("kind") == "builtin-modes" or "changedBuiltinPages" in metadata or "builtinDefaultsHash" in metadata:
             indices = metadata.get("changedBuiltinPages")
@@ -1707,6 +1832,10 @@ class Bridge:
             report.update(kind="builtin-modes", changedBuiltinPages=metadata["changedBuiltinPages"], appliedSlots=[],
                           builtinSummary=metadata["builtinSummary"], explicitDiff=metadata["explicitDiff"],
                           builtinSource=metadata["builtinSource"])
+        if metadata.get("kind") == "keymap":
+            report.update(kind="keymap", keyChanges=metadata["keyChanges"],
+                          keymap={**self.keymap_view(target["key_layer"]), "verifiedReadback": True},
+                          config=self.provenance(target, "live"))
 
         def warnings():
             if store_warnings or not state_stored or report_warnings:
@@ -1736,6 +1865,41 @@ class Bridge:
             report_warnings.append(str(error))
             warnings()
         return report
+
+    def speech_action(self, method, payload):
+        from speech_input import SpeechSettings, SpeechError, transcribe
+        try:
+            settings = SpeechSettings(self.state_dir)
+            # Reading the active profile is safe without creating a lock file:
+            # settings are replaced atomically, so a concurrent save yields
+            # either the previous or the complete new JSON document. This is
+            # also needed before enabling MiaoCall's permission-gated key tap,
+            # since profile inspection itself must not require write access.
+            if method == "get":
+                return settings.get()
+            with operation_lock(self.state_dir / ".voice-settings.lock"):
+                if method == "transcribe":
+                    return transcribe(settings, payload)
+                return getattr(settings, method)(payload)
+        except SpeechError as error:
+            raise BridgeError(error.code, error.message, **error.details) from None
+        except (OSError, ValueError, TypeError):
+            raise BridgeError("voice_operation_failed", "语音操作未完成，请检查连接后重试。") from None
+
+    def voiceSettings(self, payload):
+        return self.speech_action("get", payload)
+
+    def saveVoiceSettings(self, payload):
+        return self.speech_action("save", payload)
+
+    def revealVoiceKey(self, payload):
+        return self.speech_action("reveal", payload)
+
+    def deleteVoiceKey(self, payload):
+        return self.speech_action("delete", payload)
+
+    def transcribeVoice(self, payload):
+        return self.speech_action("transcribe", payload)
 
     def setTime(self, payload):
         timezone_name = payload.get("timezone", "Asia/Shanghai")
@@ -1767,11 +1931,37 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "runtimeHealth"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()
     try:
+        if args.action == "runtimeHealth":
+            # A release check before Bridge initialization: no credentials,
+            # device discovery, state files, or network connections are used.
+            import ssl
+            try:
+                context = ssl.create_default_context()
+                require(context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED,
+                        "runtime_tls_invalid", "网络证书校验配置无效，请重新下载软件包。")
+                certificates = context.cert_store_stats()["x509_ca"]
+                require(certificates > 0, "runtime_tls_invalid", "网络证书组件缺失，请重新下载软件包。")
+            except OSError:
+                raise BridgeError("runtime_tls_incomplete", "网络证书组件不完整，请重新下载软件包。") from None
+            emit({"result": {"tlsReady": True, "hostnameVerification": True,
+                             "certificateVerification": True, "caCertificates": certificates}})
+            return 0
+        if args.action == "miaoCallWorker":
+            # The task transport is interactive JSONL; unlike one-shot actions its
+            # input stays open for bounded tool replies and cancellation.
+            from miao_call import run as run_miao_call
+            line = sys.stdin.readline(32769)
+            require(len(line.encode("utf-8")) <= 32768, "input_too_large", "语音指令过长。")
+            payload = json.loads(line or "{}")
+            require(isinstance(payload, dict), "invalid_input", "语音指令格式无效。")
+            result = run_miao_call(payload, emit, sys.stdin)
+            emit({"result": result})
+            return 0
         max_input = MAX_WORKSPACE_BYTES if args.action == "saveWorkspace" else MAX_INPUT_BYTES
         raw = sys.stdin.buffer.read(max_input + 1)
         require(len(raw) <= max_input, "input_too_large", "输入文件过大。")
@@ -1780,7 +1970,7 @@ def main():
         bridge = Bridge(args.state_dir, args.resource_dir)
         # Native serializes actions; the lock also prevents a second app process
         # from interleaving a plan or write with this one.
-        if args.action in ("plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "detect", "keymap", "readConfiguration"):
+        if args.action in ("plan", "keymapPlan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "detect", "keymap", "readConfiguration"):
             with operation_lock(bridge.state_dir / ".operation.lock"):
                 result = getattr(bridge, args.action)(payload)
         else:

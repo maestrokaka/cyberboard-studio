@@ -2,7 +2,7 @@ Offline native bridge protocol checks
 ====================================
 
 The net10.0 console project links the production BackendClient.cs, AISettings.cs,
-ResourcePolicy.cs and StartupDiagnostics.cs unchanged. HostPaths/HostLog are test-only shims. It launches
+ResourcePolicy.cs, StartupDiagnostics.cs and VoiceRecorder.cs unchanged. HostPaths/HostLog are test-only shims. It launches
 fake-bridge.py with the local project Python in a temporary directory containing
 Chinese characters and spaces. The subprocess imports no cyberboard modules
 and accesses no USB or serial ports.
@@ -25,6 +25,14 @@ interpreter executable (python.exe on Windows).
 These tests prove C# process/JSON bridge behavior and path policy execution on
 the Mac build host. They do not verify Windows WebView2 UI, Windows process
 launch, serial driver behavior or actual USB communication.
+
+Voice checks use injected capture handles and a synthetic WinMM interface, not
+the actual microphone. They cover PCM16 WAV timing, request ownership, the 60
+second/data limit, cancellation/exit release, pointer-buffer ordering and
+reset/unprepare/close order, including cleanup after a partial start failure.
+Microphone permissions and Windows recording hardware still need real-device
+acceptance. Voice backend stderr is suppressed independently of credential
+redaction, preserving the explicit user-requested local key reveal response.
 
 Credential tests use only synthetic provider-local files under the temporary
 directory. Old encrypted files are ignored, not decrypted or migrated. They

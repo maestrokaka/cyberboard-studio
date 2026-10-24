@@ -124,6 +124,12 @@
         throw new TypeError('预览需要容器、照片视角和灯效设计');
       }
       this.container = container;
+      this._rasterMinWidth = options.rasterMinWidth ?? 640;
+      this._rasterMaxWidth = options.rasterMaxWidth ?? 1400;
+      if (![this._rasterMinWidth, this._rasterMaxWidth].every(Number.isInteger) ||
+          this._rasterMinWidth < 160 || this._rasterMinWidth > this._rasterMaxWidth || this._rasterMaxWidth > 1400) {
+        throw new RangeError('预览像素宽度需要在 160 到 1400 之间');
+      }
       this.views = Object.fromEntries(Object.entries(options.views).filter(([, view]) => galleryAllowed(view)));
       if (!Object.keys(this.views).length) throw new TypeError('预览需要水平正面整机照片');
       this.onFrame = typeof options.onFrame === 'function' ? options.onFrame : function () {};
@@ -145,6 +151,10 @@
       this._accumulator = 0;
       this._raf = null;
       this._images = {};
+      this.visible = options.visible !== false;
+      this._staticKey = null;
+      this._staticCache = new Map();
+      this._staticCacheBytes = 0;
       this._keySprites = [];
       this._warpTriangles = [];
       this._screenQuad = [];
@@ -164,6 +174,10 @@
       this._texture.width = 1600;
       this._texture.height = 200;
       this._tx = this._texture.getContext('2d');
+      this._textureCacheable = typeof global.CanvasRenderingContext2D === 'function' && this._tx instanceof global.CanvasRenderingContext2D;
+      this._textureFrame = -1;
+      this._textureBrightness = -1;
+      this._textureRenderer = '';
       this.setDesign(options.design);
 
       this._resizeListener = () => this._layout();
@@ -171,7 +185,13 @@
         this._observer = new global.ResizeObserver(this._resizeListener);
         this._observer.observe(container);
       } else global.addEventListener('resize', this._resizeListener);
-      this._visibilityListener = () => this._resetClock();
+      this._visibilityListener = () => {
+        this._resetClock();
+        if (document.hidden && this._raf !== null) {
+          global.cancelAnimationFrame(this._raf);
+          this._raf = null;
+        } else this._schedule();
+      };
       document.addEventListener('visibilitychange', this._visibilityListener);
       this._motionListener = () => { if (this._motion.matches) this.pause(); };
       if (this._motion.addEventListener) this._motion.addEventListener('change', this._motionListener);
@@ -238,7 +258,7 @@
     }
 
     _schedule() {
-      if (this._ready && this.playing && !this.error && !this._destroyed && this._raf === null) {
+      if (this._ready && this.playing && this.visible && !document.hidden && !this.error && !this._destroyed && this._raf === null) {
         this._raf = global.requestAnimationFrame(this._animate);
       }
     }
@@ -304,6 +324,8 @@
       this._combinedFrames = sharedCycle(this.frameCount, this.keyFrameCount);
       this.speedMs = speed;
       this._tick = this.frame = this.keyFrame = 0;
+      this._textureFrame = -1;
+      this._textureBrightness = -1;
       this._resetClock();
       this._drawLights();
       if (this._ready) this._emit();
@@ -316,6 +338,48 @@
       this.view = view;
       this._layout();
       return this;
+    }
+
+    // Suspend hidden pages without changing the user's play/pause selection.
+    // Coalesce their appearance/size changes into one layout on activation.
+    setVisible(visible) {
+      this._ensureActive();
+      const next = Boolean(visible);
+      if (next === this.visible) return this;
+      this.visible = next;
+      this._resetClock();
+      if (!next && this._raf !== null) {
+        global.cancelAnimationFrame(this._raf);
+        this._raf = null;
+      }
+      if (next) { this._layout(); this._schedule(); }
+      return this;
+    }
+
+    // Gallery photos are prepared while hidden. Yield to input/paint between
+    // small pixel batches, and abandon stale work when the page/snapshot changes.
+    async prepareLayoutAsync(isCurrent = () => true) {
+      await this.ready;
+      if (this._destroyed || !isCurrent()) return false;
+      if (this.visible || this.playing) throw new Error('分段准备需要暂停并隐藏预览');
+      const clock = () => global.performance?.now?.() ?? Date.now();
+      const steps = this._layoutCanvasSteps();
+      let deadline = clock() + 4;
+      try {
+        while (true) {
+          if (this._destroyed || !isCurrent()) {
+            steps.return();
+            this._staticKey = null;
+            this._keySprites = [];
+            return false;
+          }
+          if (steps.next().done) { this._clearError(); return true; }
+          if (clock() >= deadline) {
+            await new Promise(resolve => typeof global.setTimeout === 'function' ? global.setTimeout(resolve, 0) : resolve());
+            deadline = clock() + 4;
+          }
+        }
+      } catch (error) { this._reportError(error, '照片投影'); return false; }
     }
 
     drawAppearanceThumbnail(canvas, viewId) {
@@ -360,7 +424,10 @@
     setRenderer(renderer) {
       this._ensureActive();
       if (!['editor', 'library'].includes(renderer)) throw new RangeError('未知灯珠样式');
-      this.renderer = renderer;
+      if (this.renderer !== renderer) {
+        this.renderer = renderer;
+        this._textureRenderer = '';
+      }
       this._layout();
       return this;
     }
@@ -376,7 +443,11 @@
     setBrightness(percent) {
       this._ensureActive();
       if (!Number.isFinite(Number(percent))) throw new RangeError('亮度需要为数字');
-      this.brightness = Math.max(0, Math.min(100, Number(percent)));
+      const next = Math.max(0, Math.min(100, Number(percent)));
+      if (next !== this.brightness) {
+        this.brightness = next;
+        this._textureBrightness = -1;
+      }
       this._drawLights();
       return this;
     }
@@ -438,6 +509,9 @@
       this.container.classList.remove('keyboard-isolated');
       this.container.removeAttribute('data-preview-background');
       this._keySprites = [];
+      this._staticCache.clear();
+      this._staticCacheBytes = 0;
+      this._staticKey = null;
     }
 
     _clipKeyboard(context) {
@@ -448,7 +522,15 @@
       context.clip();
     }
 
-    _prepareKeyLighting(zones) {
+    _prepareKeyLighting(zones, progressive = false) {
+      const steps = this._keyLightingSteps(zones);
+      if (progressive) return steps;
+      let step;
+      do { step = steps.next(); } while (!step.done);
+      return step.value;
+    }
+
+    *_keyLightingSteps(zones) {
       this._keySprites = [];
       if (this.keyMode === 'photo') return;
       const width = this.background.width, height = this.background.height;
@@ -473,7 +555,8 @@
         const context = mask.getContext('2d'), pixels = context.createImageData(w, hh);
         const averageWidth = (Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) + Math.hypot(q[2][0] - q[3][0], q[2][1] - q[3][1])) / 2;
         const averageHeight = (Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]) + Math.hypot(q[2][0] - q[1][0], q[2][1] - q[1][1])) / 2;
-        for (let yy = 0; yy < hh; yy++) for (let xx = 0; xx < w; xx++) {
+        for (let yy = 0; yy < hh; yy++) {
+         for (let xx = 0; xx < w; xx++) {
           const [u, v] = project(inverse, x0 + xx + .5, y0 + yy + .5);
           if (u < 0 || u > 1 || v < 0 || v > 1) continue;
           const edge = Math.min(1, Math.min(u, 1 - u) * averageWidth / 2, Math.min(v, 1 - v) * averageHeight / 2);
@@ -492,6 +575,8 @@
             coverage[index] = Math.max(coverage[index], edge);
             shade[index] = Math.max(shade[index], (.22 + .6 * spatial) * edge);
           }
+         }
+         if (yy % 4 === 3) yield;
         }
         context.putImageData(pixels, 0, 0);
         const colored = document.createElement('canvas');
@@ -500,6 +585,7 @@
       }
       // Estimate unlit glass from the photo; preserve print, highlights and orange materials.
       for (let index = 0; index < coverage.length; index++) {
+        if (index % 2048 === 0) yield;
         if (coverage[index] === 0) continue;
         const p = index * 4, r = source.data[p], g = source.data[p + 1], b = source.data[p + 2];
         const maximum = Math.max(r, g, b), minimum = Math.min(r, g, b);
@@ -513,6 +599,7 @@
         }
       }
       this._bg.putImageData(neutral, 0, 0);
+      return neutral;
     }
 
     _drawKeyLights() {
@@ -554,6 +641,7 @@
     }
 
     _drawTexture() {
+      if (this._textureCacheable && this._textureFrame === this.frame && this._textureBrightness === this.brightness && this._textureRenderer === this.renderer) return;
       const tx = this._tx;
       tx.fillStyle = '#020405';
       tx.fillRect(0, 0, this._texture.width, this._texture.height);
@@ -579,10 +667,13 @@
           tx.fillStyle = grad; tx.fill();
         }
       }
+      this._textureFrame = this.frame;
+      this._textureBrightness = this.brightness;
+      this._textureRenderer = this.renderer;
     }
 
     _drawLights() {
-      if (!this._ready || this._destroyed || this.error) return false;
+      if (!this._ready || this._destroyed || this.error || !this.visible) return false;
       try {
         this._drawLightsCanvas();
         return true;
@@ -615,6 +706,7 @@
 
     _layout() {
       if (!this._ready || this._destroyed) return false;
+      if (!this.visible) return true;
       try {
         this._layoutCanvas();
         this._clearError();
@@ -626,6 +718,11 @@
     }
 
     _layoutCanvas() {
+      const steps = this._layoutCanvasSteps();
+      while (!steps.next().done) {}
+    }
+
+    *_layoutCanvasSteps() {
       const view = this.views[this.view], image = this._images[this.view];
       const [sw, sh] = view.source_size;
       // full_crop excludes the baked watermark strip in both original photographs.
@@ -636,8 +733,8 @@
       }
       this.container.style.aspectRatio = cw + ' / ' + ch;
       const viewport = containBounds(this.container.clientWidth, this.container.clientHeight, cw, ch);
-      const desiredWidth = Math.max(640, Math.round(viewport.width * Math.min(global.devicePixelRatio || 1, 2)));
-      const width = Math.min(1400, desiredWidth), height = Math.round(width * ch / cw);
+      const desiredWidth = Math.max(this._rasterMinWidth, Math.round(viewport.width * Math.min(global.devicePixelRatio || 1, 2)));
+      const width = Math.min(this._rasterMaxWidth, desiredWidth), height = Math.round(width * ch / cw);
       // Explicit CSS geometry is compatible with older WKWebView/WebView2 and
       // prevents photo, key lights and top lights from choosing different fits.
       for (const layer of [this.background, this.overlay, this.keyOverlay]) {
@@ -648,8 +745,6 @@
         layer.style.right = layer.style.bottom = 'auto';
       }
       this.viewport = viewport;
-      this.background.width = this.overlay.width = this.keyOverlay.width = width;
-      this.background.height = this.overlay.height = this.keyOverlay.height = height;
       const isolated = this.framing === 'keyboard' && (this.view === 'front' || Array.isArray(view.keyboard_outline));
       const outline = isolated ? (view.keyboard_outline || FRONT_KEYBOARD_OUTLINE) : [];
       if (isolated && (!Array.isArray(outline) || outline.length < 3 || outline.some(point =>
@@ -663,14 +758,44 @@
       this.background.setAttribute('aria-label', isolated
         ? 'Cyberboard 实体键盘，保留外壳、键帽和真实印花，背景透明'
         : 'Cyberboard 实体照片，含外壳、键帽和桌面环境');
-      const sx = image.naturalWidth / sw, sy = image.naturalHeight / sh;
-      this._bg.save();
-      this._clipKeyboard(this._bg);
-      this._bg.drawImage(image, cx * sx, cy * sy, cw * sx, ch * sy, 0, 0, width, height);
-      this._bg.restore();
-      const zones = (view.keyZones || []).map(zone => ({ ...zone,
-        quad: zone.quad.map(([x, y]) => [(x - cx) * width / cw, (y - cy) * height / ch]) }));
-      this._prepareKeyLighting(zones);
+      // Calibration is included in the key so edited/invalid geometry cannot
+      // accidentally reuse a previously valid mask. LED RGB is never cached here.
+      const staticKey = JSON.stringify([this.view, this.framing, width, height,
+        this.keyMode === 'photo', view.image, view.source_size, [cx, cy, cw, ch],
+        outline, view.keyZones, view.key_lighting, view.key_neutralization]);
+      if (this._staticKey !== staticKey) {
+        this.background.width = this.overlay.width = this.keyOverlay.width = width;
+        this.background.height = this.overlay.height = this.keyOverlay.height = height;
+        const cached = this._staticCache.get(staticKey);
+        if (cached) {
+          this._bg.putImageData(cached.pixels, 0, 0);
+          this._keySprites = cached.sprites;
+          this._staticCache.delete(staticKey);
+          this._staticCache.set(staticKey, cached);
+        } else {
+          const sx = image.naturalWidth / sw, sy = image.naturalHeight / sh;
+          this._bg.save();
+          this._clipKeyboard(this._bg);
+          this._bg.drawImage(image, cx * sx, cy * sy, cw * sx, ch * sy, 0, 0, width, height);
+          this._bg.restore();
+          const zones = (view.keyZones || []).map(zone => ({ ...zone,
+            quad: zone.quad.map(([x, y]) => [(x - cx) * width / cw, (y - cy) * height / ch]) }));
+          const pixels = yield* this._prepareKeyLighting(zones, true);
+          if (pixels?.data) {
+            const bytes = pixels.data.byteLength + this._keySprites.reduce((sum, s) => sum + s.w * s.h * 8, 0);
+            if (bytes <= 24 * 1024 * 1024) {
+              this._staticCache.set(staticKey, {pixels, sprites: this._keySprites, bytes});
+              this._staticCacheBytes += bytes;
+              while (this._staticCache.size > 2 || this._staticCacheBytes > 24 * 1024 * 1024) {
+                const oldest = this._staticCache.keys().next().value;
+                this._staticCacheBytes -= this._staticCache.get(oldest).bytes;
+                this._staticCache.delete(oldest);
+              }
+            }
+          }
+        }
+        this._staticKey = staticKey;
+      }
       const q = view.quad.map(([x, y]) => [(x - cx) * width / cw, (y - cy) * height / ch]);
       this._screenQuad = view.mask_quad.map(([x, y]) => [(x - cx) * width / cw, (y - cy) * height / ch]);
       this._warpTriangles = this._buildMesh(q);

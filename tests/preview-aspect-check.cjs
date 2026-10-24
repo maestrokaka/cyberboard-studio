@@ -20,7 +20,7 @@ const window={devicePixelRatio:2,matchMedia:()=>({matches:true,addEventListener(
 vm.runInNewContext(fs.readFileSync(path.join(webRoot,'preview-engine.js'),'utf8'),{window,document,console,Uint8Array,Uint8ClampedArray,Float32Array});
 // Raster sampling and color tests live in renderer-check.cjs. Preserve production
 // frame layout, photo draw, projected coordinates and mesh computation here.
-window.KeyboardPreview.prototype._prepareKeyLighting=function(zones){this.geometryZones=zones;};
+window.KeyboardPreview.prototype._prepareKeyLighting=function*(zones){this.geometryZones=zones;};
 window.KeyboardPreview.prototype._drawLightsCanvas=function(){};
 (async()=>{
  const host=element('div'),p=new window.KeyboardPreview(host,{views:data.views,design:data.designs[0]});await p.ready;
@@ -47,6 +47,16 @@ window.KeyboardPreview.prototype._drawLightsCanvas=function(){};
  }
  const front=data.views.front,[,,cw,ch]=front.crop;
  host.clientWidth=650;host.clientHeight=200;p.setView('front');assert.ok(Math.abs(p.viewport.width-p.viewport.height*cw/ch)<1e-8);assert.equal(p.viewport.height,200);assert.ok(p.viewport.width<400,'the wide native viewport cannot squash R6 into 650×200');
+ let galleryLayouts=0;
+ const tile=element('div');tile.clientWidth=260;tile.clientHeight=150;
+ const thumbnail=new window.KeyboardPreview(tile,{views:data.views,design:data.designs[0],rasterMinWidth:320,rasterMaxWidth:640});await thumbnail.ready;
+ for(const appearance of data.previewCatalog.appearances){thumbnail.setView(appearance.defaultViewId);const crop=data.views[appearance.defaultViewId].crop;
+  assert.ok(thumbnail.background.width>=320&&thumbnail.background.width<=640);
+  for(const layer of [thumbnail.background,thumbnail.keyOverlay,thumbnail.overlay]){
+   assert.equal(layer.style.width,thumbnail.background.style.width);assert.equal(layer.style.height,thumbnail.background.style.height);
+   assert.equal(layer.width,thumbnail.background.width);assert.equal(layer.height,thumbnail.background.height);}
+  assert.ok(Math.abs(thumbnail.viewport.width/thumbnail.viewport.height-crop[2]/crop[3])<1e-10);galleryLayouts++;}
+ thumbnail.destroy();
  assert.ok(roundedBackingCases>0,'the regression covers integer backing stores whose raster ratio differs slightly from the exact crop');p.destroy();assert.equal(host.children.length,0);
- console.log(JSON.stringify({passed:true,appearances:8,viewportCases:cases.length,layouts:checked,roundedBackingCases,allLayersUniform:true,sourceAspectPreserved:true,enclosureAnd83KeyZonesInside:true,resizeStable:true,wideNativeRegression:'650×200 host uses one centered proportional crop'}));
+ console.log(JSON.stringify({passed:true,appearances:8,viewportCases:cases.length,layouts:checked,galleryLayouts,roundedBackingCases,allLayersUniform:true,sourceAspectPreserved:true,enclosureAnd83KeyZonesInside:true,resizeStable:true,wideNativeRegression:'650×200 host uses one centered proportional crop'}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,24 +1,73 @@
-# Cyberboard Studio
+# Cyberboard Studio · MiaoCall Beta 14
 
 **简体中文** · [English](README.en.md)
 
-**第三方怒喵（Angry Miao）键盘工具，面向 CYBERBOARD R4 / CYBERBOARD R6，适用于 macOS / Windows。**
+面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。也可以开启实验性的「喵唤」，按住一颗键，把语音指令交给本机 Codex。
 
-用 Kimi、MiniMax 或 DeepSeek，在独立的 AI 对话中结合文字与参考图创作顶部与轴灯动画；比较不同版本，在真实键盘照片上预览，再到工作台调整并同步到指定槽位。
+**[下载 Beta 14 · macOS Apple Silicon](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public)** · [更新说明](docs/RELEASE_NOTES_MIAOCALL_BETA14.md) · [完整使用说明](docs/USER_GUIDE.md) · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-[下载候选版与版本记录](https://github.com/maestrokaka/cyberboard-studio/releases) · **[完整使用说明](docs/USER_GUIDE.md)** · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues) · [支持作者](#支持作者)
+这是 **公开测试版**。本次发布包含此前独立开发的喵唤、AI 输入框语音、键位编辑、双风格界面，以及截至 Beta 14 的布局和性能修复。当前新包仅提供 macOS；Windows 历史 RC2 的下载入口见下表，不能视为本版 Windows 构建。
 
-当前为 **1.0.0-rc.2 候选版**，供正式版前试用。Windows 原生 GUI / USB、R4 写入等仍需实机验收，具体范围见[候选版说明](docs/RELEASE_1.0.0_RC2.md)。第一次使用可先阅读[五分钟上手](docs/USER_GUIDE.md#quick-start)。
+## 这一版能做什么
 
-## 完整演示
+- **AI 灯效创作**：接入 Kimi、MiniMax 或 DeepSeek，用文字和最多 3 张参考图创作；保留历史会话、独立版本与局部修改。
+- **灯效工作台**：整机照片预览、亮度 / 节奏 / 配色调整、三槽草稿与同步前审核。内置 10 款可删除灯效，无需模型 Key 即可预览。
+- **键盘与外观**：8 款 R4 / R6 正面外观，同作品、同一帧比较。Beta 14 专门改善从 AI 创作进入此页的卡顿：页面先显示，预览按可取消的小批次准备，只编译当前展示帧。
+- **两种界面风格**：「经典深色」与「暖岛浅色」在设置中即时切换，重开后保留；不改变作品 RGB 或槽位。
+- **键位编辑**：独立页面显示 81 个实体键、7 层可读功能；先编辑本机草稿，审核专用计划后才写入。未知原始码保留，Fn 功能不再只是一串数字。
+- **AI 语音输入**：单独配置 MiniMax、千问或 OpenAI 的语音转文字模型，识别后检查文字，再手动发送制作灯效。
+- **喵唤 MiaoCall · Beta**：macOS 按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。
 
-77 秒查看外观切换、灯效预览、Kimi k3 结合参考图创作，以及第 3 槽同步；生成与传输等待已加速，结尾是 R6 实拍。视频使用此前版本的界面；1.0 候选版将 AI 创作、工作台与键盘外观分成独立页面，最新页面见下方截图。
+## 界面预览
 
-https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
+### 暖岛浅色 · AI 创作
 
-[查看候选版软件包与版本说明](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2)
+![AI 创作首页与暖岛浅色界面](docs/screenshots/create-beta14-light.png)
+
+### 经典深色 · 灯效工作台
+
+![经典深色工作台、整机灯效与三槽总览](docs/screenshots/workbench-beta14-dark.png)
+
+### 外观选择
+
+![八款正面外观按同一灯效时刻比较](docs/screenshots/appearances-beta14-light.png)
+
+截图来自独立的界面演示环境；没有个人密钥、会话或真实设备记录。预览使用去背景键盘照片合成顶部和轴灯，不代表实机色准测量。
+
+## 下载与运行
+
+| 平台 / 版本 | 下载 | 说明 |
+| --- | --- | --- |
+| **macOS · Beta 14** | [最新公开测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
+| Windows · **历史 RC2** | [RC2 普通 x64 / Windows 10 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 旧版灯效功能，不含本次新增界面、语音和喵唤；原生 GUI / USB 仍待实机验收 |
+
+Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.beta.14-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
+
+App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。首次打开按 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445) 操作；喵唤需要的麦克风、全局按键及 Spotify 自动化权限只在明确开启对应功能时请求。升级前先退出旧 App，固定使用同一份已签名包。[详细安装与权限说明](docs/MIAOCALL_BETA.md)
+
+## 五分钟开始创作
+
+1. **先看预设**：打开「灯效工作台」，无需 Key 即可选择内置作品并预览。
+2. **连接创作模型**：在「模型配置」选择 Kimi、MiniMax 或 DeepSeek，填写有权限的 Key 并保存。
+3. **描述你的画面**：进入「AI 创作」，例如「橙红火焰从底部窜起，轴灯像余烬，4 秒循环」，也可上传参考图。
+4. **逐版修改**：选择明确的基础版本和修改范围，例如「仅轴灯改成纯黄，顶部保持原样」。原版本保留。
+5. **保存和同步**：满意后保存指定版本，或在工作台打开；放入目标槽位草稿，检查连接与同步计划，再确认写入。
+
+文字与参考图仅在点击制作时提交给你选择的创作服务。Key 按服务直接保存在本机普通文件，默认隐藏并可显示；不读取、解密或迁移旧 Keychain / DPAPI 记录。
+
+## 喵唤：按住一颗键，说出想做的事
+
+1. 安装并登录本机 Codex 与 Spotify。
+2. 在「模型配置 → 语音转文字」配置支持 ASR 的服务；例如 MiniMax `asr-1.0`，选择与 Key 一致的区域。
+3. 在「喵唤 · Beta」填写歌曲名称、歌手与 Spotify 分享链接，应用到快捷键，再开启「按键唤起」。
+4. 按住「·」说话，松开后识别；默认确认文字后交给 Codex，喵娘显示任务状态。
+
+当前 Codex 连接使用官方本机 app-server 的**独立临时任务**，只开放已配置歌曲的 Spotify 播放与状态工具。只有目标歌曲、播放状态和播放进度经回读验证后才显示完成；不提供全曲库搜索或任意桌面操作。WorkBuddy、千问办公和豆包工作仍是规划入口，尚未接入。
+
+不开启时「·」正常输入。喵唤不会随 App 启动自动启用，退出后释放监听。桌面语音 / 浮层当前仅支持 macOS。[完整连接、权限和故障排查](docs/MIAOCALL_BETA.md) · [键位与 AI 输入框语音说明](docs/KEYMAP_VOICE_LOCAL.md)
 
 ## 内置灯效 GIF
+
 
 我已经借助 AI 创作并打磨了 **10 款灯效**，全部内置到软件中。无需配置模型，打开就能预览，选好后即可同步到键盘。
 
@@ -43,103 +92,20 @@ https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 </details>
 
-## 应用截图
+## 早期灯效流程演示
 
-候选版把三个主要步骤分开：**AI 创作 → 灯效工作台 → 设备同步**。截图使用独立演示工作区，不展示个人密钥或设备记录。
+77 秒展示外观切换、灯效预览、参考图创作和第 3 槽同步，结尾为 R6 实拍。生成和传输等待已加速；视频使用早期界面，以本页截图为准。此处保留灯效演示，不附喵唤的桌面录制 Demo。
 
-### AI 创作
+https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
-对话是主画面，右侧轻预览可以收起。每次成功生成形成独立版本；选择基础版本后，可继续修改「顶部 + 轴灯」「仅顶部」或「仅轴灯」。会话历史放在页面内部，支持搜索和继续创作。结果留在会话中，点击「保存到作品库」才保存指定版本，点击「在工作台打开」再调整和交付。
+## 数据与验证范围
 
-![AI 创作：对话、参考图与独立灯效版本](docs/screenshots/create-v100rc2.png)
+个人作品、会话、参考图、槽位草稿、Key 和设备记录与 App 安装目录分开保存，不进入源码或发布包。录音最长 60 秒，仅在明确操作后采集；临时录音结束或取消后清理，不进入作品库或工作区。同步灯效和修改键位分别需要专用计划与确认，不会因打开 App、切换外观或更新软件自动写入键盘。
 
-### 灯效工作台
-
-大整机预览、亮度 / 节奏 / 配色工具和三槽总览集中在一页。点击槽位卡选择目标，「预览」查看槽位内容，「撤销草稿」只撤销本机准备的内容。先放入或更新目标槽位草稿，再查看计划并同步；切换 AI 会话不会清空槽位草稿。
-
-![灯效工作台：整机预览、参数与三槽总览](docs/screenshots/workbench-v100rc2.png)
-
-### 键盘与外观
-
-8 款外观独立成卡片页，支持 R4 / R6 筛选，并用同一作品、同一帧比较。全部采用沿外壳轮廓去背景的正面整机照片，标签使用 `R6「Vision」` 等简洁名称。选择只影响观看，USB 实际设备身份以手动检查为准。
-
-![八款外观：统一正面、同一灯效帧](docs/screenshots/appearances-v100rc2.png)
-
-| 参考外观 | 照片来源 |
-| --- | --- |
-| CYBERBOARD R6「Vision」 | 最早提供的正面实拍 |
-| CYBERBOARD R4「Fluo Free」 | 怒喵官方商城 |
-| CYBERBOARD R4「Bebop」 | 怒喵官方商城 |
-| CYBERBOARD R4「Gangstar」 | 怒喵官方商城 |
-| CYBERBOARD R4「Cloud White V2」 | 怒喵官方商城 |
-| CYBERBOARD R4「Stone Face」 | 怒喵官方商城 |
-| CYBERBOARD R4「Paisley」 | 怒喵官方商城 |
-| CYBERBOARD R4「Vision」 | 怒喵官网 R4 产品页 |
-
-包含官网仍保留的合格售罄配色素材，参考外观与实时库存无关。[素材来源与校准记录](data/photos/official-photo-sources.json)
-
-模型配置单独管理四种服务和各自的 Key；设备页提供「设备与槽位 / 键位查看 / 同步记录」子标签。作品库保留搜索、命名、回收站与恢复功能，10 款内置作品均可删除。
-
-## 下载与运行
-
-| 文件 | 适用电脑 | 打开方式 |
-| --- | --- | --- |
-| `Cyberboard-Studio-1.0.0-rc.2-macOS-AppleSilicon.zip` | Apple Silicon Mac，macOS 13 及以上 | 解压，将 `Cyberboard Studio.app` 放入「应用程序」 |
-| `Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip` | Windows 11 x64；部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise | 完整解压后运行 `Cyberboard Studio.exe`，保留 DLL 和 `resources` |
-| `Cyberboard-Studio-1.0.0-rc.2-Windows10-Compatibility-x64.zip` | 日志明确出现 CET 启动兼容问题的旧 Windows 10 x64 | 独立解压到新目录，仅此包取消 App 的 CET 标记 |
-
-在 [v1.0.0-rc.2 的 Assets](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) 下载 ZIP 和对应 SHA-256 文件。包内包含 CLI 和运行环境，无需另外安装 Python；Windows 缺少 WebView2 时，运行 `Dependencies/MicrosoftEdgeWebview2Setup.exe` 联网安装。Intel Mac、Windows 32 位与 ARM64 原生包尚未提供。
-
-Mac 包为本机 ad-hoc 签名，尚未使用 Apple Developer ID 签名或公证；首次打开可参照 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445)。Windows 候选包的原生启动、Key 文件操作与 USB 仍需实机验收。遇到「Unknown Hard Error」先运行「诊断启动.cmd」，仅在日志明确指向 CET 时考虑兼容包；优先更新系统后使用普通包。详见[故障处理](docs/USER_GUIDE.md#faq)。
-
-历史版本保留在 [Releases](https://github.com/maestrokaka/cyberboard-studio/releases)。用户数据与安装目录分开，升级前请关闭旧 App。首次成功保存新版工作区时会保留 `workspace-before-1.0.json`，已有作品、回收站、内置删除记录和槽位草稿继续保留。候选版不会因升级自动写入键盘。
-
-## 当前功能
-
-- 独立 AI 对话，文字与最多 3 张参考图；本机保存历史、参考图、输入草稿和完整灯效版本。
-- 明确选择基础版本，限定顶部、轴灯或两者修改；局部修改保留另一灯域的完整颜色帧与时序，原版本不变。
-- 版本预览、同步比较、停止、重试、指定版本导出和明确保存入库；空会话不能保存或交付旧作品。
-- Kimi Code / 开放平台、MiniMax、DeepSeek 配置。Kimi Code 默认 `k3`，MiniMax 新连接默认 `MiniMax-M3.1-Flash-Preview`，DeepSeek 默认 `deepseek-flash`；保留已保存的其他模型选择。
-- 10 款内置作品与 8 款正面参考外观，无 Key 时也可离线体验预设。
-- 工作台亮度、节奏、配色变体、名称、JSON 导入导出，三槽目标选择、预览和撤销草稿。
-- 作品库搜索、回收站恢复与确认后永久清理，全部内置作品可删除且升级不自动补回。
-- R4 / R6 身份查询、81 个实体键的 7 层只读键位、Asia/Shanghai（UTC+8）时间同步。
-- 同步前完整配置备份与计划；指定单槽或明确同步全部待同步草稿，保留当前全部键码并读回检查。
-- 缺少原记录时提供明确范围的首次配置，已有记录时可只恢复指定内置模式；本机历史与恢复计划。
-
-DeepSeek 读取限制修正为分别约束有效输出、思考内容和传输数据；MiniMax 兼容完整 `stop` 后流关闭的结束方式，并为 M3 调整思考参数。未完成或超限回复仍会拒绝，不接受半成品。[模型与验收范围](docs/RELEASE_1.0.0_RC2.md)
-
-## 从一句描述开始
-
-1. 在「模型配置」选服务、区域和有权限的模型，输入 Key 并「保存并使用」。Key 默认隐藏，点击「显示 / 隐藏」即可查看；只按服务存本机普通文件，不访问旧系统凭据。
-2. 到「AI 创作」新建对话。无图可写「橙红火焰从底部窜起，轴灯像余烬，4 秒循环」；有图可上传后写「完整角色从下向上快速滚动，保留原配色，脸部稍停」。
-3. 点击「发送并制作」。生成检查完成后选择版本预览；继续修改时选好基础版本和范围，例如「仅轴灯，改成纯黄，顶部保持原样」。
-4. 满意后保存指定版本，或在工作台打开。放入目标槽位，检查同步计划，再确认写入。
-
-生成会发送本次描述、选中的压缩图片、简短对话回顾及明确选定的基础配方。图片与对话只保存在本机工作区，作品 JSON 不含图片和 Key；不会把整份工作区、键位或设备配置发给模型。默认不借用其他工作台作品的风格，只有勾选风格参考时才加入对应名称、描述和配色。模型计费、权限与图片支持以平台和账户为准；M3.1 Flash 需要相应套餐权限。
-
-每次生成最多额外请求一次结构或基本可见性修复；通过检查仍需看完整循环，审美和实机色准由你确认。取消、失败或修复也可能消耗模型额度。当前 CLI 没有固件升级，App 暂无键位编辑、通用图片生成或视频导出。
-
-## 第一次同步
-
-键盘不能完整读回灯效像素，单槽同步需要**同一把实体键盘**此前成功写入后留下的完整配置记录，通常为设备目录中的 `current.json` 与 `meta.json`。普通「导入灯效」只添加作品，不建立这份设备记录；从 Mac 转到 Windows 可使用「迁移原配置.cmd」。详见[原配置与首次配置](docs/USER_GUIDE.md#baseline)。
-
-没有可信记录时，App 可准备首次配置：当前完整 1,400 键码会读取、原样写入并校验；选中草稿写入指定槽位，其余槽位停用并黑屏，其他灯光采用官网标准方案。**旧灯效、文字、独立宏、交换键和换键表无法保留，部分特殊功能可能需重设。** 先核对替换范围，再确认建立配置；键码快照不是旧完整灯效备份。
-
-普通同步先放入草稿并核对计划，保留其他槽位和当前键码；只有点击计划中的确认按钮才会写入 USB。设备确认、键码验证与本机记录保存分别显示，不能把进度到头当成全部完成。[完整同步说明](docs/USER_GUIDE.md#sync)
-
-## 本机数据
-
-| 数据 | macOS | Windows |
-| --- | --- | --- |
-| 会话、版本、参考图、作品、回收站、草稿、计划和备份 | `~/Library/Application Support/Cyberboard Studio/` | `%LOCALAPPDATA%\Cyberboard Studio` |
-| CLI 设备记录 | `~/.local/share/cyberboard-cli/devices/` | `%LOCALAPPDATA%\cyberboard-cli\devices` |
-
-新版 `workspace.json` 使用 v2 格式，包含会话、参考图和完整版本；升级备份 `workspace-before-1.0.json` 也属于私人数据。会话切换与槽位草稿相互独立。保存完成后才报告成功，退出 / 重新载入前等待保存，失败时可留在 App 导出重要作品。当前最多 20 个会话，每会话 12 个版本、60 条消息，整份工作区上限 32 MiB，超限请先导出再整理，不自动删除旧记录。
-
-`ai-settings.json` 只有服务、地址和模型；Key 独立存于 `ai-keys/<服务>.key`，不写入工作区、作品、导出、日志、发布包或 GitHub。旧 Keychain / DPAPI 记录不读取、解密、迁移或删除；只有旧系统记录时请重新粘贴 Key 保存。备份 Studio 数据目录时也包含个人 Key，请妥善保管，不要整目录公开上传。
+Beta 14 已验证 14 组前端 / 预览回归、照片像素与 83 颗轴灯遮罩一致性、首次及再次进入外观页、macOS 签名包搬移启动和工作区保存恢复。语音请求的 TLS 漏包问题已修复，证书和主机名验证保持开启。Windows 原生界面 / USB、更多固件及 R4 对应写入仍需实机验收；不将本版标为正式稳定版。
 
 ## 从源码构建
+
 
 需要 Python 3.12、Node.js；Mac 构建还需 Xcode Command Line Tools，Windows 构建还需 .NET 10 SDK。
 
@@ -212,13 +178,12 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 - `data/`：灯效作品、公开预设目录 `preset-catalog.json`、照片校准、通用实体布局与合成测试 fixture。
 - `scripts/`：环境准备、素材生成和 Mac 后台构建。
 
-## 在 GitHub 更新
+## 发布维护
 
-源码与公开文档提交到 `main`；软件包通过 Releases 发布。`v1.0.0-rc.2` 使用 prerelease 标记，验收完成前不标成稳定 1.0.0。个人会话、参考图、工作区、设备记录、Key 和编译缓存不进入 Git 历史。
-
----
+当前公开 `main` 与本次公开标签包含 Beta 14 的源码快照和公开资源；此前独立开发的私有提交历史、测试录音与桌面录制素材不随本次同步。旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 反馈。
 
 ## 支持作者
+
 
 **键盘已经亮了，咖啡杯还空着。☕**
 

@@ -12,9 +12,13 @@ internal sealed class StudioForm : Form
     private readonly WebView2 web = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(14, 16, 21) };
     private readonly BackendClient backend = new();
     private readonly BackendClient aiBackend = new();
+    private readonly BackendClient voiceBackend = new();
     private readonly AISettings aiSettings = new(HostPaths.State);
+    private readonly VoiceRecorder voiceRecorder = new();
     private CancellationTokenSource? aiCancellation;
     private string? activeAIRequestId;
+    private CancellationTokenSource? voiceCancellation;
+    private string? activeVoiceRequestId;
     private readonly Label loading = new()
     {
         Dock = DockStyle.Fill, Text = "正在载入 Cyberboard Studio…", TextAlign = ContentAlignment.MiddleCenter,
@@ -29,7 +33,10 @@ internal sealed class StudioForm : Form
     private const string ReleaseVersion = "1.0.0-rc.2";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
-    { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "setTime", "restorePlan", "saveWorkspace" };
+    { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
+      "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice" };
+    private static readonly HashSet<string> VoiceBackendActions = new(StringComparer.Ordinal)
+    { "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice" };
     private static readonly HashSet<string> DeviceWriteActions = new(StringComparer.Ordinal) { "execute", "setTime" };
     private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true, MaxDepth = 256 };
 
@@ -70,7 +77,8 @@ internal sealed class StudioForm : Form
         Controls.Add(menu);
         Shown += async (_, _) => await InitializeAsync();
         FormClosing += OnClosing;
-        FormClosed += (_, _) => { workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
+        voiceRecorder.StateChanged += state => PostToUi(() => SendEvent(state));
+        FormClosed += (_, _) => { voiceRecorder.Dispose(); voiceCancellation?.Cancel(); voiceBackend.Dispose(); workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -87,6 +95,21 @@ internal sealed class StudioForm : Form
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    private void ApplyAppearance(string theme)
+    {
+        var light = theme == "island";
+        var color = light ? Color.FromArgb(248, 248, 240) : Color.FromArgb(14, 16, 21);
+        BackColor = web.DefaultBackgroundColor = loading.BackColor = color;
+        loading.ForeColor = light ? Color.FromArgb(114, 93, 66) : Color.FromArgb(238, 241, 247);
+        try
+        {
+            var dark = light ? 0 : 1;
+            DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int));
+        }
+        catch (DllNotFoundException) { }
+        catch (EntryPointNotFoundException) { }
+    }
 
     private async Task InitializeAsync()
     {
@@ -137,6 +160,8 @@ internal sealed class StudioForm : Form
             };
             core.ProcessFailed += (_, args) =>
             {
+                voiceRecorder.CancelAll();
+                voiceCancellation?.Cancel();
                 HostLog.Write("webview", args.ProcessFailedKind.ToString());
                 loading.Text = deviceWritePending
                     ? "预览组件发生错误。设备操作仍在进行，请等待同步完成后重新载入。"
@@ -219,7 +244,7 @@ internal sealed class StudioForm : Form
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
         if (deviceWritePending || workspaceExit.IsPending) { args.Cancel = true; return; }
-        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; aiCancellation?.Cancel(); navigationGeneration++; return; }
+        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; voiceRecorder.CancelAll(); voiceCancellation?.Cancel(); aiCancellation?.Cancel(); navigationGeneration++; return; }
         args.Cancel = true;
         if (args.IsUserInitiated) OpenExternalLink(args.Uri);
     }
@@ -260,7 +285,7 @@ internal sealed class StudioForm : Form
             return;
         }
         var generation = navigationGeneration;
-        if ((workspaceExit.IsPending || exitApproved) && action is "generateAI" or "testAIConnection" or "execute" or "setTime" or "importJSON" or "exportJSON" or "importAIImages" or "saveAISettings")
+        if ((workspaceExit.IsPending || exitApproved) && action is "generateAI" or "testAIConnection" or "execute" or "setTime" or "importJSON" or "exportJSON" or "importAIImages" or "saveAISettings" or "startVoiceRecording" or "transcribeVoice" or "saveVoiceSettings" or "deleteVoiceKey")
         {
             ReplyError(id, "正在保存工作区，请等待完成后再操作。", generation); return;
         }
@@ -269,6 +294,25 @@ internal sealed class StudioForm : Form
         {
             switch (action)
             {
+                case "setAppearance":
+                    if (!payload.TryGetProperty("theme", out var themeValue) || themeValue.ValueKind != JsonValueKind.String ||
+                        themeValue.GetString() is not ("dark" or "island"))
+                        throw new InvalidOperationException("界面风格无效。");
+                    ApplyAppearance(themeValue.GetString()!);
+                    Reply(id, new { theme = themeValue.GetString() }, generation); return;
+                case "transcribeVoice":
+                    await RunVoiceAsync(id, payload, generation); return;
+                case "cancelVoiceTranscription":
+                    var voiceId = VoiceRecorder.ReadRequestId(payload);
+                    var voiceCancelled = activeVoiceRequestId == voiceId;
+                    if (voiceCancelled) voiceCancellation?.Cancel();
+                    Reply(id, new { cancelled = voiceCancelled, requestId = voiceId }, generation); return;
+                case "startVoiceRecording":
+                    Reply(id, voiceRecorder.Start(VoiceRecorder.ReadRequestId(payload)), generation); return;
+                case "stopVoiceRecording":
+                    Reply(id, voiceRecorder.Stop(VoiceRecorder.ReadRequestId(payload)), generation); return;
+                case "cancelVoiceRecording":
+                    Reply(id, voiceRecorder.Cancel(VoiceRecorder.ReadRequestId(payload)), generation); return;
                 case "importJSON": await ImportJsonAsync(id, generation); return;
                 case "exportJSON": await ExportJsonAsync(id, payload, generation); return;
                 case "importAIImages": await ImportAIImagesAsync(id, generation); return;
@@ -288,6 +332,8 @@ internal sealed class StudioForm : Form
                     Reply(id, new { cancelled, requestId = cancelId }, generation); return;
             }
             if (!BackendActions.Contains(action)) { ReplyError(id, "不支持的操作：" + action, generation); return; }
+            if (activeVoiceRequestId is not null && action is "saveVoiceSettings" or "deleteVoiceKey")
+                throw new IOException("语音正在转写，请先结束输入或等待完成后再修改配置。");
             if (writesDevice && (deviceWritePending || activeAIRequestId is not null))
             {
                 ReplyError(id, "设备操作或 AI 请求正在进行，请等待完成后再试。", generation);
@@ -300,9 +346,12 @@ internal sealed class StudioForm : Form
                 var result = await Task.Run(() => backend.RunAsync(action, payload, record =>
                 {
                     var values = record.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone());
+                    if (VoiceBackendActions.Contains(action))
+                        values = values.Where(item => new[] { "event", "type", "phase", "requestId", "label", "progress" }.Contains(item.Key))
+                            .ToDictionary(item => item.Key, item => item.Value);
                     values.TryAdd("id", id);
                     PostToUi(() => SendEvent(values, generation));
-                }));
+                }, suppressDiagnostics: VoiceBackendActions.Contains(action)));
                 Reply(id, result, generation);
             }
             finally { if (writesDevice) deviceWritePending = false; }
@@ -310,7 +359,7 @@ internal sealed class StudioForm : Form
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (action is "getAISettings" or "saveAISettings" or "revealAIKey" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
+            if (VoiceBackendActions.Contains(action) || action is "startVoiceRecording" or "stopVoiceRecording" or "cancelVoiceRecording" or "cancelVoiceTranscription" or "getAISettings" or "saveAISettings" or "revealAIKey" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
                 HostLog.Write("AI request", exception.GetType().Name);
             else HostLog.Write("request " + action, exception.ToString());
             ReplyError(id, exception is BackendReplyException backendError ? backendError.Error : exception.Message, generation);
@@ -378,6 +427,38 @@ internal sealed class StudioForm : Form
             {
                 aiCancellation = null;
                 activeAIRequestId = null;
+            }
+        }
+    }
+
+    private async Task RunVoiceAsync(JsonElement id, JsonElement payload, int generation)
+    {
+        if (activeVoiceRequestId is not null) throw new IOException("语音正在转写，请先结束输入或等待完成。");
+        var requestId = VoiceRecorder.ReadRequestId(payload);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(180));
+        activeVoiceRequestId = requestId;
+        voiceCancellation = cancellation;
+        try
+        {
+            var result = await Task.Run(() => voiceBackend.RunAsync("transcribeVoice", payload, record =>
+            {
+                var allowed = new[] { "event", "type", "phase", "requestId", "label", "progress" };
+                var values = record.EnumerateObject().Where(item => allowed.Contains(item.Name))
+                    .ToDictionary(item => item.Name, item => (object?)item.Value.Clone());
+                values["id"] = id;
+                values["requestId"] = requestId;
+                PostToUi(() => SendEvent(values, generation));
+            }, cancellation.Token, suppressDiagnostics: true), cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            Reply(id, result, generation);
+        }
+        catch (OperationCanceledException) { Reply(id, new { cancelled = true, requestId }, generation); }
+        finally
+        {
+            if (ReferenceEquals(voiceCancellation, cancellation))
+            {
+                voiceCancellation = null;
+                activeVoiceRequestId = null;
             }
         }
     }
@@ -457,6 +538,8 @@ internal sealed class StudioForm : Form
         if (workspaceFailureShowing) return;
         var token = workspaceExit.Begin(intent);
         if (token is null) return;
+        voiceRecorder.CancelAll();
+        voiceCancellation?.Cancel();
         if (!documentReady || web.CoreWebView2 is null) { CompleteWorkspaceExit(token); return; }
         SendEvent(new { @event = "workspaceExit", phase = "saving" });
         workspaceExitTimeout = new CancellationTokenSource();
