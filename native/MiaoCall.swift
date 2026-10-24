@@ -310,7 +310,7 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
     private func layoutPet(expanded: Bool) {
         layingOut = true
         defer { layingOut = false }
-        let height = (style.preferences["size"] as? NSNumber)?.doubleValue ?? 340
+        let height = (style.preferences["size"] as? NSNumber)?.doubleValue ?? 300
         let anchor = NSPoint(x: panel.frame.minX + image.frame.minX, y: panel.frame.minY)
         guard let visible = visibleScreen(for: panel.frame)?.visibleFrame else { return }
         let placement = CompanionPlacement.calculate(anchor: anchor, size: height, expanded: expanded, visible: visible)

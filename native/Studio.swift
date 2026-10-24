@@ -605,7 +605,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var workspaceFailureShowing = false
     private var documentReady = false
     private var exitApproved = false
-    private let releaseVersion = "1.0.0-miaocall.companion.beta.1"
+    private let releaseVersion = "1.0.0-miaocall.companion.beta.2"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",

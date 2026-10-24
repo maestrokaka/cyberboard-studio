@@ -13,7 +13,7 @@
     const controls = document.createElement('section'); controls.className = 'settings-card companion-controls';
     controls.innerHTML = `<h2>桌面陪伴</h2><p class="companion-subtitle">让她留在桌面，也可以只在你唤醒时出现。</p>
       <div class="companion-fields"><label>出现方式<select id="companionMode"><option value="wake">仅唤醒时出现</option><option value="resident">常驻桌面</option></select></label>
-      <label>角色大小 <output id="companionSizeLabel">340</output><input id="companionSize" type="range" min="240" max="440" step="10" value="340"></label>
+      <label>角色大小 <output id="companionSizeLabel">300</output><input id="companionSize" type="range" min="240" max="440" step="10" value="300"></label>
       <label class="companion-check"><input id="companionHover" type="checkbox" checked>鼠标停留互动</label><label class="companion-check"><input id="companionSound" type="checkbox">互动声音</label>
       <label>声线<select id="companionVoice"></select></label><label>音量<input id="companionVolume" type="range" min="0" max="1" step="0.05" value="0.45"></label></div>
       <p class="companion-note">四种内置离线声线，声音默认关闭。停留约半秒才回应，同一部位有冷却；拖动与语音任务时不闲聊。</p>

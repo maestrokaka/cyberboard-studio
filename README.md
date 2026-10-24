@@ -1,14 +1,16 @@
-# Cyberboard Studio · Companion Private Beta 1
+# Cyberboard Studio · Companion Private Beta 2
 
 **简体中文** · [English](README.en.md)
 
 面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。也可以开启实验性的「喵唤」，按住一颗键，把语音指令交给本机 Codex。
 
-**[下载 Companion 私有测试版 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.companion.beta.1)** · [更新说明](docs/RELEASE_NOTES_COMPANION_BETA1.md) · [桌面陪伴与衣橱说明](docs/MIAOCALL_COMPANION.md)
+**[下载 Companion 私有测试版 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.companion.beta.2)** · [更新说明](docs/RELEASE_NOTES_COMPANION_BETA2.md) · [桌面陪伴与衣橱说明](docs/MIAOCALL_COMPANION.md)
 
 这是 **私有测试版**，在 Beta 14 灯效工作室基础上加入桌面常驻、换装衣橱、分部位互动和多声线。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
 
 ## 这一版的喵娘
+
+Beta 2 将桌面角色默认高度从 340 调整为 300，衣橱与任务预览同步缩小约 12%，保持人物比例和触点对应。
 
 - **常驻 / 仅唤醒**独立选择，角色可以拖到桌面任意位置，记住大小和位置；靠近屏幕边缘时对话框自动换侧。常驻不自动录音或启用全局按键。
 - **三套服装 + 长发可选**：橙白水手服、奶油针织 JK、雪白西装套装，水手服另有橙白长发；每组 8 个独立姿势，共 32 张。
@@ -47,10 +49,10 @@
 
 | 平台 / 版本 | 下载 | 说明 |
 | --- | --- | --- |
-| **macOS · Companion Private Beta 1** | [私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.companion.beta.1) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
+| **macOS · Companion Private Beta 2** | [私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.companion.beta.2) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
 | Windows · **历史 RC2** | [RC2 普通 x64 / Windows 10 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 旧版灯效功能，不含本次新增界面、语音和喵唤；原生 GUI / USB 仍待实机验收 |
 
-Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.companion.beta.1-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
+Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.companion.beta.2-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
 
 App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。首次打开按 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445) 操作；喵唤需要的麦克风、全局按键及 Spotify 自动化权限只在明确开启对应功能时请求。升级前先退出旧 App，固定使用同一份已签名包。[详细安装与权限说明](docs/MIAOCALL_BETA.md)
 
@@ -185,7 +187,7 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 
 ## 发布维护
 
-当前私有 `feature/miaocall-companion` 包含 Companion Beta 1 源码与素材；不推送公开 main，也不上传个人测试录音、声纹源文件或桌面录制素材。公开 Beta 14、旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 反馈。
+当前私有 `feature/miaocall-companion` 包含 Companion Beta 2 源码与素材；不推送公开 main，也不上传个人测试录音、声纹源文件或桌面录制素材。公开 Beta 14、旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 反馈。
 
 ## 支持作者
 

@@ -298,7 +298,7 @@ window.STUDIO_COMPANION_CATALOG={
     "sound": false,
     "voice": "sweet",
     "volume": 0.45,
-    "size": 340,
+    "size": 300,
     "hover": true
   },
   "interaction": {
