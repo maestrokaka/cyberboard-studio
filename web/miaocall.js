@@ -9,6 +9,7 @@
   return {uri:'spotify:track:'+match[1],title:String(title).trim().slice(0,100),artist:String(artist).trim().slice(0,100)};
  }
  function create({$,api,native,state,navigate,toast,onBusy}){
+  let companionUI=null;
   let current={enabled:false,state:'idle',transcript:'',message:''},pending=false,held=false,operation=0,revision=0,dirty=false;
   const controls=['miaoCallToggle','miaoConfirm','miaoTrackTitle','miaoTrackArtist','miaoTrackLink'];
   function options(){return {confirmBeforeSend:$('miaoConfirm').checked,tracks:[track($('miaoTrackLink').value,$('miaoTrackTitle').value,$('miaoTrackArtist').value)]};}
@@ -31,7 +32,7 @@
    $('miaoSubmitBtn').disabled=pending||!confirm;
    state.miaoCallBusy=busy||confirm;onBusy?.();
   }
-  function event(value){if(value.event!=='miaoCall'||value.type!=='state')return;revision++;current={...current,...value};render();}
+  function event(value){if(value.event!=='miaoCall'||value.type!=='state')return;revision++;current={...current,...value};companionUI?.update(value);render();}
   async function call(action,payload={}){const token=++operation,before=revision;pending=true;render();try{const result=await api(action,payload);if(token===operation&&before===revision&&result&&typeof result==='object')current={...current,...result};return token===operation?result:null;}catch(error){if(token!==operation||before!==revision)return null;current={...current,state:'error',message:error.message||'喵唤未完成，请重试。'};throw error;}finally{if(token===operation)pending=false;render();}}
   async function load(){if(!native){render();return;}try{await call('miaoCallStatus');}catch{} }
   async function toggle(){try{await call($('miaoCallToggle').checked?'miaoCallEnable':'miaoCallDisable',$('miaoCallToggle').checked?options():{});dirty=false;render();}catch(error){toast(error.message);} }
@@ -49,6 +50,7 @@
   $('miaoSubmitBtn').onclick=async()=>{try{const text=$('miaoTranscript').value.trim();if(!text||text.length>2000)throw Error('请填写 1–2000 字的指令。');await call('miaoCallSubmit',{text});}catch(error){toast(error.message);}};
   $('miaoVoiceSettings').onclick=()=>navigate('models');
   $('miaoTrackTitle').value=EXAMPLE.title;$('miaoTrackArtist').value=EXAMPLE.artist;$('miaoTrackLink').value='https://open.spotify.com/track/'+EXAMPLE.uri.split(':').pop();
+  companionUI=global.StudioCompanion?.create({$,api,native,toast,busy:()=>ACTIVE.has(current.state)||current.state==='awaitingConfirmation'});
   render();return {load,event,cancel,refresh:render,get status(){return current;}};
  }
  global.StudioMiaoCall={create,track};

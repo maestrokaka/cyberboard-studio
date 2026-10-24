@@ -141,12 +141,20 @@ def bundle_structure(app):
     for name in ("index.html", "theme.js", "themes.css", "island-theme.css", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "keymap-client.js", "keymap.css", "voice-input.js", "voice-input.css", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name),
                 "Packaged web source is missing or stale: " + name)
+    for path in (ROOT / "web/assets/companion").rglob("*"):
+        if path.is_file():
+            relative = path.relative_to(ROOT / "web")
+            require(sha256(resources / "web" / relative) == sha256(path), "Companion resource missing or stale: " + str(relative))
+    for name in ("companion.js", "companion.css"):
+        require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name), "Companion UI is stale")
     # --help exits before Bridge/CLI initialization. A fresh web tree alone must
     # not conceal a stale frozen backend lacking the configuration fixes.
     help_text = run([str(binary), "--help"]).stdout
     action_list = re.search(r"--action\s+\{([^}]+)\}", help_text)
     require(action_list is not None, "Frozen backend does not advertise its action contract")
     advertised = set(action_list.group(1).split(","))
+    require({"companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete"} <= advertised,
+            "Frozen backend lacks companion image actions")
     configuration_actions = {"readConfiguration", "builtInPlan", "initializePlan", "plan", "execute"}
     configuration_actions |= {"keymapCatalog", "keymapPlan", "voiceSettings", "saveVoiceSettings",
                               "revealVoiceKey", "deleteVoiceKey", "transcribeVoice"}
@@ -160,8 +168,8 @@ def bundle_structure(app):
             [bool(page["valid"]) for page in defaults["pages"]] == [True, True, True, False, False],
             "Bundled standard modes must enable battery, mosaic and clock")
     require(any((backend / "_internal").rglob("_imagingcms*.so")), "Color conversion native module is missing")
-    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "voice-settings.json", "pyvenv.cfg", ".operation.lock"}
-    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "voice-keys", "test-fixtures"}
+    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "voice-settings.json", "companion-image-settings.json", "companion-image.key", "pyvenv.cfg", ".operation.lock"}
+    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "voice-keys", "companion-outfits", "test-fixtures"}
     for path in app.rglob("*"):
         require(path.name.lower() not in forbidden_names, "Private/development file bundled: " + str(path.relative_to(app)))
         require(not (path.is_dir() and path.name.lower() in forbidden_directories),

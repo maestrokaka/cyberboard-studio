@@ -78,9 +78,29 @@ private final class MiaoCallPanel: NSPanel {
 /// floating panel; the mascot artwork inside the main settings page is static.
 private final class MiaoCallDraggablePetView: NSImageView {
     var onDrag: ((NSPoint) -> Void)?
+    var onMenu: ((NSEvent) -> Void)?
+    private(set) var pressed = false
     private var previousMouseLocation: NSPoint?
+    private var bitmap: NSBitmapImageRep?
+    override var image: NSImage? { didSet { bitmap = image?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) } }
+
+    func opaquePoint(_ windowPoint: NSPoint) -> NSPoint? {
+        guard let image, let bitmap else { return nil }
+        let local = convert(windowPoint, from: nil)
+        let scale = min(bounds.width / image.size.width, bounds.height / image.size.height)
+        let rect = NSRect(x: (bounds.width - image.size.width * scale) / 2,
+                          y: (bounds.height - image.size.height * scale) / 2,
+                          width: image.size.width * scale, height: image.size.height * scale)
+        guard rect.contains(local) else { return nil }
+        let point = NSPoint(x: (local.x - rect.minX) / rect.width, y: 1 - (local.y - rect.minY) / rect.height)
+        let x = min(bitmap.pixelsWide - 1, max(0, Int(point.x * Double(bitmap.pixelsWide))))
+        let y = min(bitmap.pixelsHigh - 1, max(0, Int(point.y * Double(bitmap.pixelsHigh))))
+        guard (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.15 else { return nil }
+        return point
+    }
 
     override func mouseDown(with event: NSEvent) {
+        pressed = true
         previousMouseLocation = NSEvent.mouseLocation
         window?.makeFirstResponder(nil)
     }
@@ -95,7 +115,8 @@ private final class MiaoCallDraggablePetView: NSImageView {
         previousMouseLocation = location
     }
 
-    override func mouseUp(with event: NSEvent) { previousMouseLocation = nil }
+    override func mouseUp(with event: NSEvent) { previousMouseLocation = nil; pressed = false }
+    override func rightMouseDown(with event: NSEvent) { onMenu?(event) }
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .openHand)
@@ -111,14 +132,26 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
     let cancel = NSButton(title: "取消", target: nil, action: nil)
     let activity = NSProgressIndicator()
     let image = MiaoCallDraggablePetView()
+    let style: CompanionStyle
+    private let bubble = NSView()
+    private let voice = CompanionVoice()
+    var onPreferencesChanged: (() -> Void)?
+    var canInteract: (() -> Bool)?
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
     private var animation: Timer?
     private var phase = 0.0
     private var active = false
-    private let positionDefaultsKey = "CyberboardStudio.MiaoCallOverlay.position"
+    private var taskState = "idle"
+    private var interaction = CompanionInteractionGate()
+    private var reactionUntil: TimeInterval = 0
+    private var layingOut = false
+    private var suspended = false
+    private var petTimer: Timer?
+    private let positionDefaultsKey = "CyberboardStudio.MiaoCallOverlay.companionPosition.v1"
 
     init(resources: URL) {
+        style = CompanionStyle(resources: resources)
         panel = MiaoCallPanel(contentRect: NSRect(x: 0, y: 0, width: 488, height: 300),
                               styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init()
@@ -137,9 +170,11 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         image.image = NSImage(contentsOf: resources.appendingPathComponent("web/assets/miaocall/nekomimi.png"))
         image.setAccessibilityLabel("拖动喵娘可移动桌面浮层")
         image.onDrag = { [weak self] delta in self?.movePanel(by: delta) }
+        image.onMenu = { [weak self] event in self?.contextMenu(event) }
         content.addSubview(image)
-        let bubble = NSView(frame: NSRect(x: 152, y: 96, width: 328, height: 180))
+        bubble.frame = NSRect(x: 152, y: 96, width: 328, height: 180)
         bubble.wantsLayer = true
+        bubble.appearance = NSAppearance(named: .darkAqua)
         bubble.layer?.backgroundColor = NSColor(calibratedWhite: 0.065, alpha: 0.96).cgColor
         bubble.layer?.cornerRadius = 22
         bubble.layer?.borderWidth = 1
@@ -180,51 +215,51 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         activity.isDisplayedWhenStopped = false
         bubble.addSubview(activity)
         panel.onEscape = { [weak self] in self?.onCancel?() }
+        applyStyle()
     }
     @objc private func submitClicked() { onSubmit?(transcript.stringValue) }
-    @objc private func cancelClicked() { onCancel?() }
+    @objc private func cancelClicked() { if taskState == "idle" { hide() } else { onCancel?() } }
     private func movePanel(by delta: NSPoint) {
+        interaction.reset(); reactionUntil = 0; voice.stop()
         panel.setFrameOrigin(NSPoint(x: panel.frame.origin.x + delta.x,
                                      y: panel.frame.origin.y + delta.y))
     }
     func windowDidMove(_ notification: Notification) {
-        guard (notification.object as? NSWindow) === panel else { return }
+        guard !layingOut, (notification.object as? NSWindow) === panel else { return }
         constrainAndPersistPosition()
     }
     private func visibleScreen(for frame: NSRect) -> NSScreen? {
         // While dragging, follow the display under the pointer. Choosing the
         // panel's current center first traps it at the edge of its old display.
-        if let screen = NSScreen.screens.first(where: { $0.visibleFrame.contains(NSEvent.mouseLocation) }) { return screen }
-        let center = NSPoint(x: frame.midX, y: frame.midY)
+        if image.pressed, let screen = NSScreen.screens.first(where: { $0.visibleFrame.contains(NSEvent.mouseLocation) }) { return screen }
+        let center = NSPoint(x: frame.minX + image.frame.midX, y: frame.minY + image.frame.midY)
         if let screen = NSScreen.screens.first(where: { $0.visibleFrame.contains(center) }) { return screen }
         if let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(frame) }) { return screen }
         return NSScreen.main ?? NSScreen.screens.first
     }
-    private func constrainedOrigin(_ origin: NSPoint, in visible: NSRect) -> NSPoint {
-        let maxX = max(visible.minX, visible.maxX - panel.frame.width)
-        let maxY = max(visible.minY, visible.maxY - panel.frame.height)
-        return NSPoint(x: min(max(origin.x, visible.minX), maxX), y: min(max(origin.y, visible.minY), maxY))
-    }
     private func constrainAndPersistPosition() {
-        guard let screen = visibleScreen(for: panel.frame) else { return }
-        let origin = constrainedOrigin(panel.frame.origin, in: screen.visibleFrame)
-        if panel.frame.origin != origin { panel.setFrameOrigin(origin) }
-        UserDefaults.standard.set(["x": origin.x, "y": origin.y], forKey: positionDefaultsKey)
+        layoutPet(expanded: !bubble.isHidden)
+        let anchor = NSPoint(x: panel.frame.minX + image.frame.minX, y: panel.frame.minY)
+        UserDefaults.standard.set(["x": anchor.x, "y": anchor.y], forKey: positionDefaultsKey)
     }
     private func restoreOrPlacePosition() {
-        let stored = (UserDefaults.standard.dictionary(forKey: positionDefaultsKey) as? [String: Any]).flatMap { values -> NSPoint? in
+        let saved = UserDefaults.standard.dictionary(forKey: positionDefaultsKey)
+            ?? UserDefaults.standard.dictionary(forKey: "CyberboardStudio.MiaoCallOverlay.position")
+        let stored = saved.flatMap { values -> NSPoint? in
             guard let x = values["x"] as? NSNumber, let y = values["y"] as? NSNumber,
                   x.doubleValue.isFinite, y.doubleValue.isFinite else { return nil }
             return NSPoint(x: x.doubleValue, y: y.doubleValue)
         }
-        let screen = stored.flatMap { visibleScreen(for: NSRect(origin: $0, size: panel.frame.size)) } ?? NSScreen.main ?? NSScreen.screens.first
+        let screen = stored.flatMap { anchor in NSScreen.screens.first { $0.visibleFrame.contains(anchor) } } ?? NSScreen.main ?? NSScreen.screens.first
         guard let visible = screen?.visibleFrame else { return }
-        let origin = stored.map { constrainedOrigin($0, in: visible) }
-            ?? constrainedOrigin(NSPoint(x: visible.maxX - panel.frame.width - 30, y: visible.minY + 24), in: visible)
-        panel.setFrameOrigin(origin)
-        UserDefaults.standard.set(["x": origin.x, "y": origin.y], forKey: positionDefaultsKey)
+        let anchor = stored ?? NSPoint(x: visible.maxX - image.frame.width - 30, y: visible.minY + 24)
+        layingOut = true
+        panel.setFrameOrigin(NSPoint(x: anchor.x - image.frame.minX, y: anchor.y))
+        layingOut = false
+        constrainAndPersistPosition()
     }
     func show(state: String, text: String, recognized: String) {
+        taskState = state; reactionUntil = 0; interaction.reset(); voice.stop(); suspended = false
         let labels = ["configuring": "正在准备喵唤…", "preparing": "正在准备语音…", "listening": "正在听你说…", "transcribing": "正在识别语音…", "awaitingConfirmation": "听清楚啦，确认一下？",
                       "connecting": "正在连接 Codex…", "thinking": "Codex 正在思考…", "acting": "正在为你操作…",
                       "completed": "任务完成啦", "cancelled": "已取消", "error": "需要你看一下"]
@@ -237,6 +272,9 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         cancel.title = ["completed", "error", "cancelled"].contains(state) ? "收起" : "取消"
         if confirming { transcript.stringValue = recognized }
         active = ["configuring", "preparing", "listening", "transcribing", "connecting", "thinking", "acting"].contains(state)
+        image.image = style.picture(state == "completed" ? "happy" : state == "listening" ? "ears" : state == "thinking" ? "think" : "idle")
+        bubble.isHidden = false
+        layoutPet(expanded: true)
         if active { activity.startAnimation(nil) } else { activity.stopAnimation(nil) }
         if animation == nil {
             animation = Timer.scheduledTimer(withTimeInterval: 1.0 / 24, repeats: true) { [weak self] _ in
@@ -251,8 +289,90 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
             restoreOrPlacePosition()
         }
         panel.orderFrontRegardless()
+        beginPetTimer()
     }
-    func hide() { panel.orderOut(nil); animation?.invalidate(); animation = nil; image.frame.origin.y = 0 }
+    func hide() {
+        taskState = "idle"; active = false; reactionUntil = 0; voice.stop(); interaction.reset()
+        animation?.invalidate(); animation = nil; image.frame.origin.y = 0
+        applyStyle()
+    }
+    func applyStyle() {
+        voice.stop(); interaction.reset(); reactionUntil = 0
+        guard taskState == "idle" else { return }
+        image.image = style.picture()
+        bubble.isHidden = true
+        layoutPet(expanded: false)
+        if style.resident && !suspended {
+            if !panel.isVisible { restoreOrPlacePosition() }
+            panel.orderFrontRegardless(); beginPetTimer()
+        } else { panel.orderOut(nil); petTimer?.invalidate(); petTimer = nil }
+    }
+    private func layoutPet(expanded: Bool) {
+        layingOut = true
+        defer { layingOut = false }
+        let height = (style.preferences["size"] as? NSNumber)?.doubleValue ?? 340
+        let anchor = NSPoint(x: panel.frame.minX + image.frame.minX, y: panel.frame.minY)
+        guard let visible = visibleScreen(for: panel.frame)?.visibleFrame else { return }
+        let placement = CompanionPlacement.calculate(anchor: anchor, size: height, expanded: expanded, visible: visible)
+        image.frame = placement.image; bubble.frame = placement.bubble
+        panel.setFrame(placement.frame, display: true)
+    }
+    private func beginPetTimer() {
+        guard petTimer == nil else { return }
+        petTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 15, repeats: true) { [weak self] _ in self?.pollPointer() }
+    }
+    private func pollPointer() {
+        guard panel.isVisible else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let windowPoint = panel.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let normalized = image.opaquePoint(windowPoint)
+        let inBubble = !bubble.isHidden && bubble.frame.contains(windowPoint)
+        // Transparent margins must not consume clicks intended for the desktop.
+        panel.ignoresMouseEvents = !image.pressed && normalized == nil && !inBubble
+        if taskState != "idle" { interaction.reset(); return }
+        if canInteract?() == false { voice.stop(); interaction.reset(); return }
+        if reactionUntil > 0 && now >= reactionUntil {
+            reactionUntil = 0; image.image = style.picture(); bubble.isHidden = true; layoutPet(expanded: false)
+            if !style.resident { panel.orderOut(nil); petTimer?.invalidate(); petTimer = nil; return }
+        }
+        let zone = normalized.flatMap { style.zone(at: $0) }
+        if let identity = interaction.consume(zone?["id"] as? String, now: now,
+                                               blocked: image.pressed || reactionUntil > now || style.preferences["hover"] as? Bool != true) {
+            react(identity)
+        }
+    }
+    func react(_ identity: String, forceAudio: Bool = false, audioSettings: [String: Any]? = nil) {
+        guard taskState == "idle", canInteract?() != false, let zone = style.zones.first(where: { $0["id"] as? String == identity }) else { return }
+        reactionUntil = ProcessInfo.processInfo.systemUptime + 2.4
+        image.image = style.picture(zone["pose"] as? String ?? "idle")
+        title.stringValue = "轻触 · " + (zone["name"] as? String ?? "喵娘")
+        message.stringValue = zone["text"] as? String ?? "我在这里。"
+        transcript.isHidden = true; submit.isHidden = true; cancel.isHidden = false; cancel.title = "收起"
+        activity.stopAnimation(nil); bubble.isHidden = false; layoutPet(expanded: true)
+        if !panel.isVisible { restoreOrPlacePosition() }
+        panel.orderFrontRegardless(); beginPetTimer(); voice.play(zone: zone, style: style, force: forceAudio, audioSettings: audioSettings)
+    }
+    private func contextMenu(_ event: NSEvent) {
+        let menu = NSMenu()
+        let sound = NSMenuItem(title: style.soundEnabled ? "关闭互动声音" : "开启互动声音", action: #selector(toggleSound), keyEquivalent: "")
+        sound.target = self; menu.addItem(sound)
+        let mode = NSMenuItem(title: style.resident ? "仅唤醒时出现" : "常驻桌面", action: #selector(toggleResident), keyEquivalent: "")
+        mode.target = self; menu.addItem(mode)
+        let hide = NSMenuItem(title: "暂时收起", action: #selector(suspendPet), keyEquivalent: "")
+        hide.target = self; menu.addItem(hide)
+        NSMenu.popUpContextMenu(menu, with: event, for: image)
+    }
+    @objc private func toggleSound() {
+        var value = style.preferences; value["sound"] = !style.soundEnabled
+        try? style.save(value); applyStyle(); onPreferencesChanged?()
+    }
+    @objc private func toggleResident() {
+        var value = style.preferences; value["mode"] = style.resident ? "wake" : "resident"
+        try? style.save(value); suspended = false; applyStyle(); onPreferencesChanged?()
+    }
+    @objc private func suspendPet() { suspended = true; panel.orderOut(nil); petTimer?.invalidate(); petTimer = nil; voice.stop() }
+    func resume() { suspended = false; applyStyle() }
+    deinit { petTimer?.invalidate(); animation?.invalidate(); voice.stop() }
 }
 
 // Bounded JSONL child transport. Credential and audio payloads remain on private
@@ -286,7 +406,7 @@ private final class MiaoCallChild {
             child.currentDirectoryURL = resources
             let stdinPipe = Pipe(), stdoutPipe = Pipe(), stderrPipe = Pipe()
             child.standardInput = stdinPipe; child.standardOutput = stdoutPipe; child.standardError = stderrPipe
-            let reader = JSONLineReader(maximumBytes: 1024 * 1024) { record in DispatchQueue.main.async { onEvent(record) } }
+            let reader = JSONLineReader(maximumBytes: action.hasPrefix("companion") ? 12 * 1024 * 1024 : 1024 * 1024) { record in DispatchQueue.main.async { onEvent(record) } }
             let stderrGroup = DispatchGroup()
             self.lock.lock()
             if self.cancelled { self.lock.unlock(); DispatchQueue.main.async { completion(.failure(VoiceRecordingController.failure("已取消。"))) }; return }
@@ -300,7 +420,7 @@ private final class MiaoCallChild {
                 stderrGroup.leave()
             }
             let watchdog = DispatchWorkItem { [weak self] in self?.cancel() }
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (keepInput ? 150 : 85), execute: watchdog)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (action == "companionOutfitGenerate" ? 135 : keepInput ? 150 : 85), execute: watchdog)
             do {
                 var data = try JSONSerialization.data(withJSONObject: payload)
                 if keepInput { data.append(0x0A) }
@@ -445,6 +565,7 @@ final class MiaoCallController {
     private let overlay: MiaoCallOverlay
     private let spotify = MiaoCallSpotify()
     private var child: MiaoCallChild?
+    private var wardrobeChild: MiaoCallChild?
     private var monitor: CFMachPort?
     private var source: CFRunLoopSource?
     private var gate = MiaoCallKeyGate()
@@ -464,7 +585,12 @@ final class MiaoCallController {
     init(resources: URL, recorder: VoiceRecordingController = VoiceRecordingController()) {
         self.resources = resources; self.recorder = recorder
         overlay = MiaoCallOverlay(resources: resources)
+        overlay.canInteract = { [weak self] in self?.canBegin?() != false && self?.isBusy != true }
         overlay.onCancel = { [weak self] in self?.cancel() }
+        overlay.onPreferencesChanged = { [weak self] in
+            guard let self else { return }
+            var event = self.status(); event["event"] = "miaoCall"; event["type"] = "state"; self.onEvent?(event)
+        }
         overlay.onSubmit = { [weak self] text in
             guard let self else { return }
             do { try self.submit(text) }
@@ -485,10 +611,44 @@ final class MiaoCallController {
          "permissions": ["inputMonitoring": CGPreflightListenEventAccess(), "accessibility": AXIsProcessTrusted(),
                          "microphone": AVCaptureDevice.authorizationStatus(for: .audio) == .authorized],
          "agent": "codex", "supportedAgents": ["codex"], "voiceProvider": profile["provider"] as? String ?? ""]
+            .merging(["companion": overlay.style.preferences], uniquingKeysWith: { _, new in new })
     }
     func handle(action: String, payload: [String: Any], completion: @escaping (Result<[String: Any], Error>) -> Void) {
         switch action {
-        case "miaoCallStatus": completion(.success(status()))
+        case "miaoCallCompanionSave":
+            do {
+                try overlay.style.save(payload); overlay.resume()
+                completion(.success(status()))
+            } catch { completion(.failure(error)) }
+        case "miaoCallCompanionTest":
+            guard !isBusy else { completion(.failure(VoiceRecordingController.failure("请先完成当前语音任务。"))); return }
+            do {
+                var preview = overlay.style.preferences
+                if let voice = payload["voice"] { preview["voice"] = voice }
+                if let volume = payload["volume"] { preview["volume"] = volume }
+                let checked = try overlay.style.validate(preview)
+                overlay.react(payload["zone"] as? String ?? "cheek", forceAudio: payload["sound"] as? Bool == true, audioSettings: checked)
+                completion(.success(status()))
+            } catch { completion(.failure(error)) }
+        case "miaoCallOutfitCancel":
+            wardrobeChild?.cancel(); wardrobeChild = nil
+            completion(.success(["cancelled": true]))
+        case "miaoCallImageSettings", "miaoCallImageSave", "miaoCallImageReveal", "miaoCallOutfitGenerate", "miaoCallOutfitDelete":
+            guard !isBusy, wardrobeChild == nil else { completion(.failure(VoiceRecordingController.failure("正在处理任务或衣装，请稍后再试。"))); return }
+            let methods = ["miaoCallImageSettings": "companionImageSettings", "miaoCallImageSave": "companionImageSave", "miaoCallImageReveal": "companionImageReveal", "miaoCallOutfitGenerate": "companionOutfitGenerate", "miaoCallOutfitDelete": "companionOutfitDelete"]
+            let request = MiaoCallChild(); wardrobeChild = request
+            request.start(resources: resources, action: methods[action]!, payload: payload, keepInput: false, onEvent: { _ in }) { [weak self, weak request] result in
+                if let self, self.wardrobeChild === request {
+                    self.wardrobeChild = nil
+                    if case .success = result, action == "miaoCallOutfitDelete", payload["id"] as? String == self.overlay.style.preferences["outfit"] as? String {
+                        var value = self.overlay.style.preferences; value["outfit"] = "sailor-short"
+                        try? self.overlay.style.save(value); self.overlay.applyStyle()
+                    }
+                }
+                completion(result)
+            }
+        case "miaoCallStatus":
+            var value = status(); value["customOutfits"] = overlay.style.customOutfits(); completion(.success(value))
         case "miaoCallEnable":
             guard !isBusy, let setupToken = enableGate.begin() else { completion(.failure(VoiceRecordingController.failure("请先完成或取消当前喵唤任务。"))); return }
             generation += 1
@@ -600,6 +760,7 @@ final class MiaoCallController {
         }
         return "「\(appName)」的两项权限均已允许，但系统未能建立按键监听。请退出并重新打开 App；若仍失败，请在系统设置中重新添加当前版本的 App。"
     }
+    func shutdown() { wardrobeChild?.cancel(); wardrobeChild = nil; disable() }
     func disable() {
         enabled = false; gate.reset()
         if let monitor { CGEvent.tapEnable(tap: monitor, enable: false); CFMachPortInvalidate(monitor) }
@@ -733,6 +894,6 @@ final class MiaoCallController {
     }
     deinit {
         if let monitor { CGEvent.tapEnable(tap: monitor, enable: false); CFMachPortInvalidate(monitor) }
-        child?.cancel(); recorder.cancelAll()
+        child?.cancel(); wardrobeChild?.cancel(); recorder.cancelAll()
     }
 }

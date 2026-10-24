@@ -38,3 +38,8 @@
 .vs/
 *.user
 *.suo
+
+# Private companion image profiles and generated wardrobe
+**/companion-image-settings.json
+**/companion-image.key
+**/companion-outfits/

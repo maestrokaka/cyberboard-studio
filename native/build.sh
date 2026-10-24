@@ -39,7 +39,7 @@ done
 [[ -z "$dev_python" || -x "$dev_python" ]] || { print -u2 "Development Python is not executable: $dev_python"; exit 1; }
 
 # Reject forbidden credential routes before building any candidate bundle.
-/usr/bin/python3 - "$native_dir/Studio.swift" "$native_dir/MiaoCall.swift" <<'PY'
+/usr/bin/python3 - "$native_dir/Studio.swift" "$native_dir/MiaoCall.swift" "$native_dir/Companion.swift" <<'PY'
 import pathlib, re, sys
 source = '\n'.join(pathlib.Path(name).read_text(encoding='utf-8') for name in sys.argv[1:])
 for marker in ('SecItem', 'SecKeychain', 'kSec', 'Keychain', 'import Security',
@@ -69,7 +69,7 @@ mkdir -p "$contents_dir/MacOS" "$contents_dir/Resources" "$build_dir"
 
 # Swift permits one top-level entry file; combine the native modules into an
 # ignored build source without changing their reviewable production files.
-/bin/cat "$native_dir/MiaoCall.swift" "$native_dir/Studio.swift" > "$build_dir/StudioHost.swift"
+/bin/cat "$native_dir/Companion.swift" "$native_dir/MiaoCall.swift" "$native_dir/Studio.swift" > "$build_dir/StudioHost.swift"
 /usr/bin/xcrun swiftc -O -swift-version 5 -target "$(/usr/bin/uname -m)-apple-macosx13.0" \
   -module-cache-path "$build_dir/swift-module-cache" \
   -framework Cocoa -framework WebKit -framework UniformTypeIdentifiers -framework AVFoundation -framework ApplicationServices \
@@ -98,7 +98,7 @@ if [[ -f "$backend_dir/CyberboardBackend" && -x "$backend_dir/CyberboardBackend"
   /usr/bin/ditto "$backend_dir" "$contents_dir/Resources/backend/CyberboardBackend"
 fi
 if [[ -n "$dev_python" ]]; then
-  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py ai_quality.py speech_input.py keymap_codec.py miao_call.py; do
+  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py ai_quality.py speech_input.py keymap_codec.py miao_call.py companion.py; do
     /bin/cp "$project_dir/backend/$module_name" "$contents_dir/Resources/backend/$module_name"
   done
 fi

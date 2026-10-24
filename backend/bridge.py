@@ -1866,6 +1866,25 @@ class Bridge:
             warnings()
         return report
 
+    def companion_action(self, method, payload):
+        from companion import Wardrobe, CompanionError
+        from speech_input import SpeechError
+        try:
+            with operation_lock(self.state_dir / ".companion-image.lock"):
+                return getattr(Wardrobe(self.state_dir, self.resource_dir), method)(payload)
+        except CompanionError as error:
+            raise BridgeError("companion_failed", str(error)) from None
+        except SpeechError:
+            raise BridgeError("companion_failed", "已有语音 Key 无法读取，请重新填写生图 Key。") from None
+        except (OSError, ValueError, TypeError):
+            raise BridgeError("companion_failed", "衣装操作未完成，请检查连接后重试。") from None
+
+    def companionImageSettings(self, payload): return self.companion_action("settings", payload)
+    def companionImageSave(self, payload): return self.companion_action("save", payload)
+    def companionImageReveal(self, payload): return self.companion_action("reveal", payload)
+    def companionOutfitGenerate(self, payload): return self.companion_action("generate", payload)
+    def companionOutfitDelete(self, payload): return self.companion_action("delete", payload)
+
     def speech_action(self, method, payload):
         from speech_input import SpeechSettings, SpeechError, transcribe
         try:
@@ -1931,7 +1950,7 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "runtimeHealth"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()

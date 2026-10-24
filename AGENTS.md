@@ -1,14 +1,12 @@
 # 项目维护约定
 
-## 公开发布范围
+## 本轮私有开发范围
 
-- 2026-10-24 用户明确授权将当前 MiaoCall Beta 14 更新到公开 `maestrokaka/cyberboard-studio`，覆盖此版本此前仅私有发布的限制。本 checkout 现在使用公开 `main`，`origin` 指向公开仓库。
-- 只提升经过检查的当前源码快照、公开资源和已验证 macOS 包。不要合并或推送此前私有分支的提交历史与标签，不上传测试音频或桌面录制 Demo。公开标签为 `v1.0.0-miaocall.beta.14-public`，App 内部显示版本保持 `1.0.0-miaocall.beta.14`。
-- 既有 RC2 标签和附件保持原样；新的下载仅为 macOS Apple Silicon，README 必须明确 Windows RC2 是旧版，不能称为 Beta 14 Windows 包或正式稳定版。
-- 后续已完成更新按用户既有授权同步公开 main，运行相关检查、更新中英文 README 和使用说明，不重复请求上传许可。新的私有开发要求以用户后续指示为准。
-- GitHub 更新优先使用已连接的 GitHub CLI。README 演示使用最新 Beta 14 B 站横版；只上传压缩预览，不附原画质文件、声纹源录音或视频工程。本次视频是产品介绍片，不是此前明确不上传的桌面录制 Demo。
-- README 视频须使用 GitHub 原生内嵌播放器：独立一行放正文附件 `https://github.com/user-attachments/assets/...` 地址，不改成封面或 Release 下载链接。GitHub 没有公开正文附件上传 API 时，仅附件上传可使用网页；README 修改、提交和推送仍使用 CLI，并核对渲染结果存在带 controls 的 video。
-- Releases 不放视频，包括压缩预览版；视频仅通过 README 的独立正文附件提供内嵌播放。安装包及其校验文件保留。
+- 2026-10-24 用户要求桌面喵娘互动、常驻/唤醒、AI换装、丰富触点和多声线版本仅更新私有仓库。当前分支 `feature/miaocall-companion`，只推送 `miaocall-private`（maestrokaka/cyberboard-studio-miaocall）；禁止推送公开 origin、修改公开 main 或公开 Release。
+- 公开 Beta 14 及其 README、原生内嵌视频、安装包保持原样。Releases 不放视频。原画质、声纹源录音和私有状态不上传。
+- 新角色为明确成年的橙白喵娘；参考图只参考更修长的身形、比例与服装剪裁。保留已批准 App Logo。互动以猫耳、头发、脸颊、肩膀、手、袖口、尾巴、裙摆、膝袜和鞋子为主。
+- 常驻桌面独立于全局按键监听，常驻不自动录音或启用快捷键；声音默认关闭，可选多种声线，录音/转写/任务时暂停闲聊。拖动不触发触摸反馈，透明区域不拦截桌面鼠标。
+- AI 换装只在点击生成时发送当前角色参考与服装描述给明确配置的生图服务；先预览再应用。不能把文字模型伪装成生图，也不能失败后静默换预设。生成 Key 沿用普通本机文件与隐藏/显示约定。
 
 ## 本机数据与 API Key
 

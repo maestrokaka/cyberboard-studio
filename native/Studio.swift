@@ -605,7 +605,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var workspaceFailureShowing = false
     private var documentReady = false
     private var exitApproved = false
-    private let releaseVersion = "1.0.0-miaocall.beta.14"
+    private let releaseVersion = "1.0.0-miaocall.companion.beta.1"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
@@ -667,7 +667,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
-    func applicationWillTerminate(_ notification: Notification) { miaoCall?.disable(); voiceRecorder.cancelAll(); cancelActiveVoice() }
+    func applicationWillTerminate(_ notification: Notification) { miaoCall?.shutdown(); voiceRecorder.cancelAll(); cancelActiveVoice() }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if deviceWritePending { showWriteInProgress(); return .terminateCancel }

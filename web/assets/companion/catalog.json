@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "outfits": [
+    {
+      "id": "sailor-short",
+      "name": "橙白水手服",
+      "hair": "short",
+      "frames": {
+        "idle": "assets/companion/sailor-short/idle.png",
+        "wave": "assets/companion/sailor-short/wave.png",
+        "ears": "assets/companion/sailor-short/ears.png",
+        "cheek": "assets/companion/sailor-short/cheek.png",
+        "stretch": "assets/companion/sailor-short/stretch.png",
+        "look": "assets/companion/sailor-short/look.png",
+        "think": "assets/companion/sailor-short/think.png",
+        "happy": "assets/companion/sailor-short/happy.png"
+      },
+      "builtin": true
+    },
+    {
+      "id": "knit-short",
+      "name": "奶油针织 JK",
+      "hair": "short",
+      "frames": {
+        "idle": "assets/companion/knit-short/idle.png",
+        "wave": "assets/companion/knit-short/wave.png",
+        "ears": "assets/companion/knit-short/ears.png",
+        "cheek": "assets/companion/knit-short/cheek.png",
+        "stretch": "assets/companion/knit-short/stretch.png",
+        "look": "assets/companion/knit-short/look.png",
+        "think": "assets/companion/knit-short/think.png",
+        "happy": "assets/companion/knit-short/happy.png"
+      },
+      "builtin": true
+    },
+    {
+      "id": "white-short",
+      "name": "雪白西装套装",
+      "hair": "short",
+      "frames": {
+        "idle": "assets/companion/white-short/idle.png",
+        "wave": "assets/companion/white-short/wave.png",
+        "ears": "assets/companion/white-short/ears.png",
+        "cheek": "assets/companion/white-short/cheek.png",
+        "stretch": "assets/companion/white-short/stretch.png",
+        "look": "assets/companion/white-short/look.png",
+        "think": "assets/companion/white-short/think.png",
+        "happy": "assets/companion/white-short/happy.png"
+      },
+      "builtin": true
+    },
+    {
+      "id": "sailor-long",
+      "name": "橙白水手服",
+      "hair": "long",
+      "frames": {
+        "idle": "assets/companion/sailor-long/idle.png",
+        "wave": "assets/companion/sailor-long/wave.png",
+        "ears": "assets/companion/sailor-long/ears.png",
+        "cheek": "assets/companion/sailor-long/cheek.png",
+        "stretch": "assets/companion/sailor-long/stretch.png",
+        "look": "assets/companion/sailor-long/look.png",
+        "think": "assets/companion/sailor-long/think.png",
+        "happy": "assets/companion/sailor-long/happy.png"
+      },
+      "builtin": true
+    }
+  ],
+  "poses": [
+    "idle",
+    "wave",
+    "ears",
+    "cheek",
+    "stretch",
+    "look",
+    "think",
+    "happy"
+  ],
+  "voices": [
+    {
+      "id": "sweet",
+      "name": "甜萌",
+      "description": "轻快、明亮的成年女声",
+      "voiceId": "Chinese (Mandarin)_Sweet_Lady",
+      "pitch": 2,
+      "speed": 1.04
+    },
+    {
+      "id": "mature",
+      "name": "御姐",
+      "description": "从容、沉稳的成年女声",
+      "voiceId": "Chinese (Mandarin)_Wise_Women",
+      "pitch": -1,
+      "speed": 0.94
+    },
+    {
+      "id": "gentle",
+      "name": "温柔",
+      "description": "亲切、柔和的成年女声",
+      "voiceId": "Chinese (Mandarin)_Warm_Bestie",
+      "pitch": 0,
+      "speed": 0.96
+    },
+    {
+      "id": "playful",
+      "name": "元气",
+      "description": "活泼、清亮的成年女声",
+      "voiceId": "Chinese (Mandarin)_Sweet_Lady",
+      "pitch": 3,
+      "speed": 1.12
+    }
+  ],
+  "zones": [
+    {
+      "id": "ear-left",
+      "name": "左猫耳",
+      "pose": "ears",
+      "rect": [
+        0.16,
+        0,
+        0.28,
+        0.11
+      ],
+      "text": "耳朵收到信号啦，喵。"
+    },
+    {
+      "id": "ear-right",
+      "name": "右猫耳",
+      "pose": "ears",
+      "rect": [
+        0.53,
+        0,
+        0.26,
+        0.11
+      ],
+      "text": "听见啦，我在这里。"
+    },
+    {
+      "id": "hair",
+      "name": "头发",
+      "pose": "cheek",
+      "rect": [
+        0.19,
+        0.08,
+        0.57,
+        0.12
+      ],
+      "text": "头发有一点乱，帮我顺一顺吧。"
+    },
+    {
+      "id": "cheek",
+      "name": "脸颊",
+      "pose": "cheek",
+      "rect": [
+        0.26,
+        0.17,
+        0.45,
+        0.09
+      ],
+      "text": "今天也要有个好心情。"
+    },
+    {
+      "id": "ribbon",
+      "name": "领结",
+      "pose": "think",
+      "rect": [
+        0.38,
+        0.25,
+        0.26,
+        0.12
+      ],
+      "text": "我来整理一下领结。"
+    },
+    {
+      "id": "shoulder",
+      "name": "肩膀",
+      "pose": "stretch",
+      "rect": [
+        0.16,
+        0.23,
+        0.68,
+        0.09
+      ],
+      "text": "坐久了，一起伸个懒腰吧。"
+    },
+    {
+      "id": "sleeve-left",
+      "name": "左袖口",
+      "pose": "wave",
+      "rect": [
+        0.12,
+        0.33,
+        0.19,
+        0.13
+      ],
+      "text": "袖口整理好了，准备出发。"
+    },
+    {
+      "id": "sleeve-right",
+      "name": "右袖口",
+      "pose": "wave",
+      "rect": [
+        0.72,
+        0.32,
+        0.2,
+        0.14
+      ],
+      "text": "这里也要整整齐齐。"
+    },
+    {
+      "id": "hand-left",
+      "name": "左手",
+      "pose": "wave",
+      "rect": [
+        0.06,
+        0.46,
+        0.19,
+        0.1
+      ],
+      "text": "击个掌，继续加油。"
+    },
+    {
+      "id": "hand-right",
+      "name": "右手",
+      "pose": "happy",
+      "rect": [
+        0.73,
+        0.46,
+        0.22,
+        0.1
+      ],
+      "text": "收到你的鼓励啦。"
+    },
+    {
+      "id": "tail",
+      "name": "尾巴",
+      "pose": "ears",
+      "rect": [
+        0.72,
+        0.56,
+        0.28,
+        0.25
+      ],
+      "text": "尾巴要轻轻碰哦。"
+    },
+    {
+      "id": "hem",
+      "name": "裙摆",
+      "pose": "look",
+      "rect": [
+        0.22,
+        0.47,
+        0.49,
+        0.1
+      ],
+      "text": "请留一点距离，我来整理衣摆。"
+    },
+    {
+      "id": "knees",
+      "name": "膝部",
+      "pose": "look",
+      "rect": [
+        0.26,
+        0.66,
+        0.43,
+        0.09
+      ],
+      "text": "要记得起来走动一下。"
+    },
+    {
+      "id": "socks",
+      "name": "膝袜",
+      "pose": "look",
+      "rect": [
+        0.27,
+        0.77,
+        0.43,
+        0.13
+      ],
+      "text": "今天的搭配，还不错吧。"
+    },
+    {
+      "id": "shoes",
+      "name": "鞋子",
+      "pose": "look",
+      "rect": [
+        0.24,
+        0.91,
+        0.48,
+        0.09
+      ],
+      "text": "鞋带检查完毕，随时出发。"
+    }
+  ],
+  "defaults": {
+    "mode": "wake",
+    "outfit": "sailor-short",
+    "sound": false,
+    "voice": "sweet",
+    "volume": 0.45,
+    "size": 340,
+    "hover": true
+  },
+  "interaction": {
+    "dwellMs": 480,
+    "globalCooldownMs": 3200,
+    "zoneCooldownMs": 9000,
+    "poseDurationMs": 2400
+  }
+}
