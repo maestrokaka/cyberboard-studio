@@ -22,11 +22,9 @@ This is a **public preview** of the previously separate MiaoCall development ver
 
 The **3:07** Beta 14 landscape video introduces two workflows: creating your own lighting with AI and calling the desktop companion from a key. It covers references, dictation, version edits, the workbench, slot preparation, appearances and keymaps in the current Warm Island Light interface, with Chinese narration, captions and background music.
 
-[![One keyboard, two AI workflows — Beta 14 video tour](docs/screenshots/video-beta14-bilibili.png)](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)
+https://github.com/user-attachments/assets/a0ea2c61-1c65-4d93-a893-b44f2995d499
 
-**[View the Bilibili-edition video · 3:07 · 720p](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)**
-
-GitHub hosts a compressed preview, without the original-quality download or editing sources. Lighting uses photo-composited previews; the MiaoCall segment illustrates the workflow. See below for the supported connection scope.
+Watch the compressed 720p preview directly in the player above. The original-quality download and editing sources are not included. Lighting uses photo-composited previews; the MiaoCall segment illustrates the workflow. See below for the supported connection scope.
 
 ## Screenshots
 

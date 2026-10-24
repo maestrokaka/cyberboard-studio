@@ -22,11 +22,9 @@
 
 约 **3 分 7 秒**，介绍「AI 创作自己的灯效」和「按键唤起桌面喵娘」两种玩法，包含参考图与语音输入、版本修改、工作台、三槽准备、外观和键位。使用当前暖岛浅色界面，保留中文配音、字幕与背景音乐。
 
-[![一把键盘，两种 AI 玩法：Beta 14 B 站横版演示](docs/screenshots/video-beta14-bilibili.png)](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)
+https://github.com/user-attachments/assets/a0ea2c61-1c65-4d93-a893-b44f2995d499
 
-**[查看 B 站横版视频 · 3:07 · 720p](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)**
-
-GitHub 提供压缩预览版，不附原画质下载或工程素材。灯效为照片合成预览，喵唤部分为流程示意；实际连接范围见下文。
+可直接在上方播放器观看 720p 压缩预览，不附原画质下载或工程素材。灯效为照片合成预览，喵唤部分为流程示意；实际连接范围见下文。
 
 ## 界面预览
 

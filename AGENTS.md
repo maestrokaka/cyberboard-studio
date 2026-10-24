@@ -7,6 +7,7 @@
 - 既有 RC2 标签和附件保持原样；新的下载仅为 macOS Apple Silicon，README 必须明确 Windows RC2 是旧版，不能称为 Beta 14 Windows 包或正式稳定版。
 - 后续已完成更新按用户既有授权同步公开 main，运行相关检查、更新中英文 README 和使用说明，不重复请求上传许可。新的私有开发要求以用户后续指示为准。
 - GitHub 更新优先使用已连接的 GitHub CLI。README 演示使用最新 Beta 14 B 站横版；只上传压缩预览，不附原画质文件、声纹源录音或视频工程。本次视频是产品介绍片，不是此前明确不上传的桌面录制 Demo。
+- README 视频须使用 GitHub 原生内嵌播放器：独立一行放正文附件 `https://github.com/user-attachments/assets/...` 地址，不改成封面或 Release 下载链接。GitHub 没有公开正文附件上传 API 时，仅附件上传可使用网页；README 修改、提交和推送仍使用 CLI，并核对渲染结果存在带 controls 的 video。
 
 ## 本机数据与 API Key
 
