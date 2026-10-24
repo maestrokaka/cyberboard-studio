@@ -6,6 +6,7 @@
 - 只提升经过检查的当前源码快照、公开资源和已验证 macOS 包。不要合并或推送此前私有分支的提交历史与标签，不上传测试音频或桌面录制 Demo。公开标签为 `v1.0.0-miaocall.beta.14-public`，App 内部显示版本保持 `1.0.0-miaocall.beta.14`。
 - 既有 RC2 标签和附件保持原样；新的下载仅为 macOS Apple Silicon，README 必须明确 Windows RC2 是旧版，不能称为 Beta 14 Windows 包或正式稳定版。
 - 后续已完成更新按用户既有授权同步公开 main，运行相关检查、更新中英文 README 和使用说明，不重复请求上传许可。新的私有开发要求以用户后续指示为准。
+- GitHub 更新优先使用已连接的 GitHub CLI。README 演示使用最新 Beta 14 B 站横版；只上传压缩预览，不附原画质文件、声纹源录音或视频工程。本次视频是产品介绍片，不是此前明确不上传的桌面录制 Demo。
 
 ## 本机数据与 API Key
 

@@ -18,6 +18,16 @@ This is a **public preview** of the previously separate MiaoCall development ver
 - **AI dictation:** separately configure a supported MiniMax, Qwen or OpenAI ASR model, review the transcript, then explicitly send it to create lighting.
 - **MiaoCall beta:** hold the physical `·` key on macOS to speak. A draggable catgirl overlay shows listening and task progress. The shortcut starts off and is registered only when enabled.
 
+## Video tour · Bilibili edition
+
+The **3:07** Beta 14 landscape video introduces two workflows: creating your own lighting with AI and calling the desktop companion from a key. It covers references, dictation, version edits, the workbench, slot preparation, appearances and keymaps in the current Warm Island Light interface, with Chinese narration, captions and background music.
+
+[![One keyboard, two AI workflows — Beta 14 video tour](docs/screenshots/video-beta14-bilibili.png)](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)
+
+**[View the Bilibili-edition video · 3:07 · 720p](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)**
+
+GitHub hosts a compressed preview, without the original-quality download or editing sources. Lighting uses photo-composited previews; the MiaoCall segment illustrates the workflow. See below for the supported connection scope.
+
 ## Screenshots
 
 ### Warm Island Light · AI creation
@@ -88,12 +98,6 @@ The ten full-keyboard previews below follow the app's order. Click a GIF for a l
 Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photograph, with top-matrix and key lighting composited by the app's preview renderer. The full original loop timing and source RGB are unchanged. GIF encoding may introduce slight color differences; these photo-composited screen previews are not hardware color calibration. [GIF verification manifest](docs/previews/manifest.json) · [Kaká design notes — Chinese](docs/LIGHTING_DESIGN_NOTES.md)
 
 </details>
-
-## Earlier lighting demo
-
-This 77-second video shows appearance selection, reference-based creation and slot-03 synchronization, ending with R6 hardware footage. Generation and transfer waits are sped up. It uses an earlier interface; the screenshots above show the current layout. The MiaoCall desktop-recording demo is not included.
-
-https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## Data and validation scope
 

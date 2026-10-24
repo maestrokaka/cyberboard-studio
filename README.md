@@ -18,6 +18,16 @@
 - **AI 语音输入**：单独配置 MiniMax、千问或 OpenAI 的语音转文字模型，识别后检查文字，再手动发送制作灯效。
 - **喵唤 MiaoCall · Beta**：macOS 按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。
 
+## B 站横版演示 · Beta 14
+
+约 **3 分 7 秒**，介绍「AI 创作自己的灯效」和「按键唤起桌面喵娘」两种玩法，包含参考图与语音输入、版本修改、工作台、三槽准备、外观和键位。使用当前暖岛浅色界面，保留中文配音、字幕与背景音乐。
+
+[![一把键盘，两种 AI 玩法：Beta 14 B 站横版演示](docs/screenshots/video-beta14-bilibili.png)](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)
+
+**[查看 B 站横版视频 · 3:07 · 720p](https://github.com/maestrokaka/cyberboard-studio/releases/download/v1.0.0-miaocall.beta.14-public/Cyberboard-Studio-Beta14-Bilibili-Web.mp4)**
+
+GitHub 提供压缩预览版，不附原画质下载或工程素材。灯效为照片合成预览，喵唤部分为流程示意；实际连接范围见下文。
+
 ## 界面预览
 
 ### 暖岛浅色 · AI 创作
@@ -91,12 +101,6 @@ App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证
 动图采用 CYBERBOARD R6「Vision」去背景正面实拍照片，与 App 共用预览渲染器，合成顶部与轴灯的完整原速动画。源作品 RGB 与节奏不变；GIF 编码可能产生轻微色差，照片合成预览不代表实机色准。[GIF 校验记录](docs/previews/manifest.json) · [三款卡卡的优化过程](docs/LIGHTING_DESIGN_NOTES.md)
 
 </details>
-
-## 早期灯效流程演示
-
-77 秒展示外观切换、灯效预览、参考图创作和第 3 槽同步，结尾为 R6 实拍。生成和传输等待已加速；视频使用早期界面，以本页截图为准。此处保留灯效演示，不附喵唤的桌面录制 Demo。
-
-https://github.com/user-attachments/assets/8289f982-09d3-45df-9ce7-5f7723c0da52
 
 ## 数据与验证范围
 
