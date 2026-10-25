@@ -4,6 +4,9 @@
   function zoneAt(x, y) {
     return catalog.zones.find(z => x >= z.rect[0] && y >= z.rect[1] && x <= z.rect[0] + z.rect[2] && y <= z.rect[1] + z.rect[3]);
   }
+  function settingsPayload(preferences, controls, selected, wear) {
+    return wear ? { ...preferences, outfit: selected } : { ...preferences, ...controls, outfit: preferences.outfit };
+  }
   function create({ $, api, native, toast, busy }) {
     let preferences = { ...catalog.defaults }, custom = [], selected = preferences.outfit;
     let settingsDirty = false;
@@ -47,7 +50,7 @@
     function outfit() { return [...catalog.outfits, ...custom].find(o => o.id === selected) || catalog.outfits[0]; }
     function picture(pose = 'idle') { const o = outfit(); art.src = o.imageDataUrl || o.frames[pose] || o.frames.idle; art.alt = o.name + (o.hair === 'long' ? ' · 长发' : ' · 短发'); }
     function switchTab(next) {
-      tab = next; tabs.querySelectorAll('button').forEach(b => { const active = b.dataset.tab === tab; b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1; });
+      tab = next; layout.dataset.companionTab = tab; tabs.querySelectorAll('button').forEach(b => { const active = b.dataset.tab === tab; b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1; });
       controls.hidden = tab !== 'companion'; wardrobe.hidden = tab !== 'wardrobe'; original.forEach(el => el.hidden = tab !== 'tasks');
       zones.hidden = tab === 'tasks'; bubble.textContent = ''; picture();
       stage.dataset.companion = tab === 'tasks' ? 'false' : 'true';
@@ -87,14 +90,14 @@
       $('companionMode').value = preferences.mode; $('companionSound').checked = preferences.sound; $('companionHover').checked = preferences.hover;
       $('companionVoice').value = preferences.voice; $('companionVolume').value = preferences.volume; $('companionSize').value = preferences.size; $('companionSizeLabel').value = preferences.size;
     }
-    function candidate() { return { ...preferences, mode: $('companionMode').value, sound: $('companionSound').checked, hover: $('companionHover').checked, voice: $('companionVoice').value, volume: Number($('companionVolume').value), size: Number($('companionSize').value), outfit: selected }; }
-    async function save() {
+    function candidate(wear = false) { return settingsPayload(preferences, { mode: $('companionMode').value, sound: $('companionSound').checked, hover: $('companionHover').checked, voice: $('companionVoice').value, volume: Number($('companionVolume').value), size: Number($('companionSize').value) }, selected, wear); }
+    async function save(wear = false) {
       if (!native) { toast('桌面常驻与声音设置请在 macOS App 中使用。'); return; }
-      try { const result = await api('miaoCallCompanionSave', candidate()); settingsDirty = false; update(result); $('companionSavedNote').textContent = '已保存；桌面显示与声音设置已生效。'; return true; }
+      try { const result = await api('miaoCallCompanionSave', candidate(wear)); settingsDirty = false; update(result); $('companionSavedNote').textContent = '已保存；桌面显示与声音设置已生效。'; return true; }
       catch (e) { toast(e.message); return false; }
     }
     $('companionSize').oninput = () => $('companionSizeLabel').value = $('companionSize').value;
-    $('companionSave').onclick = save; $('companionWear').onclick = save;
+    $('companionSave').onclick = () => save(false); $('companionWear').onclick = () => save(true);
     $('companionAudition').onclick = async () => {
       if (!native) { toast('声线试听请在 macOS App 中使用。'); return; }
       try { await api('miaoCallCompanionTest', { zone: 'cheek', sound: true, voice: $('companionVoice').value, volume: Number($('companionVolume').value) }); } catch (e) { toast(e.message); }
@@ -132,5 +135,5 @@
     populate(); renderOutfits(); switchTab('companion'); load();
     return { update, zoneAt };
   }
-  global.StudioCompanion = { create, zoneAt };
+  global.StudioCompanion = { create, zoneAt, settingsPayload };
 })(window);

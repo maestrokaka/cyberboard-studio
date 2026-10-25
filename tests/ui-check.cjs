@@ -35,7 +35,10 @@ class Element {
   set textContent(value) { this._text = String(value); this._html = String(value); this.children = []; }
   get innerHTML() { return this._html || this.children.map(serialize).join(''); }
   set innerHTML(value) { this._html = String(value); this.children = []; if (this.tagName === 'SELECT') this._value = undefined; parse(this._html, this); }
-  appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  appendChild(child) { child.remove(); child.parent = this; this.children.push(child); return child; }
+  prepend(child) { child.remove(); child.parent = this; this.children.unshift(child); }
+  replaceChildren(...children) { this.children.forEach(c => c.parent = null); this.children = []; this._html = ''; this.append(...children); }
+  replaceWith(child) { const parent = this.parent, index = parent.children.indexOf(this); child.remove(); parent.children[index] = child; child.parent = parent; this.parent = null; }
   append(...children) { children.forEach(child=>this.appendChild(child)); }
   after(child) { if(this.parent){child.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,child);} }
   remove() { if(this.parent)this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null; }

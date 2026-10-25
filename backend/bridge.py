@@ -1866,6 +1866,24 @@ class Bridge:
             warnings()
         return report
 
+    def agent_task_action(self, method, payload):
+        from agent_tasks import TaskStore, TaskStoreError
+        try:
+            return getattr(TaskStore(self.state_dir), method)(payload)
+        except (TaskStoreError, OSError, ValueError, TypeError) as error:
+            message = str(error) if isinstance(error, TaskStoreError) else "任务记录操作未完成，请重试。"
+            raise BridgeError("agent_task_failed", message) from None
+
+    def agentTaskList(self, payload): return self.agent_task_action("list", payload)
+    def agentTaskRead(self, payload): return self.agent_task_action("get", payload)
+    def agentTaskDiagnostics(self, payload): return self.agent_task_action("diagnostics", payload)
+    def agentTaskDelete(self, payload): return self.agent_task_action("delete", payload)
+    def agentTaskArchive(self, payload): return self.agent_task_action("archive", payload)
+    def agentTaskContext(self, payload): return self.agent_task_action("context", payload)
+    def agentTaskConfigure(self, payload): return self.agent_task_action("configure", payload)
+    def agentTaskReveal(self, payload): return self.agent_task_action("reveal", payload)
+    def agentTaskExport(self, payload): return self.agent_task_action("export", payload)
+
     def companion_action(self, method, payload):
         from companion import Wardrobe, CompanionError
         from speech_input import SpeechError
@@ -1950,7 +1968,7 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "agentTaskList", "agentTaskRead", "agentTaskArchive", "agentTaskDelete", "agentTaskDiagnostics", "agentTaskContext", "agentTaskConfigure", "agentTaskReveal", "agentTaskExport", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()
@@ -1973,12 +1991,12 @@ def main():
         if args.action == "miaoCallWorker":
             # The task transport is interactive JSONL; unlike one-shot actions its
             # input stays open for bounded tool replies and cancellation.
-            from miao_call import run as run_miao_call
+            from codex_tasks import run as run_miao_call
             line = sys.stdin.readline(32769)
             require(len(line.encode("utf-8")) <= 32768, "input_too_large", "语音指令过长。")
             payload = json.loads(line or "{}")
             require(isinstance(payload, dict), "invalid_input", "语音指令格式无效。")
-            result = run_miao_call(payload, emit, sys.stdin)
+            result = run_miao_call(payload, emit, sys.stdin, state_dir=Path(args.state_dir))
             emit({"result": result})
             return 0
         max_input = MAX_WORKSPACE_BYTES if args.action == "saveWorkspace" else MAX_INPUT_BYTES

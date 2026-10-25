@@ -145,7 +145,7 @@ def bundle_structure(app):
         if path.is_file():
             relative = path.relative_to(ROOT / "web")
             require(sha256(resources / "web" / relative) == sha256(path), "Companion resource missing or stale: " + str(relative))
-    for name in ("companion.js", "companion.css"):
+    for name in ("companion.js", "companion.css", "agent-tasks.js", "agent-tasks.css", "miaocall.js"):
         require(sha256(resources / "web" / name) == sha256(ROOT / "web" / name), "Companion UI is stale")
     # --help exits before Bridge/CLI initialization. A fresh web tree alone must
     # not conceal a stale frozen backend lacking the configuration fixes.
@@ -153,7 +153,7 @@ def bundle_structure(app):
     action_list = re.search(r"--action\s+\{([^}]+)\}", help_text)
     require(action_list is not None, "Frozen backend does not advertise its action contract")
     advertised = set(action_list.group(1).split(","))
-    require({"companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete"} <= advertised,
+    require({"companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "agentTaskList", "agentTaskRead", "agentTaskConfigure", "agentTaskDelete", "agentTaskExport", "agentTaskDiagnostics"} <= advertised,
             "Frozen backend lacks companion image actions")
     configuration_actions = {"readConfiguration", "builtInPlan", "initializePlan", "plan", "execute"}
     configuration_actions |= {"keymapCatalog", "keymapPlan", "voiceSettings", "saveVoiceSettings",
@@ -168,8 +168,8 @@ def bundle_structure(app):
             [bool(page["valid"]) for page in defaults["pages"]] == [True, True, True, False, False],
             "Bundled standard modes must enable battery, mosaic and clock")
     require(any((backend / "_internal").rglob("_imagingcms*.so")), "Color conversion native module is missing")
-    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "voice-settings.json", "companion-image-settings.json", "companion-image.key", "pyvenv.cfg", ".operation.lock"}
-    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "voice-keys", "companion-outfits", "test-fixtures"}
+    forbidden_names = {"current.json", "meta.json", "workspace.json", "ai-settings.json", "voice-settings.json", "companion-image-settings.json", "companion-image.key", "agent-task-settings.json", "pyvenv.cfg", ".operation.lock"}
+    forbidden_directories = {".venv", "venv", "history", "devices", "credentials", "ai-keys", "voice-keys", "companion-outfits", "agent-tasks", "MiaoCallWorkspace", "test-fixtures"}
     for path in app.rglob("*"):
         require(path.name.lower() not in forbidden_names, "Private/development file bundled: " + str(path.relative_to(app)))
         require(not (path.is_dir() and path.name.lower() in forbidden_directories),

@@ -7,6 +7,7 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a, b)
 async function fixture({ native = true, handlers = {} } = {}) {
   const h = harness(); await settle();
   const calls = [], state = h.app.state;
+  const spotify = h.document.createElement('input'); spotify.id = 'miaoUseSpotify'; spotify.checked = true; h.document.documentElement.appendChild(spotify);
   const sandbox = { window: h.window, document: h.document, console, Date, Promise };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(webRoot, 'miaocall.js'), 'utf8'), sandbox, { filename: 'miaocall.js' });
@@ -30,6 +31,7 @@ async function fixture({ native = true, handlers = {} } = {}) {
 }
 
 const cases = [];
+
 const test = (name, body) => cases.push([name, body]);
 
 test('starts off, reads status only, and does not create global or microphone actions', async () => {
@@ -248,6 +250,12 @@ test('an active global task cannot import, change the draft slot, or navigate in
   await f.h.el('assignBtn').click();
   assert.equal(JSON.stringify({ designs: f.state.designs, pending: [...f.state.pending], targetSlot: f.state.targetSlot, page: f.state.page }), before);
   assert.equal(f.h.calls.length, existingCalls, 'task guards must stop native import, USB and workspace mutations');
+});
+
+test('a running task can open its own detail page for approvals', async () => {
+  const f=await fixture(); f.state.miaoCallBusy=true;
+  f.h.app.navigate('miaocall'); assert.equal(f.state.page,'miaocall');
+  f.h.app.navigate('workbench'); assert.equal(f.state.page,'miaocall');
 });
 
 test('track validation accepts only exact Spotify track links and does not alter the keyboard', async () => {

@@ -1,5 +1,15 @@
 import Cocoa
 
+struct CompanionPalette {
+    let light: Bool
+    var background: NSColor { light ? NSColor(calibratedRed: 1, green: 0.989, blue: 0.947, alpha: 1) : NSColor(calibratedRed: 0.067, green: 0.071, blue: 0.075, alpha: 1) }
+    var border: NSColor { light ? NSColor(calibratedRed: 0.79, green: 0.74, blue: 0.63, alpha: 1) : NSColor(calibratedWhite: 0.28, alpha: 1) }
+    var text: NSColor { light ? NSColor(calibratedRed: 0.43, green: 0.31, blue: 0.18, alpha: 1) : NSColor(calibratedWhite: 0.94, alpha: 1) }
+    var title: NSColor { light ? NSColor(calibratedRed: 0.49, green: 0.30, blue: 0.15, alpha: 1) : NSColor(calibratedRed: 1, green: 0.58, blue: 0.31, alpha: 1) }
+    var accent: NSColor { light ? NSColor(calibratedRed: 0.05, green: 0.72, blue: 0.67, alpha: 1) : NSColor(calibratedRed: 0.96, green: 0.46, blue: 0.22, alpha: 1) }
+    var secondary: NSColor { light ? NSColor(calibratedRed: 0.96, green: 0.94, blue: 0.86, alpha: 1) : NSColor(calibratedWhite: 0.16, alpha: 1) }
+}
+
 struct CompanionInteractionGate {
     private(set) var zone: String?
     private var entered: TimeInterval = 0
@@ -94,7 +104,7 @@ final class CompanionStyle {
     func customOutfits() -> [[String: Any]] {
         let folder = stateRoot.appendingPathComponent("companion-outfits")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-        return names.sorted().suffix(20).compactMap { name in
+        return names.filter { $0.hasSuffix(".png") }.sorted().suffix(20).compactMap { name in
             let identity = String(name.dropLast(4))
             guard name.hasSuffix(".png"), validCustom(identity),
                   let data = try? Data(contentsOf: folder.appendingPathComponent(name)), data.count <= 8 * 1024 * 1024 else { return nil }

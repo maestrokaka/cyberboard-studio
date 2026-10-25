@@ -33,6 +33,9 @@ check(specific.state == "error" && specific.message == "请先登录 Codex。", 
 check(MiaoCallResultContract.message(["message": "未完成", "detail": "歌曲不在授权目录中。"], fallback: "fallback") == "歌曲不在授权目录中。", "State detail lost to generic message")
 check(MiaoCallResultContract.terminal(["ok": true, "status": "completed"]).state == "error", "Completed without playback evidence accepted")
 check(MiaoCallResultContract.message(["detail": String(repeating: "中", count: 1000)], fallback: "").count == 500, "Worker detail was unbounded")
+let general = MiaoCallResultContract.terminal(["ok":true,"status":"completed","taskId":"task-"+String(repeating:"a",count:32),"text":"资料摘要已返回。"])
+check(general.state=="completed","A non-music task with official result was rejected")
+check(MiaoCallResultContract.terminal(["ok":true,"status":"completed","taskId":"task-"+String(repeating:"a",count:32)]).state=="error","Empty general completion was accepted")
 print("PASS bounded worker details, explicit final failure and required completion evidence")
 var enable = MiaoCallEnableGate()
 let setupOne = enable.begin()!

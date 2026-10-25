@@ -43,3 +43,7 @@
 **/companion-image-settings.json
 **/companion-image.key
 **/companion-outfits/
+
+# Local managed agent task records
+/agent-tasks/
+agent-task-settings.json

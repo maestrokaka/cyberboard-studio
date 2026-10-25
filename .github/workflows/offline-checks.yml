@@ -1,0 +1,36 @@
+name: Offline release checks
+on:
+  push:
+    branches: [feature/miaocall-companion]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r vendor/requirements-cli.txt
+      - run: python scripts/check-release.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-check-results
+          path: build/release-check
+  mac-native:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tests/miaocall-native-check.py
+      - run: python tests/companion-native-check.py
+      - run: python tests/native-workspace-exit-check.py

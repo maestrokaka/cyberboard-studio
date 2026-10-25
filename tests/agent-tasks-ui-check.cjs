@@ -1,0 +1,37 @@
+/* Production controllers with a synthetic bridge. No app/server/voice/USB. */
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert/strict');
+const {harness,settle,clone}=require('./ui-check.cjs');
+const web=process.env.STUDIO_TEST_WEB_ROOT||path.join(__dirname,'../web');
+(async()=>{
+ const h=harness();await settle();const calls=[],toast=[];
+ let tasks=[],record=null,state={state:'idle',taskId:''},context={cwd:'/fixture',mode:'read-only'};
+ const sandbox={window:h.window,document:h.document,console};vm.createContext(sandbox);
+ for(const f of ['agent-tasks.js','assets/companion/catalog.js','companion.js'])vm.runInContext(fs.readFileSync(path.join(web,f),'utf8'),sandbox);
+ const api=async(action,payload={})=>{calls.push({action,payload:clone(payload)});
+  if(action==='miaoCallTaskList')return {tasks,context};
+  if(action==='miaoCallTaskRead')return record;
+  if(action==='miaoCallTaskSelect')return {};
+  if(action==='miaoCallTaskRespond')return {state:'thinking',request:{}};
+  if(action==='miaoCallTaskConfigure')return context={...context,...payload};
+  if(action==='miaoCallTaskSteer')return {queued:true};
+  if(action==='miaoCallRunTask')return {state:'connecting',taskId:'task-'+'a'.repeat(32)};
+  throw Error('Unexpected '+action);
+ };
+ const ui=h.window.StudioAgentTasks.create({$:h.el,api,native:true,toast:t=>toast.push(t),navigate:p=>h.app.state.page=p,options:()=>({tracks:[]}),status:()=>state});
+ await ui.load();assert.equal(h.el('miaoUseSpotify').checked,false);assert.equal(h.el('agentTaskWrite').checked,false);
+ h.el('agentTaskInput').value='总结资料';await h.el('agentTaskSend').click();assert.equal(calls.at(-1).action,'miaoCallRunTask');assert.deepEqual(calls.at(-1).payload.tracks,[]);
+ assert.equal(h.el('agentTaskSelect').disabled,true);assert.equal(h.el('agentTaskSend').textContent,'补充指令');
+ h.el('agentTaskInput').value='补充一个要求';await h.el('agentTaskSend').click();assert.equal(calls.at(-1).action,'miaoCallTaskSteer');
+ ui.event({type:'request',request:{id:'req1',kind:'questions',questions:[{id:'q1',question:'文件名？',isSecret:false}]}});
+ const request=h.el('agentTaskRequest'),input=request.querySelector('input');input.value='summary';
+ ui.update({state:'awaitingInput',request:{id:'req1',kind:'questions'}});assert.equal(request.querySelector('input'),input,'Unrelated update destroyed typed answer');
+ assert.equal(input.value,'summary');await request.querySelectorAll('button')[0].click();assert.equal(calls.at(-1).payload.answers.q1,'summary');assert.equal(request.hidden,true);
+ ui.event({type:'request',request:{id:'req2',kind:'questions',questions:[{id:'q2',question:'可拒绝的问题'}]}});await request.querySelectorAll('button')[1].click();assert.equal(calls.at(-1).payload.decision,'decline');assert.deepEqual(calls.at(-1).payload.answers,{});
+ const id='task-'+'a'.repeat(32);record={id,title:'测试任务',cwd:'/fixture',mode:'read-only',messages:[{role:'user',text:'<script>unsafe</script>'},{role:'assistant',text:'结果'}],steps:[],artifacts:[]};tasks=[{...record,status:'completed'}];
+ ui.update({state:'completed',taskId:id});await settle();assert.equal(h.el('agentTaskLog').querySelectorAll('script').length,0);
+ assert.equal(h.el('agentTaskSend').textContent,'继续任务');h.el('agentTaskInput').value='继续';await h.el('agentTaskSend').click();assert.equal(calls.at(-1).payload.taskId,id);
+ const prefs={outfit:'sailor-short',sound:false,size:300,mode:'resident'},controls={size:340,sound:true};
+ const apply=h.window.StudioCompanion.settingsPayload(prefs,controls,'white-short',false),wear=h.window.StudioCompanion.settingsPayload(prefs,controls,'white-short',true);
+ assert.equal(apply.outfit,'sailor-short');assert.equal(apply.size,340);assert.equal(wear.outfit,'white-short');assert.equal(wear.size,300);assert.equal(wear.sound,false);
+ console.log('PASS non-music entry, read-only default, persistent follow-up, typed steer, input preservation, explicit decline, safe output, separate Apply/Wear boundaries');
+})().catch(e=>{console.error(e);process.exitCode=1});

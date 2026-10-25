@@ -56,6 +56,15 @@ enum MiaoCallResultContract {
     static func terminal(_ value: [String: Any]) -> (state: String, message: String) {
         let state = value["status"] as? String ?? "error"
         if value["ok"] as? Bool == true, state == "completed",
+           let taskID = value["taskId"] as? String,
+           taskID.range(of: "^task-[0-9a-f]{32}$", options: .regularExpression) != nil {
+            let text = value["text"] as? String ?? ""
+            let files = value["artifacts"] as? [String] ?? []
+            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty {
+                return ("completed", message(value, fallback: String(text.prefix(220)).isEmpty ? "Codex 已返回文件，请检查任务结果。" : String(text.prefix(220))))
+            }
+        }
+        if value["ok"] as? Bool == true, state == "completed",
            let playback = value["playback"] as? [String: Any], playback["verified"] as? Bool == true,
            playback["playing"] as? Bool == true, MiaoCallSpotify.validURI(playback["uri"] as? String ?? "") {
             return ("completed", message(value, fallback: "Spotify 已播放目标歌曲，播放进度已核实。"))
@@ -79,13 +88,16 @@ private final class MiaoCallPanel: NSPanel {
 private final class MiaoCallDraggablePetView: NSImageView {
     var onDrag: ((NSPoint) -> Void)?
     var onMenu: ((NSEvent) -> Void)?
+    var onOpenTask: (() -> Void)?
     private(set) var pressed = false
     private var previousMouseLocation: NSPoint?
     private var bitmap: NSBitmapImageRep?
+    private var interactionBitmap: NSBitmapImageRep?
+    func setInteractionImage(_ image: NSImage?) { interactionBitmap = image?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) }
     override var image: NSImage? { didSet { bitmap = image?.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)) } }
 
-    func opaquePoint(_ windowPoint: NSPoint) -> NSPoint? {
-        guard let image, let bitmap else { return nil }
+    func opaquePoint(_ windowPoint: NSPoint, forInteraction: Bool = false) -> NSPoint? {
+        guard let image, let bitmap = forInteraction ? interactionBitmap : bitmap else { return nil }
         let local = convert(windowPoint, from: nil)
         let scale = min(bounds.width / image.size.width, bounds.height / image.size.height)
         let rect = NSRect(x: (bounds.width - image.size.width * scale) / 2,
@@ -100,6 +112,7 @@ private final class MiaoCallDraggablePetView: NSImageView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { onOpenTask?(); return }
         pressed = true
         previousMouseLocation = NSEvent.mouseLocation
         window?.makeFirstResponder(nil)
@@ -139,6 +152,7 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
     var canInteract: (() -> Bool)?
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
+    var onOpenTask: (() -> Void)?
     private var animation: Timer?
     private var phase = 0.0
     private var active = false
@@ -171,16 +185,12 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         image.setAccessibilityLabel("拖动喵娘可移动桌面浮层")
         image.onDrag = { [weak self] delta in self?.movePanel(by: delta) }
         image.onMenu = { [weak self] event in self?.contextMenu(event) }
+        image.onOpenTask = { [weak self] in self?.onOpenTask?() }
         content.addSubview(image)
         bubble.frame = NSRect(x: 152, y: 96, width: 328, height: 180)
         bubble.wantsLayer = true
-        bubble.appearance = NSAppearance(named: .darkAqua)
-        bubble.layer?.backgroundColor = NSColor(calibratedWhite: 0.065, alpha: 0.96).cgColor
         bubble.layer?.cornerRadius = 22
-        bubble.layer?.borderWidth = 1
-        bubble.layer?.borderColor = NSColor(calibratedRed: 1, green: 0.38, blue: 0.08, alpha: 0.65).cgColor
         bubble.layer?.shadowColor = NSColor.black.cgColor
-        bubble.layer?.shadowOpacity = 0.4
         bubble.layer?.shadowRadius = 12
         content.addSubview(bubble)
         title.frame = NSRect(x: 22, y: 140, width: 282, height: 23)
@@ -215,9 +225,40 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         activity.isDisplayedWhenStopped = false
         bubble.addSubview(activity)
         panel.onEscape = { [weak self] in self?.onCancel?() }
+        applyTheme(UserDefaults.standard.string(forKey: "studioUITheme") ?? "dark")
         applyStyle()
     }
-    @objc private func submitClicked() { onSubmit?(transcript.stringValue) }
+    func applyTheme(_ theme: String) {
+        let palette = CompanionPalette(light: theme == "island")
+        let appearance = NSAppearance(named: palette.light ? .aqua : .darkAqua)
+        panel.appearance = appearance; bubble.appearance = appearance
+        bubble.layer?.backgroundColor = palette.background.cgColor
+        bubble.layer?.borderColor = palette.border.cgColor
+        bubble.layer?.borderWidth = palette.light ? 1.5 : 1
+        bubble.layer?.shadowOpacity = palette.light ? 0.12 : 0.24
+        title.textColor = palette.title; message.textColor = palette.text
+        title.font = NSFont.systemFont(ofSize: 15, weight: .semibold)
+        message.font = NSFont.systemFont(ofSize: 13)
+        if palette.light {
+            if let rounded = title.font?.fontDescriptor.withDesign(.rounded) { title.font = NSFont(descriptor: rounded, size: 15) }
+            if let rounded = message.font?.fontDescriptor.withDesign(.rounded) { message.font = NSFont(descriptor: rounded, size: 13) }
+        }
+        transcript.textColor = palette.text; transcript.backgroundColor = palette.secondary
+        transcript.bezelStyle = .roundedBezel; transcript.focusRingType = .default
+        for button in [submit, cancel] {
+            button.wantsLayer = true; button.isBordered = false
+            button.layer?.cornerRadius = 13
+            button.layer?.backgroundColor = (button === submit ? palette.accent : palette.secondary).cgColor
+            button.layer?.borderColor = palette.border.cgColor
+            button.layer?.borderWidth = button === submit ? 0 : 1
+            button.font = .systemFont(ofSize: 12, weight: .semibold)
+            button.contentTintColor = button === submit && !palette.light ? .white : palette.text
+        }
+    }
+    @objc private func submitClicked() {
+        if submit.title == "查看任务" { onOpenTask?() }
+        else if taskState == "awaitingConfirmation" { onSubmit?(transcript.stringValue) }
+    }
     @objc private func cancelClicked() { if taskState == "idle" { hide() } else { onCancel?() } }
     private func movePanel(by delta: NSPoint) {
         interaction.reset(); reactionUntil = 0; voice.stop()
@@ -262,13 +303,16 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         taskState = state; reactionUntil = 0; interaction.reset(); voice.stop(); suspended = false
         let labels = ["configuring": "正在准备喵唤…", "preparing": "正在准备语音…", "listening": "正在听你说…", "transcribing": "正在识别语音…", "awaitingConfirmation": "听清楚啦，确认一下？",
                       "connecting": "正在连接 Codex…", "thinking": "Codex 正在思考…", "acting": "正在为你操作…",
-                      "completed": "任务完成啦", "cancelled": "已取消", "error": "需要你看一下"]
+                      "awaitingApproval": "Codex 需要你的授权", "awaitingInput": "Codex 需要补充信息",
+                      "cancelling": "正在停止任务…", "completed": "Codex 已返回结果", "cancelled": "已取消", "error": "需要你看一下"]
         title.stringValue = labels[state] ?? "喵唤 MiaoCall"
         message.stringValue = String(text.prefix(220))
         let confirming = state == "awaitingConfirmation"
+        let needsTask = ["awaitingApproval", "awaitingInput", "completed"].contains(state)
         transcript.isHidden = !confirming
-        submit.isHidden = !confirming
-        cancel.frame.origin.x = confirming ? 76 : 220
+        submit.isHidden = !(confirming || needsTask)
+        submit.title = needsTask ? "查看任务" : "交给 Codex"
+        cancel.frame.origin.x = confirming || needsTask ? 76 : 220
         cancel.title = ["completed", "error", "cancelled"].contains(state) ? "收起" : "取消"
         if confirming { transcript.stringValue = recognized }
         active = ["configuring", "preparing", "listening", "transcribing", "connecting", "thinking", "acting"].contains(state)
@@ -300,6 +344,7 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         voice.stop(); interaction.reset(); reactionUntil = 0
         guard taskState == "idle" else { return }
         image.image = style.picture()
+        image.setInteractionImage(image.image)
         bubble.isHidden = true
         layoutPet(expanded: false)
         if style.resident && !suspended {
@@ -335,7 +380,7 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
             reactionUntil = 0; image.image = style.picture(); bubble.isHidden = true; layoutPet(expanded: false)
             if !style.resident { panel.orderOut(nil); petTimer?.invalidate(); petTimer = nil; return }
         }
-        let zone = normalized.flatMap { style.zone(at: $0) }
+        let zone = image.opaquePoint(windowPoint, forInteraction: true).flatMap { style.zone(at: $0) }
         if let identity = interaction.consume(zone?["id"] as? String, now: now,
                                                blocked: image.pressed || reactionUntil > now || style.preferences["hover"] as? Bool != true) {
             react(identity)
@@ -354,6 +399,8 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
     }
     private func contextMenu(_ event: NSEvent) {
         let menu = NSMenu()
+        let task = NSMenuItem(title: "查看任务", action: #selector(openTaskClicked), keyEquivalent: "")
+        task.target = self; menu.addItem(task)
         let sound = NSMenuItem(title: style.soundEnabled ? "关闭互动声音" : "开启互动声音", action: #selector(toggleSound), keyEquivalent: "")
         sound.target = self; menu.addItem(sound)
         let mode = NSMenuItem(title: style.resident ? "仅唤醒时出现" : "常驻桌面", action: #selector(toggleResident), keyEquivalent: "")
@@ -362,6 +409,7 @@ private final class MiaoCallOverlay: NSObject, NSWindowDelegate {
         hide.target = self; menu.addItem(hide)
         NSMenu.popUpContextMenu(menu, with: event, for: image)
     }
+    @objc private func openTaskClicked() { onOpenTask?() }
     @objc private func toggleSound() {
         var value = style.preferences; value["sound"] = !style.soundEnabled
         try? style.save(value); applyStyle(); onPreferencesChanged?()
@@ -406,7 +454,7 @@ private final class MiaoCallChild {
             child.currentDirectoryURL = resources
             let stdinPipe = Pipe(), stdoutPipe = Pipe(), stderrPipe = Pipe()
             child.standardInput = stdinPipe; child.standardOutput = stdoutPipe; child.standardError = stderrPipe
-            let reader = JSONLineReader(maximumBytes: action.hasPrefix("companion") ? 12 * 1024 * 1024 : 1024 * 1024) { record in DispatchQueue.main.async { onEvent(record) } }
+            let reader = JSONLineReader(maximumBytes: action.hasPrefix("companion") ? 12 * 1024 * 1024 : action == "miaoCallWorker" ? 8 * 1024 * 1024 : action.hasPrefix("agentTask") ? 3 * 1024 * 1024 : 1024 * 1024) { record in DispatchQueue.main.async { onEvent(record) } }
             let stderrGroup = DispatchGroup()
             self.lock.lock()
             if self.cancelled { self.lock.unlock(); DispatchQueue.main.async { completion(.failure(VoiceRecordingController.failure("已取消。"))) }; return }
@@ -420,7 +468,7 @@ private final class MiaoCallChild {
                 stderrGroup.leave()
             }
             let watchdog = DispatchWorkItem { [weak self] in self?.cancel() }
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (action == "companionOutfitGenerate" ? 135 : keepInput ? 150 : 85), execute: watchdog)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + (action == "companionOutfitGenerate" ? 135 : keepInput ? 1830 : 85), execute: watchdog)
             do {
                 var data = try JSONSerialization.data(withJSONObject: payload)
                 if keepInput { data.append(0x0A) }
@@ -474,7 +522,7 @@ private final class MiaoCallChild {
     deinit { cancel() }
 }
 
-// The only desktop capability exposed to the managed Codex session. Spotify's
+// Optional verified desktop example; general Codex tasks use their own available tools. Spotify's
 // bundled official scripting dictionary supplies play track/current track/state.
 final class MiaoCallSpotify {
     private let queue = DispatchQueue(label: "local.cyberboard.studio.miaocall.spotify", qos: .userInitiated)
@@ -566,6 +614,11 @@ final class MiaoCallController {
     private let spotify = MiaoCallSpotify()
     private var child: MiaoCallChild?
     private var wardrobeChild: MiaoCallChild?
+    private var taskQueries: [UUID: MiaoCallChild] = [:]
+    private var currentTaskID: String?
+    private var agentRequest: [String: Any]?
+    private var taskResult: [String: Any]?
+    private var selectedAttachments: Set<String> = []
     private var monitor: CFMachPort?
     private var source: CFRunLoopSource?
     private var gate = MiaoCallKeyGate()
@@ -580,6 +633,7 @@ final class MiaoCallController {
     private(set) var transcript = ""
     private var message = ""
     var onEvent: (([String: Any]) -> Void)?
+    var onShowTask: (() -> Void)?
     var canBegin: (() -> Bool)?
     var isBusy: Bool { enableGate.isPending || !["idle", "completed", "cancelled", "error"].contains(state) }
     init(resources: URL, recorder: VoiceRecordingController = VoiceRecordingController()) {
@@ -587,12 +641,14 @@ final class MiaoCallController {
         overlay = MiaoCallOverlay(resources: resources)
         overlay.canInteract = { [weak self] in self?.canBegin?() != false && self?.isBusy != true }
         overlay.onCancel = { [weak self] in self?.cancel() }
+        overlay.onOpenTask = { [weak self] in self?.onShowTask?() }
         overlay.onPreferencesChanged = { [weak self] in
             guard let self else { return }
             var event = self.status(); event["event"] = "miaoCall"; event["type"] = "state"; self.onEvent?(event)
         }
         overlay.onSubmit = { [weak self] text in
             guard let self else { return }
+            if ["awaitingApproval", "awaitingInput", "completed"].contains(self.state) { self.onShowTask?(); return }
             do { try self.submit(text) }
             catch {
                 self.transcript = String(text.prefix(6000))
@@ -605,16 +661,98 @@ final class MiaoCallController {
             else if event["reason"] as? String == "error" { self.finish("error", "录音未能保存，请重新尝试。") }
         }
     }
+    func applyTheme(_ theme: String) { overlay.applyTheme(theme) }
     func status() -> [String: Any] {
         ["enabled": enabled, "state": state, "transcript": transcript, "message": message,
          "physicalKeyCode": MiaoCallKeyGate.keyCode, "confirmBeforeSend": options["confirmBeforeSend"] as? Bool ?? true,
          "permissions": ["inputMonitoring": CGPreflightListenEventAccess(), "accessibility": AXIsProcessTrusted(),
                          "microphone": AVCaptureDevice.authorizationStatus(for: .audio) == .authorized],
          "agent": "codex", "supportedAgents": ["codex"], "voiceProvider": profile["provider"] as? String ?? ""]
-            .merging(["companion": overlay.style.preferences], uniquingKeysWith: { _, new in new })
+            .merging(["companion": overlay.style.preferences, "taskId": currentTaskID ?? "",
+                      "request": agentRequest ?? [:], "taskResult": taskResult ?? [:]], uniquingKeysWith: { _, new in new })
     }
     func handle(action: String, payload: [String: Any], completion: @escaping (Result<[String: Any], Error>) -> Void) {
         switch action {
+        case "miaoCallTaskList", "miaoCallTaskRead", "miaoCallTaskArchive", "miaoCallTaskDelete", "miaoCallTaskContext", "miaoCallTaskConfigure", "miaoCallTaskReveal", "miaoCallTaskExport", "miaoCallTaskDiagnostics":
+            if ["miaoCallTaskConfigure", "miaoCallTaskArchive", "miaoCallTaskDelete"].contains(action) && isBusy {
+                completion(.failure(VoiceRecordingController.failure("请先完成或停止当前任务。"))); return
+            }
+            if action == "miaoCallTaskDelete" {
+                let alert = NSAlert(); alert.messageText = "删除这条归档任务记录？"
+                alert.informativeText = "仅删除喵唤本机对话记录，不删除任务文件或 Codex 保存的原会话。此操作不能撤销。可先导出记录。"
+                alert.addButton(withTitle: "取消"); alert.addButton(withTitle: "删除记录")
+                guard alert.runModal() == .alertSecondButtonReturn else { completion(.success(["cancelled": true])); return }
+            }
+            let mapping = ["miaoCallTaskList": "agentTaskList", "miaoCallTaskRead": "agentTaskRead",
+                           "miaoCallTaskArchive": "agentTaskArchive", "miaoCallTaskDelete": "agentTaskDelete", "miaoCallTaskContext": "agentTaskContext",
+                           "miaoCallTaskConfigure": "agentTaskConfigure", "miaoCallTaskReveal": "agentTaskReveal",
+                           "miaoCallTaskExport": "agentTaskExport", "miaoCallTaskDiagnostics": "agentTaskDiagnostics"]
+            var requestPayload = payload
+            if action == "miaoCallTaskList" { requestPayload["activeTaskId"] = isBusy ? currentTaskID : nil }
+            if action == "miaoCallTaskConfigure" { requestPayload.removeValue(forKey: "cwd") }
+            taskQuery(mapping[action]!, requestPayload) { result in
+                if case .success(var value) = result, action == "miaoCallTaskDiagnostics" {
+                    value["appVersion"] = Bundle.main.object(forInfoDictionaryKey: "CyberboardDisplayVersion") as? String ?? "unknown"
+                    value["permissions"] = self.status()["permissions"]
+                    if let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]), let text = String(data: data, encoding: .utf8) {
+                        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+                    }
+                }
+                if case .success(let value) = result, action == "miaoCallTaskReveal", let path = value["path"] as? String {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                }
+                if case .success(let value) = result, action == "miaoCallTaskExport", let data = value["json"] {
+                    let panel = NSSavePanel(); panel.allowedContentTypes = [.json]
+                    panel.nameFieldStringValue = value["fileName"] as? String ?? "MiaoCall-task.json"
+                    panel.begin { response in
+                        do {
+                            if response == .OK, let url = panel.url { try JSONSerialization.data(withJSONObject: data, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic) }
+                            completion(.success(["exported": response == .OK]))
+                        } catch { completion(.failure(VoiceRecordingController.failure("任务导出未完成。"))) }
+                    }
+                } else { completion(result) }
+            }
+        case "miaoCallTaskChooseFolder":
+            guard !isBusy else { completion(.failure(VoiceRecordingController.failure("请先完成当前任务。"))); return }
+            let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false; panel.message = "选择新任务的工作目录；修改范围由任务权限决定。"
+            panel.begin { [weak self] response in
+                guard response == .OK, let url = panel.url else { completion(.success(["cancelled": true])); return }
+                self?.taskQuery("agentTaskConfigure", ["cwd": url.path], completion)
+            }
+        case "miaoCallTaskChooseFiles":
+            guard !isBusy else { completion(.failure(VoiceRecordingController.failure("请先完成当前任务。"))); return }
+            let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
+            panel.message = "添加最多 8 个任务文件，文件只在提交任务时交给 Codex。"
+            panel.begin { [weak self] response in
+                guard response == .OK else { completion(.success(["cancelled": true])); return }
+                guard panel.urls.count <= 8 else { completion(.failure(VoiceRecordingController.failure("最多添加 8 个文件。"))); return }
+                let paths = panel.urls.map { $0.path }; self?.selectedAttachments.formUnion(paths)
+                completion(.success(["paths": paths]))
+            }
+        case "miaoCallTaskSelect":
+            guard !isBusy else { completion(.failure(VoiceRecordingController.failure("请先完成或停止当前任务。"))); return }
+            currentTaskID = payload["taskId"] as? String; taskResult = nil; options["attachments"] = []
+            completion(.success(status()))
+        case "miaoCallRunTask":
+            guard !isBusy, canBegin?() != false else { completion(.failure(VoiceRecordingController.failure("请先完成当前操作。"))); return }
+            currentTaskID = payload["taskId"] as? String
+            options["tracks"] = (payload["tracks"] as? [[String: Any]] ?? []).filter { MiaoCallSpotify.validURI($0["uri"] as? String ?? "") }.prefix(20).map { $0 }
+            options["attachments"] = (payload["attachments"] as? [String] ?? []).filter { selectedAttachments.contains($0) }.prefix(8).map { $0 }
+            state = "awaitingConfirmation"
+            do { try submit(payload["text"] as? String ?? ""); completion(.success(status())) }
+            catch { state = "idle"; completion(.failure(error)) }
+        case "miaoCallTaskRespond":
+            guard let pending = agentRequest, pending["id"] as? String == payload["id"] as? String else { completion(.failure(VoiceRecordingController.failure("这条请求已结束。"))); return }
+            child?.send(["type": pending["kind"] as? String == "questions" ? "answers" : "approval",
+                         "id": payload["id"] ?? "", "decision": payload["decision"] ?? "decline",
+                         "answers": payload["answers"] ?? [:]])
+            agentRequest = nil; publish("thinking", "已将你的答复交给 Codex。")
+            completion(.success(status()))
+        case "miaoCallTaskSteer":
+            guard ["thinking", "acting", "connecting"].contains(state), let child else { completion(.failure(VoiceRecordingController.failure("当前任务不能补充，请在结果后继续追问。"))); return }
+            do { let text = try MiaoCallTranscript.validated(payload["text"] as? String ?? ""); child.send(["type": "steer", "text": text]); completion(.success(["queued": true])) }
+            catch { completion(.failure(error)) }
         case "miaoCallCompanionSave":
             do {
                 try overlay.style.save(payload); overlay.resume()
@@ -681,6 +819,13 @@ final class MiaoCallController {
             startRecording(); completion(.success(status()))
         case "miaoCallStopRecording": stopRecording(); completion(.success(status()))
         default: completion(.failure(VoiceRecordingController.failure("不支持的喵唤操作。")))
+        }
+    }
+    private func taskQuery(_ action: String, _ payload: [String: Any], _ completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        let identity = UUID(), query = MiaoCallChild()
+        taskQueries[identity] = query
+        query.start(resources: resources, action: action, payload: payload, keepInput: false, onEvent: { _ in }) { [weak self] result in
+            self?.taskQueries.removeValue(forKey: identity); completion(result)
         }
     }
     private func loadProfile(completion: @escaping (Result<Void, Error>) -> Void) {
@@ -760,12 +905,12 @@ final class MiaoCallController {
         }
         return "「\(appName)」的两项权限均已允许，但系统未能建立按键监听。请退出并重新打开 App；若仍失败，请在系统设置中重新添加当前版本的 App。"
     }
-    func shutdown() { wardrobeChild?.cancel(); wardrobeChild = nil; disable() }
+    func shutdown() { taskQueries.values.forEach { $0.cancel() }; taskQueries.removeAll(); wardrobeChild?.cancel(); wardrobeChild = nil; disable() }
     func disable() {
         enabled = false; gate.reset()
         if let monitor { CGEvent.tapEnable(tap: monitor, enable: false); CFMachPortInvalidate(monitor) }
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
-        monitor = nil; source = nil; cancel(); publish("idle", "喵唤已关闭，· 恢复正常输入。")
+        monitor = nil; source = nil; cancel(); if state != "cancelling" { publish("idle", "喵唤已关闭，· 恢复正常输入。") }
     }
     private func publish(_ state: String, _ text: String) {
         self.state = state; message = text
@@ -855,41 +1000,60 @@ final class MiaoCallController {
         guard state == "awaitingConfirmation" else { throw VoiceRecordingController.failure("当前没有等待确认的语音指令。") }
         let clean = try MiaoCallTranscript.validated(text)
         transcript = clean
-        publish("connecting", "已交给 Codex。此 Beta 仅开放 Spotify 播放与状态查询。")
+        taskResult = nil; agentRequest = nil
+        generation += 1; hideTask?.cancel()
+        publish("connecting", "已交给 Codex，任务和结果会保存在本机。")
         let token = generation
         let request = MiaoCallChild(); child = request
         let tracks = options["tracks"] as? [[String: Any]] ?? []
-        request.start(resources: resources, action: "miaoCallWorker", payload: ["transcript": clean, "tracks": tracks], keepInput: true, onEvent: { [weak self, weak request] event in
-            guard let self, let request, token == self.generation else { return }
+        var taskPayload: [String: Any] = ["transcript": clean, "tracks": tracks, "attachments": options["attachments"] as? [String] ?? []]
+        if let currentTaskID { taskPayload["taskId"] = currentTaskID }
+        request.start(resources: resources, action: "miaoCallWorker", payload: taskPayload, keepInput: true, onEvent: { [weak self, weak request] event in
+            guard let self, let request, token == self.generation, self.state != "cancelling" else { return }
+            if let identity = event["taskId"] as? String, !identity.isEmpty { self.currentTaskID = identity }
             if event["type"] as? String == "tool", event["tool"] as? String == "spotify", let id = event["id"] ?? event["callId"], let arguments = event["arguments"] as? [String: Any] {
-                self.publish("acting", "正在打开 Spotify，并核对歌曲和实际播放进度。")
+                self.publish("acting", "正在执行 Spotify 示例，并核对实际播放状态。")
                 self.spotify.run(arguments: arguments, allowedTracks: tracks) { [weak self, weak request] result in
-                    guard let self, let request, token == self.generation else { return }
+                    guard let self, let request, token == self.generation, self.state != "cancelling" else { return }
                     request.send(["type": "toolResult", "id": id, "result": result, "success": result["error"] == nil])
                 }
-            } else if let state = event["state"] as? String {
-                let text = MiaoCallResultContract.message(event, fallback: "Codex 任务状态已更新。")
-                if state == "completed" { self.publish("acting", "Codex 已结束，正在核对最终播放结果。") }
-                else if ["cancelled", "error"].contains(state) { self.finish(state, text) }
-                else if ["connecting", "thinking", "acting"].contains(state) { self.publish(state, text) }
-            }
+            } else if event["type"] as? String == "request", let pending = event["request"] as? [String: Any] {
+                self.agentRequest = pending
+                self.publish(pending["kind"] as? String == "questions" ? "awaitingInput" : "awaitingApproval", "请在任务详情中查看并答复；本次没有自动授权。")
+                self.onEvent?(event)
+            } else if event["type"] as? String == "requestResolved" {
+                self.agentRequest = nil; self.onEvent?(event)
+            } else if let phase = event["state"] as? String {
+                let detail = MiaoCallResultContract.message(event, fallback: "Codex 任务状态已更新。")
+                if phase == "completed" { self.publish("acting", "Codex 已结束，正在保存结果。") }
+                else if ["connecting", "thinking", "acting"].contains(phase) { self.publish(phase, detail); self.onEvent?(event) }
+            } else { self.onEvent?(event) }
         }) { [weak self] result in
-            guard let self, token == self.generation else { return }; self.child = nil
+            guard let self, token == self.generation else { return }; self.child = nil; self.agentRequest = nil
             switch result {
-            case .failure(let error):
-                if !["cancelled", "error", "idle"].contains(self.state) { self.finish("error", error.localizedDescription) }
+            case .failure(let error): self.finish(self.state == "cancelling" ? "cancelled" : "error", self.state == "cancelling" ? "任务已停止，已发生的修改不会自动撤销。" : error.localizedDescription)
             case .success(let value):
+                self.taskResult = value
+                if let identity = value["taskId"] as? String { self.currentTaskID = identity }
                 let outcome = MiaoCallResultContract.terminal(value)
                 self.finish(outcome.state, outcome.message)
             }
         }
     }
+
     func cancel() {
-        generation += 1; keyReleasedBeforeStart = true
+        if ["connecting", "thinking", "acting", "awaitingApproval", "awaitingInput", "cancelling"].contains(state), let child {
+            guard state != "cancelling" else { return }
+            agentRequest = nil; spotify.cancel(); hideTask?.cancel()
+            publish("cancelling", "正在停止 Codex；已经发生的修改不会自动撤销。")
+            child.cancel()
+            return
+        }
+        generation += 1; keyReleasedBeforeStart = true; agentRequest = nil
         enableGate.cancel()
         spotify.cancel()
         hideTask?.cancel(); child?.cancel(); child = nil; recorder.cancelAll()
-        if isBusy { finish("cancelled", "已取消当前语音任务。已完成的 Spotify 播放不会自动撤销。") }
+        if isBusy { finish("cancelled", "已停止当前任务，已经发生的操作不会自动撤销。") }
         else { overlay.hide(); publish("idle", "") }
     }
     deinit {

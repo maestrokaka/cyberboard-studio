@@ -1,3 +1,5 @@
+> 本文保留早期 Spotify 专用 Beta 的安装与权限背景。最新私有 Tasks Beta 3 的工作目录、通用任务、持久记录与授权流程以 [通用任务说明](MIAOCALL_TASKS.md) 为准。
+
 # 喵唤 MiaoCall · Beta 14 公开测试版
 
 当前下载：[MiaoCall Beta 14（macOS Apple Silicon）](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public) · [版本更新说明](RELEASE_NOTES_MIAOCALL_BETA14.md)

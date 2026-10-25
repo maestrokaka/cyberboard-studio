@@ -605,7 +605,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var workspaceFailureShowing = false
     private var documentReady = false
     private var exitApproved = false
-    private let releaseVersion = "1.0.0-miaocall.companion.beta.2"
+    private let releaseVersion = "1.0.0-miaocall.tasks.beta.3"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
@@ -619,6 +619,10 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         if let resources = Bundle.main.resourceURL {
             let controller = MiaoCallController(resources: resources)
             controller.onEvent = { [weak self] state in self?.sendEvent(state) }
+            controller.onShowTask = { [weak self] in
+                self?.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+                self?.sendEvent(["event": "miaoCall", "type": "openTask"])
+            }
             controller.canBegin = { [weak self] in
                 guard let self else { return false }
                 return self.voiceRecorder.requestID == nil && self.activeVoiceRequestID == nil &&
@@ -824,6 +828,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         window.backgroundColor = color
         webView.underPageBackgroundColor = color
         UserDefaults.standard.set(theme, forKey: "studioUITheme")
+        miaoCall?.applyTheme(theme)
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

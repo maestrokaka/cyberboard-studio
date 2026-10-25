@@ -1,9 +1,8 @@
-"""Private MiaoCall Beta: one ephemeral official Codex app-server turn.
+"""Bounded official Codex transport and optional verified Spotify example tools.
 
-The host owns microphone capture, transcription confirmation and the narrow
-Spotify adapter.  This worker only sends a confirmed instruction to a fresh
-Codex turn and forwards two explicitly registered dynamic tools over JSONL.
-It neither reads authentication files nor resumes the user's desktop chats.
+The general persistent task engine lives in codex_tasks.py. Legacy one-turn
+Spotify tests exercise this transport without accessing user desktop chats.
+No authentication files are read by either module.
 """
 from __future__ import annotations
 
@@ -175,8 +174,8 @@ class _InputMailbox:
 class CodexTask:
     """Official app-server transport with no approval escalation or raw logging."""
 
-    def __init__(self, payload, emit: Callable, input_stream=None, *, cli=None):
-        self.payload = validate_payload(payload)
+    def __init__(self, payload, emit: Callable, input_stream=None, *, cli=None, _validator=validate_payload):
+        self.payload = _validator(payload)
         self.emit = emit
         self.mailbox = _InputMailbox(input_stream)
         self.cli = cli
@@ -195,7 +194,7 @@ class CodexTask:
         self.handlers = set()
         self.play_requested_uri = None
         self.playback = {"playing": False, "verified": False}
-        self.allowed_uris = {track["uri"] for track in self.payload["tracks"]}
+        self.allowed_uris = {track["uri"] for track in self.payload.get("tracks", [])}
         self.closed = False
 
     def state(self, state, **fields):

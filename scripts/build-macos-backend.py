@@ -59,7 +59,7 @@ def main():
         "--copy-metadata", "cyberboard-cli", "--hidden-import", "serial.tools.list_ports_osx",
         "--hidden-import", "kimi_ai", "--hidden-import", "lighting_recipe", "--hidden-import", "ai_images",
         "--hidden-import", "ai_quality", "--hidden-import", "speech_input", "--hidden-import", "keymap_codec",
-        "--hidden-import", "miao_call", "--hidden-import", "companion"]
+        "--hidden-import", "miao_call", "--hidden-import", "companion", "--hidden-import", "agent_tasks", "--hidden-import", "codex_tasks"]
     for resource in tls_resources:
         command += ["--add-data", str(resource) + ":."]
     for file in sorted(tools.glob("*.py")):
