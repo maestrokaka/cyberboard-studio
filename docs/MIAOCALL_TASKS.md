@@ -2,6 +2,8 @@
 
 喵唤将确认后的语音或文字交给本机 Codex。Spotify 是可选演示；整理文件、总结资料、修改项目等任务使用 Codex 已有工具与连接。本版不接管其他 Codex 桌面聊天，也不承诺所有桌面 App 都有可用接口。
 
+安装私有 macOS 包时，请先阅读[私有版安装与权限说明](PRIVATE_MACOS_INSTALL.md)。当前包使用 ad-hoc 签名，首次打开需要 Control-click →“打开”；不需要关闭 Gatekeeper。
+
 ## 从一个任务开始
 
 1. 安装并登录本机 Codex。打开「喵唤 · Beta」→「语音任务」。文字任务不需要语音 Key、麦克风或全局按键权限。

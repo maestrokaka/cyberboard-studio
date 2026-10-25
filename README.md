@@ -54,7 +54,7 @@
 
 Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
 
-App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。首次打开按 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445) 操作；喵唤需要的麦克风、全局按键及 Spotify 自动化权限只在明确开启对应功能时请求。升级前先退出旧 App，固定使用同一份已签名包。[详细安装与权限说明](docs/MIAOCALL_BETA.md)
+App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。首次打开时在“应用程序”中 Control-click App，选择“打开”，再在系统确认窗口中选择“打开”。不要关闭 Gatekeeper，也不要把网上复制的隔离属性移除命令作为常规安装步骤。喵唤需要的麦克风、全局按键及 Spotify 自动化权限只在明确开启对应功能时请求。升级前先退出旧 App，固定使用同一份已签名包。[私有版安装与权限说明](docs/PRIVATE_MACOS_INSTALL.md) · [详细 Beta 说明](docs/MIAOCALL_BETA.md)
 
 ## 五分钟开始创作
 
