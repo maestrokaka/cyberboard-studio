@@ -1,5 +1,7 @@
 > 本文保留 Companion Beta 2 的设计与 Mac 实测记录；后续修正已进入 Mac Tasks Beta 3。Windows Private Beta 1 复用这些素材并增加原生宿主，桌面拖动、声音与真实按键仍待 Windows 实机验收，见 [Windows 指南](MIAOCALL_WINDOWS.md)。
 
+> 当前公开与私有发行版为 [Beta 15](RELEASE_NOTES_BETA15.md)。以下保留各功能的详细说明；涉及旧私有版本、下载包或仅限私有发布的描述，以 Beta 15 更新说明和仓库首页为准。
+
 # 喵唤 · Companion Private Beta 2
 
 此版本只发布到私有仓库 `maestrokaka/cyberboard-studio-miaocall` 的 `feature/miaocall-companion`。公开 Beta 14、公开 main 和安装包保持不变。当前新包为 macOS Apple Silicon、macOS 13+。

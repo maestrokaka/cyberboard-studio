@@ -1,91 +1,89 @@
-# Cyberboard Studio · MiaoCall Private Beta
+# Cyberboard Studio · Beta 15
 
 [简体中文](README.md) · **English**
 
-A third-party **CYBERBOARD R4 / R6** studio: create lighting through AI conversations, compare versions on real keyboard photographs, and review a plan before syncing. The optional MiaoCall beta turns a held key and a voice instruction into a persistent local Codex task.
+A third-party **CYBERBOARD R4 / R6** studio: create lighting through AI conversations, compare versions on real keyboard photographs, and review a plan before syncing. The optional MiaoCall companion sends held-key voice instructions to local Codex. R6 now has dedicated sound controls, local microphone playback and advanced keymap editing.
 
-**[Download Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[Download Windows Private Beta 1](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1)** · [Windows release notes — Chinese](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [Companion guide — Chinese](docs/MIAOCALL_COMPANION.md)
+**[Download Beta 15 · Mac / Windows](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15)** · [Release notes — Chinese](docs/RELEASE_NOTES_BETA15.md) · [R6 configuration guide — Chinese](docs/R6_CONFIGURATION.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-This **private beta** adds persistent Codex tasks, follow-ups, working folders, approvals, results and artifacts. It includes a persistent or wake-only desktop companion, 15 hover interactions, 32 poses across four outfit/hair variants, four offline voice styles and opt-in AI wardrobe generation. It preserves the Beta 14 lighting studio. Windows Private Beta 1 is available with the same task and companion features; the current Mac download remains Tasks Private Beta 3. The public repository and public Beta 14 release are unchanged.
+This is a **public beta**, bringing previously private persistent Codex tasks, desktop companion features and native Windows integration into the public release. Packages are provided for macOS Apple Silicon, Windows x64 and Windows 10 Compatibility x64. New hardware features still need real-device acceptance; this is not the stable 1.0 release.
 
-## Desktop companion and wardrobe
+## New in Beta 15
 
-The default character height remains 300. Beta 3 fixes all 20 custom outfits being listed, unintended outfit changes when applying settings, and repeated hover reactions after a pose changes. Desktop bubbles now follow the selected light or dark theme.
+- **Clearer sync states:** distinguish sent data, device acknowledgement, verified keymap data and unknown state. A failure or interruption after a potentially mutating write blocks reuse of the old lighting baseline; the app does not blindly repeat a full write.
+- **Dedicated R6 Sound page:** speaker channels, microphone direction, noise reduction and tone presets use independent short commands. Opening the page only checks connectivity. Unavailable current values remain unknown; a setting echo is not acoustic verification.
+- **Local microphone test:** list system audio devices and identify the active input, explicitly record up to 30 seconds, then play or clear the recording locally. Leaving the page clears it; no ASR service is called. Speaker calibration is an advanced, separately confirmed operation.
+- **R6 single-key, tap/hold and macro editing:** independent commands and tables, reviewed plans, device/baseline binding and backups. Add, update or delete entries, and choose the ordinary binding after deletion. Full keycodes and readable advanced tables are checked after transmission; an incomplete table is never replaced with an invented empty table.
+- **Persistent Codex tasks:** choose a working directory, attach files, continue a task, steer it during execution, review individual permissions and inspect results and files. Spotify is an optional Mac example.
+- **Quick Windows Codex setup:** Install → Sign in → Check connection through the official native CLI, without requiring Node.js or WSL and without reading or copying authentication files.
+- **Desktop companion and wardrobe:** resident or wake-only mode, remembered drag position, three outfits plus long hair, 32 poses, 15 interaction regions and four offline voice styles. Sound is off by default. AI outfits are previewed before application.
+- **Firmware handoff:** show the device version and open Angry Miao's official updater. Firmware is not flashed inside this app. The partial lighting protocol is still awaiting hardware validation and is not enabled by default.
 
-- Choose **resident or wake-only** independently of the global shortcut; drag her anywhere on the desktop. Position, size and outfit are retained. Bubbles switch sides near the screen edge.
-- **Three outfits plus long hair:** orange-white sailor, cream knit JK and white tailored set; the sailor outfit also has a long-hair version. Each has eight actual pose images.
-- **15 interaction regions**, dwell and cooldown protection. Sweet, mature, gentle and lively adult voices; 60 bundled offline lines, sound off by default. Idle interaction pauses while recording or running tasks.
-- **AI wardrobe:** explicitly configure MiniMax image-01, preview before applying, cancel or delete local AI outfits. Generated outfits currently have one static pose. Character reference and outfit brief are sent only when Generate is clicked.
+## Lighting studio
 
-![Long-hair wardrobe preview](docs/screenshots/companion-wardrobe-long.png)
+AI lighting supports Kimi, MiniMax and DeepSeek, text and up to three references, saved conversations, immutable versions and scoped edits. The workbench combines photo previews, brightness/timing/palette controls, three independent slot drafts and reviewed sync plans. Ten removable presets work without a model key.
 
-## What's included
+Compare eight front-view R4/R6 appearances at the same design and moment. Classic Dark and Warm Island Light can be switched instantly and persist after restart. Readable functions cover 81 physical keys across seven layers. AI dictation uses a separately configured MiniMax, Qwen or OpenAI ASR service; review the transcript before sending it to create lighting.
 
-- **AI lighting:** Kimi, MiniMax and DeepSeek connections; text and up to three reference images; saved conversations, immutable versions and scoped edits.
-- **Lighting workbench:** photo-composited previews, brightness / timing / palette controls, three independent slot drafts and reviewed sync plans. Ten removable presets work without a model key.
-- **Keyboard appearances:** eight calibrated front photographs, with the same design and moment shown across them. Beta 14 specifically improves AI Creation → Appearances: the page paints first, preparation yields and can be cancelled, and each card compiles only its displayed frame.
-- **Two styles:** Classic Dark and Warm Island Light, switchable in Settings and retained after restart without changing artwork RGB or slot drafts.
-- **Keymap editor:** readable functions for 81 physical keys across seven layers, local drafts and a separate reviewed write plan. Unknown raw codes are preserved.
-- **AI dictation:** separately configure a supported MiniMax, Qwen or OpenAI ASR model, review the transcript, then explicitly send it to create lighting.
-- **MiaoCall beta:** hold the physical `·` key to speak. A draggable catgirl overlay shows listening and task progress. The shortcut starts off and is registered only when enabled. Private packages are available for Mac and Windows; real Windows microphone, shortcut and user sign-in acceptance remains pending.
+## Video tour · Bilibili edition
+
+The **3:07 Beta 14** landscape video introduces AI lighting and the held-key companion workflow, with Chinese narration, captions and music. It retains the earlier interface and feature scope; see the Beta 15 screenshots and release notes for additions.
+
+https://github.com/user-attachments/assets/a0ea2c61-1c65-4d93-a893-b44f2995d499
+
+Watch the compressed 720p preview in the embedded player. Original-quality video and editing sources are not provided, and Releases contain no video assets. Lighting uses photo compositing; the MiaoCall segment illustrates the workflow.
 
 ## Screenshots
 
-### Warm Island Light · AI creation
+| AI creation · Warm Island Light | Workbench · Classic Dark |
+| --- | --- |
+| ![AI creation](docs/screenshots/create-beta15-light.png) | ![Keyboard lighting and three slots](docs/screenshots/workbench-beta15-dark.png) |
+| **Keyboard appearances** | **R6 sound and microphone test** |
+| ![Eight appearances at the same moment](docs/screenshots/appearances-beta15-light.png) | ![Independent R6 sound controls and local playback](docs/screenshots/r6-audio-beta15-light.png) |
+| **R6 keymap editor** | **MiaoCall and companion** |
+| ![Keymap, tap/hold and macro editor](docs/screenshots/keymap-beta15-dark.png) | ![Persistent Codex tasks and companion](docs/screenshots/miaocall-beta15-light.png) |
 
-![AI creation in Warm Island Light](docs/screenshots/create-beta14-light.png)
-
-### Classic Dark · lighting workbench
-
-![Classic Dark workbench, keyboard preview and slot overview](docs/screenshots/workbench-beta14-dark.png)
-
-### Appearance selection
-
-![Eight appearances compared at one lighting instant](docs/screenshots/appearances-beta14-light.png)
-
-Screenshots use a separate interface demonstration environment with no personal keys, conversations or device records. Keyboard photographs are composited with the source lighting; this is not hardware color calibration.
+Screenshots use a separate demonstration environment, without personal keys, conversations or device records. Photo-composited lighting is not hardware color calibration, and sample states do not establish a real hardware write.
 
 ## Downloads
 
-| Platform / version | Download | Scope |
+| Platform | Download | Scope |
 | --- | --- | --- |
-| **macOS · MiaoCall Tasks Private Beta 3** | [Private package and SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3) | Apple Silicon, macOS 13+; CLI and runtime included |
-| **Windows · MiaoCall Private Beta 1** | [Standard x64 / compatibility packages and SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) | Windows CI and package checks passed; native GUI, microphone, shortcut, user sign-in and USB still need real-machine acceptance |
-| Windows · older RC2 | [Historical x64 / compatibility packages](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | Earlier lighting build without MiaoCall; historical assets remain unchanged |
+| **macOS Apple Silicon** | [Beta 15 ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | macOS 13+; CLI and runtime included |
+| **Windows x64** | [Beta 15 standard ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | Extract the full folder; use the bundled Microsoft WebView2 bootstrapper if needed |
+| **Windows 10 Compatibility x64** | [Beta 15 compatibility ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | Addresses the existing CET startup issue; does not expand .NET or Codex system support |
 
-On Mac, download `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`, extract it and move the app to Applications. Verify the matching `.zip.sha256` file first. This private beta is ad-hoc signed and not notarized: on first launch, Control-click the app, choose **Open**, then choose **Open** again in the system dialog. Do not disable Gatekeeper or use copied quarantine-removal commands as a normal install step. No separate Python installation is required. See the [private macOS installation guide](docs/PRIVATE_MACOS_INSTALL.md). There is no new Intel Mac, 32-bit Windows or native Windows ARM64 package.
+Download a platform ZIP rather than only Source code, and verify its matching `.sha256`. No separate Python installation is required. Start with the standard Windows package and retain all adjacent DLLs and resources; do not mix package contents. There are no Intel Mac, 32-bit Windows or native Windows ARM64 packages.
 
-The Mac app is ad-hoc signed, without Apple Developer ID signing or notarization. Follow [Apple's app-opening instructions](https://support.apple.com/en-gb/102445). Microphone, global-key and Spotify automation access are requested when the corresponding feature is explicitly enabled. Quit the old app before upgrading and retain one fixed signed copy. [Setup and permission guide — Chinese](docs/MIAOCALL_BETA.md)
+On Mac, extract the app and move it to Applications. This build is ad-hoc signed and is not Apple Developer ID signed or notarized. Follow [Apple's app-opening instructions](https://support.apple.com/en-gb/102445) without disabling system protection. Quit the previous app before upgrading and retain one fixed signed copy. Microphone, global-key and optional Spotify automation access is requested only when using the respective feature.
 
 ## Quick start
 
-1. Open the workbench and preview a built-in effect without a model key.
+1. Preview a built-in effect in the workbench without a model key.
 2. Configure Kimi, MiniMax or DeepSeek under Model Configuration.
-3. Start an AI conversation with text or reference images, such as “orange flames rising from below, ember-like key lighting, four-second loop.”
-4. Choose a base version and edit scope, such as “only make the key backlight pure yellow; keep the top unchanged.” Earlier versions remain intact.
-5. Save the chosen version or open it in the workbench, prepare a slot draft, inspect the device and plan, then confirm the write.
+3. Start an AI conversation with text or references, such as “orange flames rising from below, ember-like key lighting, four-second loop.”
+4. Choose a base version and edit scope, such as “only make the key backlight pure yellow; keep the top unchanged.”
+5. Save the chosen version, prepare a slot draft, inspect the device and sync plan, then confirm the write.
 
-Requests send your description and selected reference images only when you click Create. Provider keys are stored in ordinary local files, masked by default with a Show / Hide control. Legacy Keychain / DPAPI records are never accessed or migrated.
+Descriptions and selected references are submitted only when Create is clicked. Provider keys are stored in ordinary local files, masked by default with a Show/Hide control. Legacy Keychain/DPAPI records are never read, decrypted or migrated.
 
-## MiaoCall: hold a key and speak
+## MiaoCall: give Codex a task
 
-The Windows port provides **Install Codex → Sign in → Check connection**, using the official native CLI without requiring Node.js or WSL. Existing sign-in is checked through the official interface; MiaoCall never reads or copies authentication files. [Windows setup guide — Chinese](docs/MIAOCALL_WINDOWS.md)
+Sign in to local Codex and open MiaoCall → Voice Tasks. Windows includes **Install → Sign in → Check connection**. Choose a working directory and optional files; new tasks default to read-only, and changes require an explicit choice. Submit a typed task, or configure ASR and confirm a held-key voice transcript. Review steps, individual approvals and questions, then inspect results and files. Existing tasks support follow-ups and typed steering during execution.
 
-Sign in to local Codex, open MiaoCall → Voice Tasks, and choose a working directory. New tasks are read-only by default; explicitly enable changes when needed. Send a text task and optional files, or configure an ASR service and confirm a held-key voice instruction. Continue an existing task, add typed instructions during execution, review per-request permissions and questions, and inspect returned text and files.
+MiaoCall creates and resumes its own persistent sessions through the official local app-server; available tools and permissions determine what a task can do. It does not take over other desktop chats. Codex sign-in and ASR are separate connections, and typed tasks need no voice key. WorkBuddy, Qwen Office and Doubao Work remain planned integrations.
 
-MiaoCall creates and resumes its own persistent sessions through the official local app-server. File organization, summaries and project changes use tools available to local Codex. Spotify is an optional Mac example with independent playback verification; this dedicated verifier is not included on Windows. WorkBuddy, Qwen Office and Doubao Work remain unavailable. See the [task guide and data boundaries — Chinese](docs/MIAOCALL_TASKS.md).
-
-
-When disabled, the key types normally. The global shortcut never starts automatically and is released on exit. Windows Private Beta 1 adds a native desktop voice and overlay implementation, with real-machine acceptance still pending. [Full setup and troubleshooting — Chinese](docs/MIAOCALL_BETA.md) · [Keymap and dictation guide — Chinese](docs/KEYMAP_VOICE_LOCAL.md)
+The shortcut starts off, types normally while disabled, and is released on exit. Resident companion mode is independent of recording. Idle interactions pause during recording, transcription and tasks. Four offline voice styles are muted by default. AI wardrobe generation sends the character reference and outfit description only after an explicit click and requires preview before application; generated outfits currently have one static pose. [Task guide — Chinese](docs/MIAOCALL_TASKS.md) · [Companion guide — Chinese](docs/MIAOCALL_COMPANION.md)
 
 ## Built-in lighting GIFs
+
 
 
 I've created and refined **ten lighting designs with AI**, and included them in the app. You can preview and use them without configuring a model, then sync your favorites to the keyboard.
 
 To make something of your own, connect **Kimi, MiniMax or DeepSeek**, describe your idea, and let AI help you create it.
 
-If there's a theme, character or effect you'd love to see, [leave me a suggestion in GitHub Issues](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues). Add a short description or reference image—the next built-in design might start with your idea.
+If there's a theme, character or effect you'd love to see, [leave me a suggestion in GitHub Issues](https://github.com/maestrokaka/cyberboard-studio/issues). Add a short description or reference image—the next built-in design might start with your idea.
 
 The ten full-keyboard previews below follow the app's order. Click a GIF for a larger view.
 
@@ -106,15 +104,15 @@ Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photog
 
 ## Data and validation scope
 
-Works, conversations, reference images, drafts, keys and device records stay outside the installation directory and release assets. Recordings are limited to 60 seconds and start only after an explicit action; temporary audio is cleaned up and is not stored in works or the workspace. Lighting sync and keymap writes use separate reviewed plans. Starting the app, selecting a photograph or upgrading does not write to the keyboard.
+Works, conversations, references, slot drafts, provider keys, tasks and device records stay outside the installation folder and release assets. AI/MiaoCall recording is limited to 60 seconds; R6 local tests to 30 seconds. Audio is captured only after an explicit action and cleaned up without entering works or the workspace. Lighting writes, keymap writes, sound settings and calibration each have explicit controls; selecting an appearance or upgrading does not execute them.
 
-Windows Private Beta 1 passed 17 local offline suites, 14 package checks for each of the two actual ZIPs, 64 packaged preview-aspect cases, 40 Windows host checks and two Windows process-liveness checks. Official CLI installation, automatic discovery and real app-server initialization / signed-out account queries also passed without signing in a user. Native GUI, microphone, shortcut, user sign-in and USB acceptance on a personal Windows PC is still pending. [Windows CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)
+Checks cover synthetic device protocols, failure/interruption states, complete keycodes and advanced tables, sound echoes, recording lifecycle, both themes, preview proportions and actual packages. Offline/CI results do not replace acceptance of R6 sound parameters and physical direction, microphone recording/playback, new macros/tap-hold, partial lighting, Windows GUI/shortcuts/user sign-in and USB. [Acceptance boundaries — Chinese](docs/R6_CONFIGURATION.md#验证范围)
 
-Beta 14 passed fourteen UI / preview groups, byte-identical photo and 83-mask checks, cold and warm appearance-entry tests, relocated signed macOS startup and workspace restoration. The packaged speech-runtime TLS-file omission is fixed while certificate and hostname verification remain enabled. Windows GUI / USB, additional firmware and corresponding R4 writes still need hardware acceptance. This is not a stable 1.0 release.
+Earlier native Windows CI verified host compilation, owned descendant cleanup, official Codex installation and discovery, real app-server initialization and signed-out account queries. This did not sign in a user or run a real model task. Beta 14 photo-mask, preview-performance and packaged speech TLS dependency fixes are retained.
 
 ## Building and contributing
 
-The repository includes vendored `cyberboard-cli` 0.1.2 with R6 and cross-platform patches. See [CLI provenance and licenses](vendor/README.md). Mac builds require Python 3.12, Node.js and Xcode Command Line Tools:
+The repository includes patched `cyberboard-cli` 0.1.2; see [provenance and licenses](vendor/README.md). Mac builds require Python 3.12, Node.js and Xcode Command Line Tools:
 
 ```sh
 python3 scripts/setup-cli.py --env-dir .tools/macos-build --with-pyinstaller
@@ -123,11 +121,14 @@ python3 scripts/prepare-data.py
 native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 ```
 
-The app is generated at `build/Cyberboard Studio.app`. Windows development notes are in [the runtime guide](windows/runtime-readme.txt); Windows Private Beta 1 is available for private testing. Offline checks use synthetic devices and HTTP substitutes, without USB or model credits. See the [offline checks](README.md#离线验证).
+Windows builds require .NET 10 SDK and the prepared Python runtime; see the [runtime guide](windows/runtime-readme.txt). `python scripts/check-release.py --mac-native` runs local release checks, and detailed UI/backend/package checks are in `tests/`. Synthetic tests do not access USB or use model credits.
 
-This private `feature/miaocall-companion` contains Tasks Beta 3 and Windows Private Beta 1 integration source and assets. It is not pushed to public main; personal audio, voice-cloning sources and desktop recordings are excluded. Public Beta 14 and existing RC2 tags and downloads remain unchanged. For feedback, include your app version, operating system, keyboard model and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues).
+Source lives in `web/`, `backend/`, `native/` and `windows/src/`. Public artwork, photographs and generic layouts are in `data/`; third-party code and licenses are in `vendor/`. R6 additions are independently implemented from the official website's observed communication behavior rather than copied website business code.
+
+Beta 15 is synchronized to the public and private repositories. Historical Beta 14, RC2 and private tags/assets remain intact. Releases contain packages and checksums, without videos, personal audio, voice-cloning sources, keys, workspaces or device records. For feedback, include the app version, operating system, keyboard model, firmware version and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio/issues).
 
 ## Support the author
+
 
 
 **Your keyboard is glowing. My coffee cup could use a refill. ☕**

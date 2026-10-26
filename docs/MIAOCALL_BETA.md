@@ -1,5 +1,7 @@
 > 本文保留早期 macOS Spotify 专用公开 Beta 的安装与权限背景，不表示当前私有版的平台范围。私有版的通用任务、持久记录与授权流程见 [任务说明](MIAOCALL_TASKS.md)；Windows Private Beta 1 的安装、Codex 连接与待验收项见 [Windows 指南](MIAOCALL_WINDOWS.md)。
 
+> 当前公开与私有发行版为 [Beta 15](RELEASE_NOTES_BETA15.md)。以下保留各功能的详细说明；涉及旧私有版本、下载包或仅限私有发布的描述，以 Beta 15 更新说明和仓库首页为准。
+
 # 喵唤 MiaoCall · Beta 14 公开测试版
 
 当前下载：[MiaoCall Beta 14（macOS Apple Silicon）](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-miaocall.beta.14-public) · [版本更新说明](RELEASE_NOTES_MIAOCALL_BETA14.md)

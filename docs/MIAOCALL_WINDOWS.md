@@ -1,5 +1,7 @@
 # 喵唤 Windows · Private Beta 1
 
+> 当前公开与私有发行版为 [Beta 15](RELEASE_NOTES_BETA15.md)。以下保留各功能的详细说明；涉及旧私有版本、下载包或仅限私有发布的描述，以 Beta 15 更新说明和仓库首页为准。
+
 版本：`1.0.0-miaocall.windows.beta.1`。[Windows 私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) 已提供下载；macOS 继续使用 Tasks Private Beta 3。Windows 真机的窗口、麦克风、全局按键、Codex 登录和 USB 尚待验收。
 
 喵唤把你确认后的文字或语音交给本机 Codex，适合整理文件、总结资料、修改项目等任务。每个任务有自己的工作目录、记录与后续追问。实际可执行的操作取决于 Codex 已配置的工具和连接；本版没有接管其他 Codex 桌面聊天。

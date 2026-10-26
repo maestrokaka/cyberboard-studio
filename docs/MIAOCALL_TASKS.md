@@ -1,5 +1,7 @@
 # 喵唤通用任务 · 私有 Beta
 
+> 当前公开与私有发行版为 [Beta 15](RELEASE_NOTES_BETA15.md)。以下保留各功能的详细说明；涉及旧私有版本、下载包或仅限私有发布的描述，以 Beta 15 更新说明和仓库首页为准。
+
 喵唤将确认后的语音或文字交给本机 Codex。Spotify 是可选演示；整理文件、总结资料、修改项目等任务使用 Codex 已有工具与连接。本版不接管其他 Codex 桌面聊天，也不承诺所有桌面 App 都有可用接口。
 
 Mac 当前下载为 Tasks Private Beta 3；Windows Private Beta 1 正在准备，安装与官方 Codex 接入步骤见 [Windows 指南](MIAOCALL_WINDOWS.md)。安装私有 macOS 包时，请先阅读[私有版安装与权限说明](PRIVATE_MACOS_INSTALL.md)。当前包使用 ad-hoc 签名，首次打开需要 Control-click →“打开”；不需要关闭 Gatekeeper。

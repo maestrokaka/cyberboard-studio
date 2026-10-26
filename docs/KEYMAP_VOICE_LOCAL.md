@@ -1,5 +1,7 @@
 # 键位编辑与 AI 语音输入
 
+> 当前公开与私有发行版为 [Beta 15](RELEASE_NOTES_BETA15.md)。以下保留各功能的详细说明；涉及旧私有版本、下载包或仅限私有发布的描述，以 Beta 15 更新说明和仓库首页为准。
+
 本页介绍 MiaoCall Beta 14 以来的键位编辑与 AI 输入框语音。Mac 私有 Tasks Beta 3 延续这些功能；Windows Private Beta 1 已接入对应实现，但真实录音、快捷键与 USB 仍待实机验收。Windows 安装与 Codex 连接请看 [Windows 指南](MIAOCALL_WINDOWS.md)，通用任务见 [任务说明](MIAOCALL_TASKS.md)。历史 Windows RC2 不包含这些新增功能。
 
 ## 键位编辑

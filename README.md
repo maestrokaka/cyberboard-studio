@@ -1,94 +1,94 @@
-# Cyberboard Studio · MiaoCall Private Beta
+# Cyberboard Studio · Beta 15
 
 **简体中文** · [English](README.en.md)
 
-面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。也可以开启实验性的「喵唤」，按住一颗键，把语音指令交给本机 Codex。
+面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。实验性的「喵唤」让你按住一颗键，把任务交给本机 Codex；R6 新增独立声音设置、麦克风试听和高级键位编辑。
 
-**[下载 Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[下载 Windows Private Beta 1](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1)** · [Windows 更新说明](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [桌面陪伴与衣橱](docs/MIAOCALL_COMPANION.md)
+**[下载 Beta 15 · Mac / Windows](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15)** · [本版更新说明](docs/RELEASE_NOTES_BETA15.md) · [R6 配置指南](docs/R6_CONFIGURATION.md) · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-这是 **私有测试版**，在灯效工作室和桌面陪伴基础上，将喵唤扩展为 Codex 通用任务入口。支持工作目录、持久任务、继续追问、授权与结果文件；Spotify 仅作可选示例。Windows Private Beta 1 已提供下载，将同一套任务与桌面陪伴接入 Windows；当前 macOS 下载保持 Tasks Private Beta 3。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
+这是 **公开测试版**。本次将此前私有版的通用 Codex 任务、桌面陪伴与 Windows 接入合并公开，同时补齐 R6 配置能力。提供 macOS Apple Silicon、Windows x64、Windows 10 Compatibility 三个软件包；硬件新增功能仍需实机验收，不作为稳定 1.0 版本。
 
-## 这一版的喵娘
+## Beta 15 新增与修正
 
-角色默认高度保持 300。Beta 3 修复完整衣橱显示、设置误穿预览和原位重复互动；桌面气泡会随浅色/深色主题即时切换。
+- **同步状态更清楚**：区分已发送、设备已确认、键位已验证与状态未知。可能改写设备后失败或中断，会阻止继续复用旧灯效基线；不会盲目重复整包写入。
+- **独立「R6 声音」页**：设置扬声器声道、麦克风方向、降噪和音色。采用独立短指令；打开页面和检查连接只做查询，不自动设置参数。没有可用的声音当前值查询接口时显示未知，设置回执不会冒充声学验证。
+- **本地麦克风试听**：列出系统输入与默认输出，明确当前系统默认输入。主动录制最长 30 秒，再本地回放、清除；离页清理，不发送给语音模型。高级区提供需单独确认的扬声器校准。
+- **R6 单键、长短按与宏**：独立指令与配置表，支持新增、更新、删除及删除后的普通绑定；读取完整基底、审核修改并生成备份后才写入。发送后核对完整键码及可读高级表。未读全的表不会当作空表覆盖。
+- **Codex 通用持久任务**：选择工作目录、添加文件、交代任务、继续追问、执行中补充、逐次授权并查看结果与文件。Spotify 只是可选 Mac 示例。
+- **Windows 快速连接 Codex**：安装 → 登录 → 检测连接，采用官方原生 CLI，无需先装 Node.js 或 WSL，不读取或复制认证文件。
+- **更多桌面陪伴**：常驻 / 仅唤醒、拖动记位置、三套服装和长发选项、32 张姿势、15 个互动区域、四种离线声线。声音默认关闭；AI 换装先预览再应用。
+- **固件更新入口**：显示版本并交接到 Angry Miao 官方网页完成升级。本版没有在 App 内刷写固件；局部灯效协议仍待实机验证，未默认启用。
 
-- **常驻 / 仅唤醒**独立选择，角色可以拖到桌面任意位置，记住大小和位置；靠近屏幕边缘时对话框自动换侧。常驻不自动录音或启用全局按键。
-- **三套服装 + 长发可选**：橙白水手服、奶油针织 JK、雪白西装套装，水手服另有橙白长发；每组 8 个独立姿势，共 32 张。
-- **15 处互动 + 四种声线**：甜萌、御姐、温柔、元气，共 60 条内置离线语音；默认静音，鼠标停留后才回应，带冷却与拖动保护。录音和任务时暂停闲聊。
-- **AI 换装**：配置 MiniMax image-01，生成后先预览，喜欢再穿上；可取消，可删除本机 AI 衣装。AI 新衣装目前为静态立绘，不自动生成 8 个动作。
+## 灯效工作室
 
-![长发衣橱预览](docs/screenshots/companion-wardrobe-long.png)
+- **AI 创作**：接入 Kimi、MiniMax 或 DeepSeek，用文字和最多 3 张参考图创作；保存会话、独立版本与局部修改。
+- **灯效工作台**：整机照片预览、亮度 / 节奏 / 配色调整、三槽草稿与同步前审核。内置 10 款可删除灯效，无需模型 Key 即可体验。
+- **键盘与外观**：8 款 R4 / R6 正面外观，同作品、同一帧比较；页面先显示，预览按可取消的小批次准备。
+- **双风格界面**：经典深色与暖岛浅色即时切换，重开保留；不改变作品 RGB 或槽位。
+- **可读键位与语音输入**：81 个实体键、7 层中文功能；AI 输入框单独配置 MiniMax、千问或 OpenAI 语音识别，识别后检查文字再发送。
 
-## 这一版能做什么
+## B 站横版演示 · Beta 14
 
-- **AI 灯效创作**：接入 Kimi、MiniMax 或 DeepSeek，用文字和最多 3 张参考图创作；保留历史会话、独立版本与局部修改。
-- **灯效工作台**：整机照片预览、亮度 / 节奏 / 配色调整、三槽草稿与同步前审核。内置 10 款可删除灯效，无需模型 Key 即可预览。
-- **键盘与外观**：8 款 R4 / R6 正面外观，同作品、同一帧比较。Beta 14 专门改善从 AI 创作进入此页的卡顿：页面先显示，预览按可取消的小批次准备，只编译当前展示帧。
-- **两种界面风格**：「经典深色」与「暖岛浅色」在设置中即时切换，重开后保留；不改变作品 RGB 或槽位。
-- **键位编辑**：独立页面显示 81 个实体键、7 层可读功能；先编辑本机草稿，审核专用计划后才写入。未知原始码保留，Fn 功能不再只是一串数字。
-- **AI 语音输入**：单独配置 MiniMax、千问或 OpenAI 的语音转文字模型，识别后检查文字，再手动发送制作灯效。
-- **喵唤 MiaoCall · Beta**：按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。Mac 与 Windows 均提供私有测试包；Windows 的真实麦克风、快捷键与用户登录仍待实机验收。
+约 **3 分 7 秒**，展示 AI 创作灯效和按键唤起喵娘的基本流程。视频沿用 Beta 14 的界面与功能范围，Beta 15 新增能力见下方截图和更新说明。
+
+https://github.com/user-attachments/assets/a0ea2c61-1c65-4d93-a893-b44f2995d499
+
+可直接在上方播放器观看 720p 压缩预览，不提供原画质下载或工程素材。灯效为照片合成预览；喵唤部分为流程示意。Releases 不附视频。
 
 ## 界面预览
 
-### 暖岛浅色 · AI 创作
+| AI 创作 · 暖岛浅色 | 灯效工作台 · 经典深色 |
+| --- | --- |
+| ![AI 创作首页](docs/screenshots/create-beta15-light.png) | ![整机灯效与三槽总览](docs/screenshots/workbench-beta15-dark.png) |
+| **键盘与外观** | **R6 声音与麦克风试听** |
+| ![同一灯效时刻比较八款外观](docs/screenshots/appearances-beta15-light.png) | ![R6 独立声音设置和本地试听](docs/screenshots/r6-audio-beta15-light.png) |
+| **R6 键位编辑** | **喵唤与桌面陪伴** |
+| ![键位、长短按和宏编辑](docs/screenshots/keymap-beta15-dark.png) | ![通用 Codex 任务与喵娘](docs/screenshots/miaocall-beta15-light.png) |
 
-![AI 创作首页与暖岛浅色界面](docs/screenshots/create-beta14-light.png)
-
-### 经典深色 · 灯效工作台
-
-![经典深色工作台、整机灯效与三槽总览](docs/screenshots/workbench-beta14-dark.png)
-
-### 外观选择
-
-![八款正面外观按同一灯效时刻比较](docs/screenshots/appearances-beta14-light.png)
-
-截图来自独立的界面演示环境；没有个人密钥、会话或真实设备记录。预览使用去背景键盘照片合成顶部和轴灯，不代表实机色准测量。
+截图来自独立演示环境，不含个人 Key、会话或设备记录。照片合成灯效不是实机色准测量，示例状态也不代表真实设备已经写入。
 
 ## 下载与运行
 
-| 平台 / 版本 | 下载 | 说明 |
+| 平台 | 下载 | 说明 |
 | --- | --- | --- |
-| **macOS · MiaoCall Tasks Private Beta 3** | [私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
-| **Windows · MiaoCall Private Beta 1** | [普通 x64 / 兼容包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) | 已通过 Windows CI 与包检查；原生 GUI、语音、快捷键、用户登录与 USB 待实机验收 |
-| Windows · 历史 RC2 | [旧版普通 x64 / 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 历史灯效版，不含本次喵唤功能；附件保持原样 |
+| **macOS Apple Silicon** | [Beta 15 ZIP 与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | macOS 13 及以上；含 CLI 与运行环境 |
+| **Windows x64** | [Beta 15 普通包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | 完整解压后打开 EXE；缺少 WebView2 时运行随包引导安装器 |
+| **Windows 10 Compatibility x64** | [Beta 15 兼容包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | 用于既有 CET 启动兼容问题，不扩大 .NET / Codex 官方系统支持范围 |
 
-Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
+请选择平台 ZIP，不要只下载 Source code；同名 `.sha256` 用于校验。无需另装 Python。Windows 建议先使用普通 x64 包，保留同目录全部 DLL 和资源；两种包不要混用。当前没有 Intel Mac、Windows 32 位或 Windows ARM64 原生包。
 
-App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。首次打开时在“应用程序”中 Control-click App，选择“打开”，再在系统确认窗口中选择“打开”。不要关闭 Gatekeeper，也不要把网上复制的隔离属性移除命令作为常规安装步骤。喵唤需要的麦克风、全局按键及 Spotify 自动化权限只在明确开启对应功能时请求。升级前先退出旧 App，固定使用同一份已签名包。[私有版安装与权限说明](docs/PRIVATE_MACOS_INSTALL.md) · [详细 Beta 说明](docs/MIAOCALL_BETA.md)
+Mac 解压后将 App 放入「应用程序」。当前采用 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证，首次打开请按 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445) 操作。升级前先退出旧 App，并固定使用同一份软件包；不要关闭系统保护。麦克风、全局按键和可选 Spotify 自动化权限只在明确使用对应功能时请求。
 
 ## 五分钟开始创作
 
-1. **先看预设**：打开「灯效工作台」，无需 Key 即可选择内置作品并预览。
-2. **连接创作模型**：在「模型配置」选择 Kimi、MiniMax 或 DeepSeek，填写有权限的 Key 并保存。
-3. **描述你的画面**：进入「AI 创作」，例如「橙红火焰从底部窜起，轴灯像余烬，4 秒循环」，也可上传参考图。
-4. **逐版修改**：选择明确的基础版本和修改范围，例如「仅轴灯改成纯黄，顶部保持原样」。原版本保留。
-5. **保存和同步**：满意后保存指定版本，或在工作台打开；放入目标槽位草稿，检查连接与同步计划，再确认写入。
+1. 打开「灯效工作台」，先预览内置作品，无需 Key。
+2. 在「模型配置」选择 Kimi、MiniMax 或 DeepSeek，保存有权限的 Key。
+3. 进入「AI 创作」，描述画面或上传参考图，例如「橙红火焰从底部窜起，轴灯像余烬，4 秒循环」。
+4. 选择明确的基础版本和范围继续修改，例如「仅轴灯改成纯黄，顶部保持原样」。
+5. 保存指定版本，放入槽位草稿，检查连接与同步计划，再确认写入。
 
-文字与参考图仅在点击制作时提交给你选择的创作服务。Key 按服务直接保存在本机普通文件，默认隐藏并可显示；不读取、解密或迁移旧 Keychain / DPAPI 记录。
+文字和参考图仅在点击制作时提交给所选服务。Key 按服务保存在普通本机文件，默认隐藏，可直接显示；不读取、解密或迁移旧 Keychain / DPAPI 记录。
 
-## 喵唤：按住一颗键，说出想做的事
+## 喵唤：交代任务给 Codex
 
-Windows 新版在页面内提供「安装 Codex → 登录 → 检测连接」，默认使用官方原生 CLI，无需先装 Node.js 或 WSL；已有登录由官方接口判断，不复制认证文件。[Windows 连接步骤](docs/MIAOCALL_WINDOWS.md#连接-codex安装--登录--检测)
+1. 安装并登录本机 Codex，进入「喵唤 · Beta」→「语音任务」。Windows 可直接使用「安装 → 登录 → 检测连接」。
+2. 选择任务工作目录，必要时添加文件。新任务默认只读，需要修改时明确开启写入。
+3. 输入任务并提交；或先配置语音识别服务，按住「·」说话，检查识别文字后提交。
+4. 查看步骤、回答问题或逐次授权，核对结果和文件。同一个任务可继续追问，执行中可补充指令。
 
-1. 安装并登录本机 Codex，进入「喵唤 · Beta」→「语音任务」。文字任务可直接使用。
-2. 选择工作目录。默认只读，需要修改时再明确勾选；可添加文件。
-3. 输入任务并提交；也可配置 MiniMax / 千问 / OpenAI 语音服务，开启快捷键后按住「·」交代，确认文字后提交。
-4. 在任务详情查看步骤、回答问题或逐次授权，检查返回结果与文件；同一任务可继续追问，执行中可补充文字指令。
+通过官方本机 app-server 创建和续接喵唤自己的持久会话，实际能力取决于本机 Codex 工具与权限；不接管其他桌面聊天。Codex 登录与语音识别是两条连接，文字任务无需语音 Key。WorkBuddy、千问办公和豆包工作仍为规划入口。
 
-使用官方本机 app-server，保存喵唤自己创建的任务会话。支持文件整理、资料摘要、项目修改等，实际能力取决于本机 Codex 工具和连接。Spotify 是 Mac 的可选示例，保留实际播放验证；Windows 不提供这套专用验证工具。WorkBuddy、千问办公和豆包工作尚未接入。[完整任务说明与数据范围](docs/MIAOCALL_TASKS.md)
-
-
-不开启时「·」正常输入。喵唤不会随 App 启动自动启用，退出后释放监听。Windows Private Beta 1 增加原生语音与桌面浮层，真机行为仍待验收。[完整连接、权限和故障排查](docs/MIAOCALL_BETA.md) · [键位与 AI 输入框语音说明](docs/KEYMAP_VOICE_LOCAL.md)
+快捷键默认关闭，关闭时正常输入符号，退出时释放。桌面喵娘可独立常驻，不自动录音；录音、转写和任务期间暂停闲聊。四种离线声线默认静音，AI 衣装生成仅在主动点击时发送角色参考与服装描述，先预览再应用。当前 AI 衣装为单张立绘，不自动生成完整动作集。[任务使用说明](docs/MIAOCALL_TASKS.md) · [陪伴与衣橱说明](docs/MIAOCALL_COMPANION.md)
 
 ## 内置灯效 GIF
+
 
 
 我已经借助 AI 创作并打磨了 **10 款灯效**，全部内置到软件中。无需配置模型，打开就能预览，选好后即可同步到键盘。
 
 想做自己的灯效，也可以接入 **Kimi、MiniMax 或 DeepSeek**，写下你的想法，让 AI 帮你创作。
 
-有想要的主题、角色或灯效，欢迎[到 GitHub Issues 留言告诉我](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues)。附上一句话描述或参考图，下一款内置灯效，也许就来自你的脑洞。
+有想要的主题、角色或灯效，欢迎[到 GitHub Issues 留言告诉我](https://github.com/maestrokaka/cyberboard-studio/issues)。附上一句话描述或参考图，下一款内置灯效，也许就来自你的脑洞。
 
 下方是这 10 款灯效的整机动态预览，点击动图可查看大图。
 
@@ -109,18 +109,15 @@ Windows 新版在页面内提供「安装 Codex → 登录 → 检测连接」�
 
 ## 数据与验证范围
 
-个人作品、会话、参考图、槽位草稿、Key 和设备记录与 App 安装目录分开保存，不进入源码或发布包。录音最长 60 秒，仅在明确操作后采集；临时录音结束或取消后清理，不进入作品库或工作区。同步灯效和修改键位分别需要专用计划与确认，不会因打开 App、切换外观或更新软件自动写入键盘。
+个人作品、会话、参考图、槽位草稿、Key、任务及设备记录与安装目录分开保存，不进入源码或安装包。AI／喵唤语音录音最长 60 秒，R6 本地试听最长 30 秒，只在明确操作后采集并清理，不保存到作品和工作区。同步灯效、改键、声音设置和校准都有明确操作入口，不会因切换外观或升级 App 自动执行。
 
-Windows Private Beta 1 已通过 17 组本机离线套件、两个实际 ZIP 各 14 项包检查、包内 64 组预览比例检查，以及 Windows CI 的 40 组宿主检查和 2 项进程探活。官方 CLI 安装、自动发现与真实 app-server 初始化 / 未登录状态查询也已通过；这些检查未登录用户账户。原生 GUI、真实麦克风、快捷键、用户登录与 USB 仍待个人 Windows 电脑实测。[Windows CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)
+本版检查覆盖设备协议替身、异常/中断状态、完整键位与高级表核对、声音回执与录音生命周期、两种主题、照片预览比例及实际软件包。离线和 CI 通过不能替代真实硬件验收：R6 声音参数与物理方向、麦克风录放、新增宏/长短按、局部灯效、Windows 原生 GUI / 快捷键 / 用户登录和 USB，仍需对应实机确认。[验收边界与操作说明](docs/R6_CONFIGURATION.md#验证范围)
 
-Beta 14 已验证 14 组前端 / 预览回归、照片像素与 83 颗轴灯遮罩一致性、首次及再次进入外观页、macOS 签名包搬移启动和工作区保存恢复。语音请求的 TLS 漏包问题已修复，证书和主机名验证保持开启。Windows 原生界面 / USB、更多固件及 R4 对应写入仍需实机验收；不将本版标为正式稳定版。
+此前 Windows 原生 CI 已通过宿主构建、所属子进程回收、官方 Codex 安装与自动发现、真实 app-server 初始化和未登录状态查询；没有把这些检查描述为用户已登录并完成真实任务。Beta 14 的预览性能、照片遮罩与语音 TLS 依赖修复继续保留。
 
 ## 从源码构建
 
-
-需要 Python 3.12、Node.js；Mac 构建还需 Xcode Command Line Tools，Windows 构建还需 .NET 10 SDK。
-
-本仓库保留经过验证的 CLI 0.1.2 源码、R6 识别与跨平台补丁，见 [CLI 来源与许可证](vendor/README.md)。源码素材在 `data/`，测试使用合成配置，不能将其当作真实设备基线。
+需要 Python 3.12、Node.js；Mac 还需 Xcode Command Line Tools，Windows 还需 .NET 10 SDK。本仓库保留经过补丁维护的 CLI 0.1.2，见 [来源与许可证](vendor/README.md)。测试配置只能用于替身验证，不是真实设备基线。
 
 Mac，在仓库根目录执行：
 
@@ -131,71 +128,22 @@ python3 scripts/prepare-data.py
 native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 ```
 
-这会先冻结独立后台，再生成 `build/Cyberboard Studio.app`。Mac 构建会检查发布素材不含个人基线，并验证签名。
-
-Windows 独立运行环境准备与校验见 [运行环境构建说明](windows/runtime-readme.txt)。准备 `windows/runtime/python` 后：
+Windows 运行环境准备见 [构建说明](windows/runtime-readme.txt)。准备 `windows/runtime/python` 后执行：
 
 ```sh
 python windows/build.py --dotnet /path/to/dotnet --nuget /path/to/nuget-cache --bootstrapper /path/to/MicrosoftEdgeWebview2Setup.exe
 ```
 
-`--dotnet`、`--nuget` 可省略以使用本机 SDK 与仓库内缓存；软件包始终包含完整运行组件。Windows 使用 `EnableWindowsTargeting`，允许从 Mac 交叉编译。WebView2 引导安装器来自 [Microsoft 官方下载](https://go.microsoft.com/fwlink/p/?LinkId=2124703)。
+`--dotnet`、`--nuget` 可省略以使用本机 SDK 与缓存。构建始终包含运行组件，WebView2 引导安装器来自 Microsoft 官方。可用 `python scripts/check-release.py --mac-native` 运行本机发布检查；具体前端、后端及软件包检查位于 `tests/`。测试使用合成设备和 HTTP 替身，不访问 USB 或消耗模型额度。
 
-可选重建 GitHub 的十款照片合成 GIF：使用已安装 Pillow 的 Python 环境、Node.js 与 `@napi-rs/canvas`，在仓库根目录执行；这是发布素材工具，不是 App 新增的视频导出功能。
-
-```sh
-npm install --prefix .tools/gif-render @napi-rs/canvas
-python scripts/build-preset-gifs.py
-```
-
-生成器默认查找 `.tools/gif-render/node_modules`，也可通过 `STUDIO_CANVAS_MODULE` 指定 Canvas 模块。它用 App 预览引擎合成照片动画；临时 PNG 只写入 `build/`，不上传。
-
-## 离线验证
-
-Windows 登录与安装发现新增 `tests/codex-connection-check.py`；通用任务包含 `tests/agent-tasks-check.py` 与 `tests/agent-tasks-ui-check.cjs`；`python scripts/check-release.py --mac-native` 是本机离线发布检查入口，GitHub Actions 自动运行相应检查。桌面陪伴保留 `tests/companion-check.py`、`tests/companion-native-check.py` 与 `tests/companion-package-check.py --app APP路径`，覆盖衣装生成边界、32 个姿势、60 条音频解码、停留冷却、设置与真实软件包连接配置。
-
-```sh
-node tests/model-check.cjs
-node tests/presets-check.cjs
-node tests/frontend-regressions.cjs
-node tests/library-ui-check.cjs
-node tests/renderer-check.cjs
-node tests/preview-selector-check.cjs
-node tests/ui-check.cjs
-node tests/ai-ui-check.cjs
-node tests/chat-ui-check.cjs
-STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
-.tools/macos-build/bin/python tests/backend-check.py
-.tools/macos-build/bin/python tests/ai-recipe-check.py
-.tools/macos-build/bin/python tests/kimi-ai-check.py
-.tools/macos-build/bin/python tests/kimi-ai-extra-check.py
-.tools/macos-build/bin/python tests/multi-provider-ai-check.py
-.tools/macos-build/bin/python tests/ai-conversation-check.py
-.tools/macos-build/bin/python tests/workspace-conversation-check.py
-.tools/macos-build/bin/python tests/ai-images-check.py
-.tools/macos-build/bin/python tests/native-ai-check.py
-.tools/macos-build/bin/python windows/tests/migration-check.py
-```
-
-测试使用设备和 HTTP 替身，不访问 USB，也不消耗真实模型额度。发布包另外检查依赖校验和、架构、许可证、无个人状态，以及 Mac 后台整体搬移后的运行能力。
-
-## 代码结构
-
-- `web/`：灯效工作台、JSON 模型、照片预览和已确认的 Logo。
-- `backend/bridge.py`：CLI 桥接、备份、同步计划、实际传输与验证。
-- `backend/kimi_ai.py`、`lighting_recipe.py`、`ai_images.py`：模型调用、有限灯效编排与参考图规范化。
-- `native/`：macOS 窗口、原生文件对话框、后台通信与同步保护。
-- `windows/src/`：WinForms / WebView2 窗口、文件对话框和后台进度。
-- `windows/runtime/`：Windows 运行环境的官方来源、固定版本和准备脚本。
-- `vendor/`：CLI 源码、补丁说明及第三方许可。
-- `data/`：灯效作品、公开预设目录 `preset-catalog.json`、照片校准、通用实体布局与合成测试 fixture。
-- `scripts/`：环境准备、素材生成和 Mac 后台构建。
+源码主要位于 `web/`、`backend/`、`native/`、`windows/src/`；公开作品、照片与通用布局在 `data/`，CLI 与第三方许可在 `vendor/`。本版的 R6 协议根据官网公开通信行为独立实现，没有搬运整站业务代码。
 
 ## 发布维护
 
-当前私有 `feature/miaocall-companion` 包含 Tasks Beta 3 以及 Windows Private Beta 1 接入源码与素材；不推送公开 main，也不上传个人测试录音、声纹源文件或桌面录制素材。公开 Beta 14、旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues) 反馈。
+Beta 15 同步公开与私有仓库；历史 Beta 14、RC2 和私有测试版标签/附件保留原样。Releases 只提供软件包与校验文件，不放视频、私人录音、声纹源素材、Key、个人工作区或设备记录。反馈时请附 App 版本、系统、键盘型号、固件版本和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 留言。
 
 ## 支持作者
+
 
 
 **键盘已经亮了，咖啡杯还空着。☕**
