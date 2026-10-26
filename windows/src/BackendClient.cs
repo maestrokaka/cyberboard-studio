@@ -122,13 +122,7 @@ internal sealed class BackendClient : IDisposable
                 var diagnosticText = await diagnostics;
                 // AI subprocess diagnostics are never copied to host logs: SDK/network errors may contain credentials.
                 if (secret is null && !suppressDiagnostics && !string.IsNullOrWhiteSpace(diagnosticText)) HostLog.Write("backend " + action, diagnosticText);
-                if (parseError is not null) throw new IOException(parseError);
-                if (final is null) throw new IOException($"后台没有返回操作结果（{process.ExitCode}）。");
-                var safeFinal = secret is null ? final.Value : AISettings.Redact(final.Value, secret);
-                if (safeFinal.TryGetProperty("error", out var error))
-                    throw new BackendReplyException(error);
-                if (process.ExitCode != 0) throw new IOException($"后台操作未成功完成（{process.ExitCode}）。");
-                return safeFinal.GetProperty("result").Clone();
+                return FinishReply(final, parseError, process.ExitCode, cancellation, secret);
             }
             catch
             {
@@ -139,6 +133,21 @@ internal sealed class BackendClient : IDisposable
             }
         }
         finally { queue.Release(); }
+    }
+
+    internal static JsonElement FinishReply(JsonElement? final, string? parseError, int exitCode,
+                                            CancellationToken cancellation, string? secret)
+    {
+        // A killed child can reach EOF and complete WaitForExitAsync before
+        // either API observes cancellation. Honor the caller's stop request
+        // even when all I/O tasks have already completed successfully.
+        cancellation.ThrowIfCancellationRequested();
+        if (parseError is not null) throw new IOException(parseError);
+        if (final is null) throw new IOException($"后台没有返回操作结果（{exitCode}）。");
+        var safeFinal = secret is null ? final.Value : AISettings.Redact(final.Value, secret);
+        if (safeFinal.TryGetProperty("error", out var error)) throw new BackendReplyException(error);
+        if (exitCode != 0) throw new IOException($"后台操作未成功完成（{exitCode}）。");
+        return safeFinal.GetProperty("result").Clone();
     }
 
     private static async Task WriteInputAsync(StreamWriter stream, JsonElement payload, CancellationToken cancellation)

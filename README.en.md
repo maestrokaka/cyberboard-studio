@@ -1,18 +1,18 @@
-# Cyberboard Studio · Beta 15
+# Cyberboard Studio · Next-version preview
 
 [简体中文](README.md) · **English**
 
 A third-party **CYBERBOARD R4 / R6** studio: create lighting through AI conversations, compare versions on real keyboard photographs, and review a plan before syncing. The optional MiaoCall companion sends held-key voice instructions to local Codex. R6 now has dedicated sound controls, local microphone playback and advanced keymap editing.
 
-**[Download Beta 15 · Mac / Windows](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15)** · [Release notes — Chinese](docs/RELEASE_NOTES_BETA15.md) · [R6 configuration guide — Chinese](docs/R6_CONFIGURATION.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues)
+**App binaries are not publicly released yet** · [Release notes — Chinese](docs/RELEASE_NOTES_BETA15.md) · [R6 configuration guide — Chinese](docs/R6_CONFIGURATION.md) · [Report an issue](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-This is a **public beta**, bringing previously private persistent Codex tasks, desktop companion features and native Windows integration into the public release. Packages are provided for macOS Apple Silicon, Windows x64 and Windows 10 Compatibility x64. New hardware features still need real-device acceptance; this is not the stable 1.0 release.
+This is a **preview of the next version, not a public App release**. Source, documentation and screenshots are public; new App packages remain private for testing. Historical Beta 14, RC2 and 0.4.x releases are preserved. The current source includes the Beta 15.1 Windows cancellation correction; screenshots show the Beta 15 feature set.
 
 ## New in Beta 15
 
 - **Clearer sync states:** distinguish sent data, device acknowledgement, verified keymap data and unknown state. A failure or interruption after a potentially mutating write blocks reuse of the old lighting baseline; the app does not blindly repeat a full write.
 - **Dedicated R6 Sound page:** speaker channels, microphone direction, noise reduction and tone presets use independent short commands. Opening the page only checks connectivity. Unavailable current values remain unknown; a setting echo is not acoustic verification.
-- **Local microphone test:** list system audio devices and identify the active input, explicitly record up to 30 seconds, then play or clear the recording locally. Leaving the page clears it; no ASR service is called. Speaker calibration is an advanced, separately confirmed operation.
+- **Local microphone test:** list system audio devices and identify the system default input, explicitly record up to 30 seconds, then play or clear the recording locally. Leaving the page clears it; no ASR service is called. Speaker calibration is an advanced, separately confirmed operation.
 - **R6 single-key, tap/hold and macro editing:** independent commands and tables, reviewed plans, device/baseline binding and backups. Add, update or delete entries, and choose the ordinary binding after deletion. Full keycodes and readable advanced tables are checked after transmission; an incomplete table is never replaced with an invented empty table.
 - **Persistent Codex tasks:** choose a working directory, attach files, continue a task, steer it during execution, review individual permissions and inspect results and files. Spotify is an optional Mac example.
 - **Quick Windows Codex setup:** Install → Sign in → Check connection through the official native CLI, without requiring Node.js or WSL and without reading or copying authentication files.
@@ -45,17 +45,11 @@ Watch the compressed 720p preview in the embedded player. Original-quality video
 
 Screenshots use a separate demonstration environment, without personal keys, conversations or device records. Photo-composited lighting is not hardware color calibration, and sample states do not establish a real hardware write.
 
-## Downloads
+## Public preview and testing status
 
-| Platform | Download | Scope |
-| --- | --- | --- |
-| **macOS Apple Silicon** | [Beta 15 ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | macOS 13+; CLI and runtime included |
-| **Windows x64** | [Beta 15 standard ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | Extract the full folder; use the bundled Microsoft WebView2 bootstrapper if needed |
-| **Windows 10 Compatibility x64** | [Beta 15 compatibility ZIP and SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | Addresses the existing CET startup issue; does not expand .NET or Codex system support |
+This update publishes source, documentation and screenshots only. **No new public App binaries are available.** The briefly published Beta 15 release has been withdrawn; historical Beta 14, RC2 and 0.4.x releases remain available.
 
-Download a platform ZIP rather than only Source code, and verify its matching `.sha256`. No separate Python installation is required. Start with the standard Windows package and retain all adjacent DLLs and resources; do not mix package contents. There are no Intel Mac, 32-bit Windows or native Windows ARM64 packages.
-
-On Mac, extract the app and move it to Applications. This build is ad-hoc signed and is not Apple Developer ID signed or notarized. Follow [Apple's app-opening instructions](https://support.apple.com/en-gb/102445) without disabling system protection. Quit the previous app before upgrading and retain one fixed signed copy. Microphone, global-key and optional Spotify automation access is requested only when using the respective feature.
+macOS Apple Silicon, Windows x64 and Windows 10 Compatibility are being tested privately. The Mac build uses ad-hoc signing, without Developer ID notarization. New R6 audio and advanced key controls still require hardware acceptance; partial lighting writes remain disabled, and firmware updates are handed off to the official website.
 
 ## Quick start
 

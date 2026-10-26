@@ -1,12 +1,14 @@
-# Cyberboard Studio · Beta 15
+# Cyberboard Studio · 下一版预告
 
 **简体中文** · [English](README.en.md)
 
 面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。实验性的「喵唤」让你按住一颗键，把任务交给本机 Codex；R6 新增独立声音设置、麦克风试听和高级键位编辑。
 
-**[下载 Beta 15 · Mac / Windows](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15)** · [本版更新说明](docs/RELEASE_NOTES_BETA15.md) · [R6 配置指南](docs/R6_CONFIGURATION.md) · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
+**App 暂不公开发布** · [本版更新说明](docs/RELEASE_NOTES_BETA15.md) · [R6 配置指南](docs/R6_CONFIGURATION.md) · [反馈问题](https://github.com/maestrokaka/cyberboard-studio/issues)
 
-这是 **公开测试版**。本次将此前私有版的通用 Codex 任务、桌面陪伴与 Windows 接入合并公开，同时补齐 R6 配置能力。提供 macOS Apple Silicon、Windows x64、Windows 10 Compatibility 三个软件包；硬件新增功能仍需实机验收，不作为稳定 1.0 版本。
+这是 **下一版本的功能预告**。公开仓库同步源码、说明和截图，App 安装包暂不公开提供；历史 Beta 14、RC2 与 0.4.x 保留。本次在私有测试中整合通用 Codex 任务、桌面陪伴、Windows 接入和 R6 配置能力，新增硬件功能仍需实机验收。
+
+当前源码包含 **Beta 15.1** 修订，修复 Windows 取消后台请求时偶发误报“没有返回结果”的问题。以下截图展示正在测试的 Beta 15 系列界面，不代表已经公开发行。
 
 ## Beta 15 新增与修正
 
@@ -47,17 +49,11 @@ https://github.com/user-attachments/assets/a0ea2c61-1c65-4d93-a893-b44f2995d499
 
 截图来自独立演示环境，不含个人 Key、会话或设备记录。照片合成灯效不是实机色准测量，示例状态也不代表真实设备已经写入。
 
-## 下载与运行
+## 公开预告与测试状态
 
-| 平台 | 下载 | 说明 |
-| --- | --- | --- |
-| **macOS Apple Silicon** | [Beta 15 ZIP 与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | macOS 13 及以上；含 CLI 与运行环境 |
-| **Windows x64** | [Beta 15 普通包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | 完整解压后打开 EXE；缺少 WebView2 时运行随包引导安装器 |
-| **Windows 10 Compatibility x64** | [Beta 15 兼容包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15) | 用于既有 CET 启动兼容问题，不扩大 .NET / Codex 官方系统支持范围 |
+本轮公开仓库仅提供源码、功能说明和截图，**暂不发布 App 安装包**。刚上传的 Beta 15 已撤下；此前 Beta 14、RC2 和 0.4.x 历史发行版保留。
 
-请选择平台 ZIP，不要只下载 Source code；同名 `.sha256` 用于校验。无需另装 Python。Windows 建议先使用普通 x64 包，保留同目录全部 DLL 和资源；两种包不要混用。当前没有 Intel Mac、Windows 32 位或 Windows ARM64 原生包。
-
-Mac 解压后将 App 放入「应用程序」。当前采用 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证，首次打开请按 [Apple 的应用打开说明](https://support.apple.com/en-gb/102445) 操作。升级前先退出旧 App，并固定使用同一份软件包；不要关闭系统保护。麦克风、全局按键和可选 Spotify 自动化权限只在明确使用对应功能时请求。
+macOS Apple Silicon、Windows x64 与 Windows 10 Compatibility 在私有测试中验证。Mac 使用 ad-hoc 签名，尚未进行 Developer ID 签名或公证；新增 R6 声音、宏和长短按仍需实机确认。局部灯效写入未启用，固件升级交接到官方网页。
 
 ## 五分钟开始创作
 
@@ -140,7 +136,7 @@ python windows/build.py --dotnet /path/to/dotnet --nuget /path/to/nuget-cache --
 
 ## 发布维护
 
-Beta 15 同步公开与私有仓库；历史 Beta 14、RC2 和私有测试版标签/附件保留原样。Releases 只提供软件包与校验文件，不放视频、私人录音、声纹源素材、Key、个人工作区或设备记录。反馈时请附 App 版本、系统、键盘型号、固件版本和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 留言。
+本轮公开仓库只同步预告源码、文档与截图；App 包仅私有测试。刚公开的 Beta 15 已撤下，历史 Beta 14、RC2 和 0.4.x 标签/附件保留原样。Releases 不放视频、私人录音、声纹源素材、Key、个人工作区或设备记录。反馈时请附 App 版本、系统、键盘型号、固件版本和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio/issues) 留言。
 
 ## 支持作者
 

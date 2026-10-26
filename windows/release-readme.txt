@@ -1,9 +1,9 @@
-Cyberboard Studio 1.0.0-beta.15 · Windows x64 测试版
+Cyberboard Studio 1.0.0-beta.15.1 · Windows x64 测试版
 
 第三方怒喵（Angry Miao）键盘工具，面向 CYBERBOARD R4 / CYBERBOARD R6。
 本版将喵唤通用 Codex 任务与桌面喵娘接入 Windows。仍为私有 Beta，Windows
 原生窗口、麦克风、全局快捷键、Codex 登录与真实任务、USB 和 R4 写入待实机验收。
-Beta 15 同时更新 macOS 与 Windows，公开和私有仓库均提供。
+源码与预告说明同步公开和私有仓库；本轮 App 软件包仅供私有测试。
 完整指南与验收范围：
 https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/MIAOCALL_WINDOWS.md
 https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/RELEASE_NOTES_WINDOWS_BETA1.md

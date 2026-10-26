@@ -32,7 +32,7 @@ internal sealed class StudioForm : Form
     private bool workspaceFailureShowing;
     private bool documentReady;
     private bool exitApproved;
-    private const string ReleaseVersion = "1.0.0-beta.15";
+    private const string ReleaseVersion = "1.0.0-beta.15.1";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
     { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",

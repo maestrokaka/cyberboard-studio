@@ -1,8 +1,12 @@
-# Cyberboard Studio · Beta 15
+# 下一版本预告 · Beta 15 系列
 
-版本：`1.0.0-beta.15`。本版统一提供 macOS Apple Silicon、Windows x64 和 Windows 10 Compatibility x64，更新公开与私有仓库。[下载软件包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-beta.15)
+源码版本：`1.0.0-beta.15.1`。公开仓库仅作功能预告，**本轮 App 暂不公开发布**。本轮公开 Beta 15 已撤下，历史 Beta 14、RC2 和 0.4.x 保留。macOS 与 Windows 修订包继续私有测试。
 
 这是测试版。新增硬件功能需要对应 R6 和固件实机确认；离线协议、CI 或包检查不能替代真实 USB、麦克风与声学方向验收。
+
+## Beta 15.1 修订
+
+修复 Windows 取消后台请求的时序问题：即使子进程已经退出、输出流已结束，也先识别取消状态，避免误报“后台没有返回操作结果”。新增确定性的取消与已完成结果回归；没有改变设备协议或声音参数。
 
 ## 设备配置与同步
 

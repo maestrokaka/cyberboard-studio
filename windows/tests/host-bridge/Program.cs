@@ -576,6 +576,59 @@ internal static class Program
                 Check(events.All(e => !e.GetRawText().Contains(secret)), "Progress exposed a credential.");
                 Check(HostLog.Messages.Count == before, "AI stderr reached host logs.");
             });
+            await Run("already-completed EOF and exit still honor cancellation before interpreting a final reply", () =>
+            {
+                // Test the production post-I/O boundary directly. StreamReader
+                // EOF and WaitForExitAsync may both already be completed when
+                // a killed child is reaped, so neither await must be relied on
+                // to throw. No sleep, subprocess timing or retry is involved.
+                using var cancellation = new CancellationTokenSource();
+                var replies = new (JsonElement? Final, string? ParseError, int ExitCode)[]
+                {
+                    (null, null, 0),
+                    (null, null, -1),
+                    (null, "后台返回的数据不是有效的 JSON。", -1),
+                    (Payload(new { result = new { ok = true } }), null, 0),
+                    (Payload(new { error = new { code = "fixture_error", message = "未完成" } }), null, 1),
+                    (Payload(new { result = new { ok = true } }), null, 7),
+                };
+                cancellation.Cancel();
+                foreach (var reply in replies)
+                {
+                    var cancelled = false;
+                    try
+                    {
+                        _ = BackendClient.FinishReply(reply.Final, reply.ParseError, reply.ExitCode, cancellation.Token, null);
+                    }
+                    catch (OperationCanceledException error)
+                    {
+                        Check(error.CancellationToken == cancellation.Token, "Cancellation lost the originating token.");
+                        cancelled = true;
+                    }
+                    Check(cancelled, "Completed I/O turned a cancelled request into a reply or a backend failure.");
+                }
+                return Task.CompletedTask;
+            });
+            await Run("uncancelled finalization preserves EOF, parse, structured errors, exit codes and redacted cloned results", async () =>
+            {
+                var token = CancellationToken.None;
+                await Fails(() => { _ = BackendClient.FinishReply(null, null, -1, token, null); return Task.CompletedTask; }, "后台没有返回操作结果（-1）");
+                await Fails(() => { _ = BackendClient.FinishReply(Payload(new { result = new { ok = true } }), "确定的解析错误", 0, token, null); return Task.CompletedTask; }, "确定的解析错误");
+                await Fails(() => { _ = BackendClient.FinishReply(Payload(new { result = new { ok = true } }), null, 7, token, null); return Task.CompletedTask; }, "后台操作未成功完成（7）");
+                var failure = await Fails(() =>
+                {
+                    _ = BackendClient.FinishReply(Payload(new { error = new { code = "fixture_error", message = "明确失败", details = new { preserved = true } } }), null, 1, token, null);
+                    return Task.CompletedTask;
+                }, "明确失败");
+                Check(failure is BackendReplyException structured && structured.Error.GetProperty("code").GetString() == "fixture_error" &&
+                    structured.Error.GetProperty("details").GetProperty("preserved").GetBoolean(), "Finalization discarded structured error details.");
+                JsonElement result;
+                const string secret = "sk-finish-reply-synthetic";
+                using (var document = JsonDocument.Parse(JsonSerializer.Serialize(new { result = new { ok = true, note = "prefix:" + secret, apiKey = secret } })))
+                    result = BackendClient.FinishReply(document.RootElement, null, 0, token, secret);
+                Check(result.GetProperty("ok").GetBoolean() && !result.GetRawText().Contains(secret) && !result.TryGetProperty("apiKey", out _),
+                    "Success did not remain usable/redacted after source document disposal.");
+            });
             await Run("request cancellation stops AI child while the independent device lane completes", async () =>
             {
                 using var ai = new BackendClient();

@@ -2,7 +2,9 @@
 
 ## 本轮公开与私有开发范围
 
-- 2026-10-26 用户明确要求本轮同时更新公开 origin 与 miaocall-private，更新公开 README 对比 Beta 14 的变化和全部页面截图。此指令覆盖下方历史 private-only 限制。本轮版本 v1.0.0-beta.15，发布测试版并如实说明 R6 新指令仅离线验证、固件使用官方网页升级、局部灯效保留未验收；不得上传私人数据、Key、声纹源素材或视频到 Releases。
+- 2026-10-26 最新指令：公开仓库本轮只作预告，更新源码、说明与截图，不发布本轮 App；只撤下刚发布的公开 Beta 15，保留 Beta 14/RC2/0.4.x 历史版。Beta 15.1 修订包仅更新私有仓库。此限制覆盖本段此前的双仓安装包发布安排。
+
+- 2026-10-26 用户明确要求本轮同时更新公开 origin 与 miaocall-private，更新公开 README 对比 Beta 14 的变化和全部页面截图。此指令覆盖下方历史 private-only 限制。本轮版本 v1.0.0-beta.15.1，发布测试版并如实说明 R6 新指令仅离线验证、固件使用官方网页升级、局部灯效保留未验收；不得上传私人数据、Key、声纹源素材或视频到 Releases。
 
 - 2026-10-24 用户要求桌面喵娘互动、常驻/唤醒、AI换装、丰富触点和多声线版本仅更新私有仓库。当前分支 `feature/miaocall-companion`，只推送 `miaocall-private`（maestrokaka/cyberboard-studio-miaocall）；禁止推送公开 origin、修改公开 main 或公开 Release。
 - 公开 Beta 14 及其 README、原生内嵌视频、安装包保持原样。Releases 不放视频。原画质、声纹源录音和私有状态不上传。

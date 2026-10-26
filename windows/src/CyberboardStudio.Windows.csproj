@@ -12,10 +12,10 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
-    <Version>1.0.0-beta.15</Version>
+    <Version>1.0.0-beta.15.1</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-beta.15</InformationalVersion>
+    <InformationalVersion>1.0.0-beta.15.1</InformationalVersion>
     <Authors>Cyberboard Studio</Authors>
     <Product>Cyberboard Studio</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
