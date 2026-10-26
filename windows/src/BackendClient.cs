@@ -126,9 +126,7 @@ internal sealed class BackendClient : IDisposable
             }
             catch
             {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-                catch (InvalidOperationException) { }
-                catch (System.ComponentModel.Win32Exception) { }
+                await OwnedProcessCleanup.StopAsync(process);
                 throw;
             }
         }
@@ -175,4 +173,23 @@ internal sealed class BackendClient : IDisposable
     }
 
     public void Dispose() => shutdown.Cancel();
+}
+
+// Kill is asynchronous on Windows. Do not release the request/working directory
+// until this owned child has exited. Cleanup never replaces the original error.
+internal static class OwnedProcessCleanup
+{
+    internal static async Task StopAsync(Process child)
+    {
+        try
+        {
+            if (!child.HasExited) child.Kill(entireProcessTree: true);
+            await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (InvalidOperationException) { /* Start failed; no child was owned. */ }
+        catch (System.ComponentModel.Win32Exception)
+        { HostLog.Write("backend cleanup", "Owned child could not be stopped; the original request error is preserved."); }
+        catch (TimeoutException)
+        { HostLog.Write("backend cleanup", "Owned child did not exit within the cleanup deadline; the original request error is preserved."); }
+    }
 }

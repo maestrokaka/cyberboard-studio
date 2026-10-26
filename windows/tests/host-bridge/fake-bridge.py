@@ -1,5 +1,6 @@
 """JSON-lines test subprocess. No cyberboard import, device enumeration or USB."""
 import argparse
+import os
 import json
 import sys
 import time
@@ -12,7 +13,11 @@ args = parser.parse_args()
 if args.action == "miaoCallWorker":
     payload=json.loads(sys.stdin.readline())
     def stream(value):print(json.dumps(value),flush=True)
-    if payload.get("mode") == "malformed":
+    if payload.get("mode") == "malformed-live":
+        stream({"event":"miaoCall","workerPid":os.getpid()})
+        print("{broken JSON",flush=True)
+        time.sleep(60)
+    elif payload.get("mode") == "malformed":
         print("{broken JSON", flush=True)
         stream({"result": {"ok": True}})
     elif payload.get("mode") == "nonzero":
@@ -70,7 +75,7 @@ elif args.action == "exit":
 elif args.action == "empty":
     sys.exit(0)
 elif args.action == "cancel":
-    emit({"event": "started", "中文": "等待取消"})
+    emit({"event": "started", "中文": "等待取消", "workerPid": os.getpid()})
     time.sleep(120)
     emit({"result": {"unexpected": True}})
 else:

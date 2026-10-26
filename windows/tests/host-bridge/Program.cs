@@ -52,6 +52,13 @@ internal static class Program
         throw new Exception("Expected IOException containing " + expected);
     }
 
+    internal static void CheckWorkerExited(int pid)
+    {
+        Check(pid > 0, "Fixture did not identify its owned worker.");
+        try { using var child = Process.GetProcessById(pid); Check(child.HasExited, "Request returned before its owned worker exited."); }
+        catch (ArgumentException) { /* No such PID: the worker has exited. */ }
+    }
+
     private static async Task Main(string[] args)
     {
         if (args.Length != 1 || !File.Exists(args[0])) throw new Exception("Pass a real Python interpreter path.");
@@ -652,13 +659,16 @@ internal static class Program
                 using var device = new BackendClient();
                 using var cancellation = new CancellationTokenSource();
                 var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var active = voice.RunAsync("cancel", Payload(new { requestId = "voice-cancel" }), _ => started.TrySetResult(), cancellation.Token, suppressDiagnostics: true);
+                int workerPid = 0;
+                var active = voice.RunAsync("cancel", Payload(new { requestId = "voice-cancel" }), e =>
+                { workerPid = e.GetProperty("workerPid").GetInt32(); started.TrySetResult(); }, cancellation.Token, suppressDiagnostics: true);
                 await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 var aiReply = ai.RunAsync("queue", Payload(new { lane = "ai" }), _ => { }, secret: "synthetic-ai-key");
                 var deviceReply = device.RunAsync("queue", Payload(new { lane = "device" }), _ => { });
                 cancellation.Cancel();
                 try { await active.WaitAsync(TimeSpan.FromSeconds(5)); throw new Exception("Expected voice cancellation."); }
                 catch (OperationCanceledException) { }
+                CheckWorkerExited(workerPid);
                 Check((await aiReply).GetProperty("payload").GetProperty("lane").GetString() == "ai" &&
                       (await deviceReply).GetProperty("payload").GetProperty("lane").GetString() == "device", "Voice cancellation interrupted another request.");
                 Check((await voice.RunAsync("echo", Payload(new { after = true }), _ => { }, suppressDiagnostics: true)).GetProperty("payload").GetProperty("after").GetBoolean(), "Voice backend remained blocked after cancellation.");

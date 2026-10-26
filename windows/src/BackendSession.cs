@@ -108,7 +108,8 @@ internal sealed class BackendSession : IDisposable
         catch(JsonException){throw new IOException("任务返回格式无效，已停止。");}
         finally
         {
-            try{if(!child.HasExited)child.Kill(entireProcessTree:true);}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}
+            if(job is not null)await job.StopAsync();
+            await OwnedProcessCleanup.StopAsync(child);
             job?.Dispose();process=null;
         }
     }
@@ -128,11 +129,35 @@ internal sealed class OwnedProcessJob : IDisposable
     }
     internal void Assign(Process process)
     {if(!AssignProcessToJobObject(handle,process.Handle))throw new IOException("无法管理任务进程，请重新打开软件或联系设备管理员。");}
+    internal async Task StopAsync()
+    {
+        // Closing a job initiates termination but does not wait for descendants.
+        // Keep the handle until its owned process count reaches zero.
+        try
+        {
+            if(!TerminateJobObject(handle,1))
+            {HostLog.Write("backend cleanup","Owned job could not be stopped; the original session result is preserved.");return;}
+            var deadline=Stopwatch.StartNew();
+            while(deadline.Elapsed<TimeSpan.FromSeconds(5))
+            {
+                if(!QueryInformationJobObject(handle,1,out var accounting,(uint)Marshal.SizeOf<BasicAccounting>(),IntPtr.Zero))
+                {HostLog.Write("backend cleanup","Owned job completion could not be checked; the original session result is preserved.");return;}
+                if(accounting.ActiveProcesses==0)return;
+                await Task.Delay(20);
+            }
+            HostLog.Write("backend cleanup","Owned job did not exit within the cleanup deadline; the original session result is preserved.");
+        }
+        catch(ObjectDisposedException) { }
+    }
     public void Dispose()=>handle.Dispose();
+    [StructLayout(LayoutKind.Sequential)] private struct BasicAccounting
+    {public long TotalUserTime,TotalKernelTime,ThisPeriodUserTime,ThisPeriodKernelTime;public uint TotalPageFaultCount,TotalProcesses,ActiveProcesses,TotalTerminatedProcesses;}
     [StructLayout(LayoutKind.Sequential)] private struct BasicLimit {public long PerProcessUserTime,PerJobUserTime;public uint LimitFlags;public UIntPtr MinWorkingSet,MaxWorkingSet;public uint ActiveProcessLimit;public UIntPtr Affinity;public uint PriorityClass,SchedulingClass;}
     [StructLayout(LayoutKind.Sequential)] private struct IoCounters {public ulong ReadOperations,WriteOperations,OtherOperations,ReadBytes,WriteBytes,OtherBytes;}
     [StructLayout(LayoutKind.Sequential)] private struct ExtendedLimit {public BasicLimit BasicLimit;public IoCounters IoInfo;public UIntPtr ProcessMemoryLimit,JobMemoryLimit,PeakProcessMemory,PeakJobMemory;}
     [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] private static extern SafeFileHandle CreateJobObject(IntPtr attributes,string? name);
     [DllImport("kernel32.dll",SetLastError=true)] private static extern bool SetInformationJobObject(SafeFileHandle job,int infoClass,ref ExtendedLimit info,uint length);
+    [DllImport("kernel32.dll",SetLastError=true)] private static extern bool TerminateJobObject(SafeFileHandle job,uint exitCode);
+    [DllImport("kernel32.dll",SetLastError=true)] private static extern bool QueryInformationJobObject(SafeFileHandle job,int infoClass,out BasicAccounting accounting,uint length,IntPtr returnLength);
     [DllImport("kernel32.dll",SetLastError=true)] private static extern bool AssignProcessToJobObject(SafeFileHandle job,IntPtr process);
 }

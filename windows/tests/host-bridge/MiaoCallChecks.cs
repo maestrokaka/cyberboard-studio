@@ -5,16 +5,6 @@ using CyberboardStudio;
 internal static class MiaoCallChecks
 {
     private static void Check(bool ok, string text) { if (!ok) throw new Exception(text); }
-    private static async Task<bool> ProcessEnded(int pid)
-    {
-        for (var attempt = 0; attempt < 30; attempt++)
-        {
-            try { using var child = Process.GetProcessById(pid); if (child.HasExited) return true; }
-            catch (ArgumentException) { return true; }
-            await Task.Delay(100);
-        }
-        return false;
-    }
     private static void CleanFixtureChild(int pid)
     {
         // The fixture reports only the PID of its own synthetic 60-second sleeper.
@@ -68,6 +58,18 @@ internal static class MiaoCallChecks
             var result = await pending.WaitAsync(TimeSpan.FromSeconds(10));
             Check(MiaoCallContracts.Text(result, "status") == "cancelled", "Noninteractive cancellation stalled or returned success");
         }
+        using (var session = new BackendSession())
+        {
+            int workerPid = 0;
+            try
+            {
+                await session.RunAsync("miaoCallWorker", new { mode = "malformed-live" }, e =>
+                { workerPid = e.GetProperty("workerPid").GetInt32(); }).WaitAsync(TimeSpan.FromSeconds(10));
+                throw new Exception("Malformed live worker was accepted.");
+            }
+            catch (IOException) { }
+            Program.CheckWorkerExited(workerPid);
+        }
         foreach (var mode in new[] { "malformed", "nonzero", "partial", "duplicate", "after-final", "unknown" })
         {
             using var session = new BackendSession();
@@ -80,7 +82,7 @@ internal static class MiaoCallChecks
             using var session = new BackendSession();
             var result = await session.RunAsync("miaoCallWorker", new { mode = "child" }, _ => { }).WaitAsync(TimeSpan.FromSeconds(10));
             int pid = result.GetProperty("childPid").GetInt32();
-            try { Check(await ProcessEnded(pid), "Owned app-server descendant outlived completed session job"); }
+            try { Program.CheckWorkerExited(pid); }
             finally { CleanFixtureChild(pid); }
             Console.WriteLine("PASS Windows native Job Object terminates owned descendant after session completion");
         }
