@@ -6,7 +6,7 @@ internal static class ResourcePolicy
     public const string Index = "https://studio.cyberboard.invalid/index.html";
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".html", ".js", ".css", ".json", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".ico", ".woff", ".woff2", ".ttf"
+        ".html", ".js", ".css", ".json", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif", ".ico", ".woff", ".woff2", ".ttf", ".mp3"
     };
 
     public static bool IsOrigin(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) &&

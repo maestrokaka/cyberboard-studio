@@ -99,15 +99,13 @@ def validate_payload(payload):
     return {"transcript": transcript.strip(), "tracks": tracks, "model": model}
 
 
-def find_cli():
-    """Discover an executable, never the CLI's credentials or configuration."""
-    for name in CLI_LOCATIONS:
-        if Path(name).is_file() and os.access(name, os.X_OK):
-            return name
-    found = shutil.which("codex")
-    if found and Path(found).is_file() and os.access(found, os.X_OK):
-        return found
-    raise MiaoCallError("codex_not_installed")
+def find_cli(selected=None):
+    """Use a native runtime, never shell shims or copied account data."""
+    from codex_runtime import locate
+    try:
+        return locate(selected)
+    except (OSError, ValueError):
+        raise MiaoCallError("codex_not_installed") from None
 
 
 def dynamic_tools():

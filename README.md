@@ -1,12 +1,12 @@
-# Cyberboard Studio · MiaoCall Tasks Private Beta 3
+# Cyberboard Studio · MiaoCall Private Beta
 
 **简体中文** · [English](README.en.md)
 
 面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。也可以开启实验性的「喵唤」，按住一颗键，把语音指令交给本机 Codex。
 
-**[下载 Tasks 私有测试版 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · [更新说明](docs/RELEASE_NOTES_TASKS_BETA3.md) · [桌面陪伴与衣橱说明](docs/MIAOCALL_COMPANION.md)
+**[下载 Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[Windows Private Beta 1 · 发布准备与配置指南](docs/MIAOCALL_WINDOWS.md)** · [Windows 更新说明](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [桌面陪伴与衣橱](docs/MIAOCALL_COMPANION.md)
 
-这是 **私有测试版**，在灯效工作室和桌面陪伴基础上，将喵唤扩展为 Codex 通用任务入口。支持工作目录、持久任务、继续追问、授权与结果文件；Spotify 仅作可选示例。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
+这是 **私有测试版**，在灯效工作室和桌面陪伴基础上，将喵唤扩展为 Codex 通用任务入口。支持工作目录、持久任务、继续追问、授权与结果文件；Spotify 仅作可选示例。Windows Private Beta 1 正在准备，将同一套任务与桌面陪伴接入 Windows；当前 macOS 下载保持 Tasks Private Beta 3。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
 
 ## 这一版的喵娘
 
@@ -27,7 +27,7 @@
 - **两种界面风格**：「经典深色」与「暖岛浅色」在设置中即时切换，重开后保留；不改变作品 RGB 或槽位。
 - **键位编辑**：独立页面显示 81 个实体键、7 层可读功能；先编辑本机草稿，审核专用计划后才写入。未知原始码保留，Fn 功能不再只是一串数字。
 - **AI 语音输入**：单独配置 MiniMax、千问或 OpenAI 的语音转文字模型，识别后检查文字，再手动发送制作灯效。
-- **喵唤 MiaoCall · Beta**：macOS 按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。
+- **喵唤 MiaoCall · Beta**：按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。Mac 已有私有测试包，Windows 新版正在准备实机验收。
 
 ## 界面预览
 
@@ -50,7 +50,8 @@
 | 平台 / 版本 | 下载 | 说明 |
 | --- | --- | --- |
 | **macOS · MiaoCall Tasks Private Beta 3** | [私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
-| Windows · **历史 RC2** | [RC2 普通 x64 / Windows 10 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 旧版灯效功能，不含本次新增界面、语音和喵唤；原生 GUI / USB 仍待实机验收 |
+| **Windows · MiaoCall Private Beta 1** | [发布准备与配置指南](docs/MIAOCALL_WINDOWS.md) | x64 私有版正在打包验证；原生 GUI、语音、快捷键、Codex 登录与 USB 待实机验收 |
+| Windows · 历史 RC2 | [旧版普通 x64 / 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 历史灯效版，不含本次喵唤功能；附件保持原样 |
 
 Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
 
@@ -68,15 +69,17 @@ App 使用本机 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证
 
 ## 喵唤：按住一颗键，说出想做的事
 
+Windows 新版在页面内提供「安装 Codex → 登录 → 检测连接」，默认使用官方原生 CLI，无需先装 Node.js 或 WSL；已有登录由官方接口判断，不复制认证文件。[Windows 连接步骤](docs/MIAOCALL_WINDOWS.md#连接-codex安装--登录--检测)
+
 1. 安装并登录本机 Codex，进入「喵唤 · Beta」→「语音任务」。文字任务可直接使用。
 2. 选择工作目录。默认只读，需要修改时再明确勾选；可添加文件。
 3. 输入任务并提交；也可配置 MiniMax / 千问 / OpenAI 语音服务，开启快捷键后按住「·」交代，确认文字后提交。
 4. 在任务详情查看步骤、回答问题或逐次授权，检查返回结果与文件；同一任务可继续追问，执行中可补充文字指令。
 
-使用官方本机 app-server，保存喵唤自己创建的任务会话。支持文件整理、资料摘要、项目修改等，实际能力取决于本机 Codex 工具和连接。Spotify 是可选示例，保留实际播放验证。WorkBuddy、千问办公和豆包工作尚未接入。[完整任务说明与数据范围](docs/MIAOCALL_TASKS.md)
+使用官方本机 app-server，保存喵唤自己创建的任务会话。支持文件整理、资料摘要、项目修改等，实际能力取决于本机 Codex 工具和连接。Spotify 是 Mac 的可选示例，保留实际播放验证；Windows 不提供这套专用验证工具。WorkBuddy、千问办公和豆包工作尚未接入。[完整任务说明与数据范围](docs/MIAOCALL_TASKS.md)
 
 
-不开启时「·」正常输入。喵唤不会随 App 启动自动启用，退出后释放监听。桌面语音 / 浮层当前仅支持 macOS。[完整连接、权限和故障排查](docs/MIAOCALL_BETA.md) · [键位与 AI 输入框语音说明](docs/KEYMAP_VOICE_LOCAL.md)
+不开启时「·」正常输入。喵唤不会随 App 启动自动启用，退出后释放监听。Windows Private Beta 1 增加原生语音与桌面浮层，真机行为仍待验收。[完整连接、权限和故障排查](docs/MIAOCALL_BETA.md) · [键位与 AI 输入框语音说明](docs/KEYMAP_VOICE_LOCAL.md)
 
 ## 内置灯效 GIF
 
@@ -147,7 +150,7 @@ python scripts/build-preset-gifs.py
 
 ## 离线验证
 
-通用任务新增 `tests/agent-tasks-check.py` 与 `tests/agent-tasks-ui-check.cjs`；`python scripts/check-release.py --mac-native` 是本机离线发布检查入口，GitHub Actions 自动运行相应检查。桌面陪伴保留 `tests/companion-check.py`、`tests/companion-native-check.py` 与 `tests/companion-package-check.py --app APP路径`，覆盖衣装生成边界、32 个姿势、60 条音频解码、停留冷却、设置与真实软件包连接配置。
+Windows 登录与安装发现新增 `tests/codex-connection-check.py`；通用任务包含 `tests/agent-tasks-check.py` 与 `tests/agent-tasks-ui-check.cjs`；`python scripts/check-release.py --mac-native` 是本机离线发布检查入口，GitHub Actions 自动运行相应检查。桌面陪伴保留 `tests/companion-check.py`、`tests/companion-native-check.py` 与 `tests/companion-package-check.py --app APP路径`，覆盖衣装生成边界、32 个姿势、60 条音频解码、停留冷却、设置与真实软件包连接配置。
 
 ```sh
 node tests/model-check.cjs
@@ -188,7 +191,7 @@ STUDIO_UI_PLATFORM=windows node tests/ui-check.cjs
 
 ## 发布维护
 
-当前私有 `feature/miaocall-companion` 包含 Tasks Beta 3 源码与素材；不推送公开 main，也不上传个人测试录音、声纹源文件或桌面录制素材。公开 Beta 14、旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues) 反馈。
+当前私有 `feature/miaocall-companion` 包含 Tasks Beta 3 以及 Windows Private Beta 1 接入源码与素材；不推送公开 main，也不上传个人测试录音、声纹源文件或桌面录制素材。公开 Beta 14、旧 RC2 的标签和附件保持原样。后续问题欢迎附上版本、系统、键盘型号和复现步骤，到 [Issues](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues) 反馈。
 
 ## 支持作者
 

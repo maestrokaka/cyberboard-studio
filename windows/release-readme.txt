@@ -1,10 +1,12 @@
-Cyberboard Studio 1.0.0-rc.2 · Windows x64 候选版
+Cyberboard Studio 1.0.0-miaocall.windows.beta.1 · Windows x64 私有测试版
 
 第三方怒喵（Angry Miao）键盘工具，面向 CYBERBOARD R4 / CYBERBOARD R6。
-此包为 1.0 正式发布前候选版，不代表 Windows GUI / Key 文件操作 / USB 或 R4
-写入已经完成实机验收。完整指南与验收范围：
-https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/USER_GUIDE.md
-https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/RELEASE_1.0.0_RC2.md
+本版将喵唤通用 Codex 任务与桌面喵娘接入 Windows。仍为私有 Beta，Windows
+原生窗口、麦克风、全局快捷键、Codex 登录与真实任务、USB 和 R4 写入待实机验收。
+本次不替换 macOS Tasks Beta 3，也不修改公开仓库和公开 Beta 14。
+完整指南与验收范围：
+https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/MIAOCALL_WINDOWS.md
+https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/RELEASE_NOTES_WINDOWS_BETA1.md
 
 下载与安装
 1. 整个 ZIP 解压到普通目录，例如 D:\Apps\Cyberboard Studio。
@@ -12,9 +14,10 @@ https://github.com/maestrokaka/cyberboard-studio/blob/main/docs/RELEASE_1.0.0_RC
 3. 若缺 WebView2，运行 Dependencies\MicrosoftEdgeWebview2Setup.exe，
    联网按 Microsoft 向导安装后重开 App。不要直接在 ZIP 内运行或只复制 EXE。
 
-普通包面向 Windows 11 x64 及部分受 .NET 10 支持的 Windows 10 LTSC / Enterprise。
+推荐 Windows 11 x64；Windows 10 是否可运行还取决于 .NET 与 Codex 官方支持范围。
 Intel Mac、32 位 Windows、Windows ARM64 原生包不在本包范围。
-Python、CLI 和 .NET 运行组件已附，无需另外安装。此包没有商业代码签名，
+Python、Cyberboard CLI 和 .NET 运行组件已附，无需另外安装。
+Codex 由下面的官方安装入口另外安装，不随包复制账户资料。此包没有商业代码签名，
 请核对包内 SHA256SUMS 及 GitHub 对应 .zip.sha256。应用不设置自动启动、
 防火墙、计划任务或自动升级。
 
@@ -23,23 +26,55 @@ Python、CLI 和 .NET 运行组件已附，无需另外安装。此包没有商�
 兼容包只取消本 App 的 CET 标记，不修改系统安全设置，不扩大 .NET 官方系统
 支持范围。优先更新系统后继续使用普通包，不要混用普通和兼容包的文件。
 
-1.0.0-rc.2 本次更新
-• AI 创作独立为对话页：主对话、参考图、可收起的轻预览和完整版本。
-  会话搜索在页面内部；每次接受的结果新增版本，选择基础版本继续修改。
-• 明确选择顶部+轴灯、仅顶部、仅轴灯；局部编辑保留另一灯域完整帧和时序。
-  旧版本不改变；停止、错误和中断保留输入、图片及已有结果。
-• 结果先保存在会话，指定版本明确保存到作品库，或打开工作台调整。
-  空会话不能交付旧作品；会话切换不清空三槽草稿。
-• 工作台只放整机大预览、参数、JSON和三槽管理。键盘与外观独立八卡页，
-  可筛 R4/R6，以同作品同帧比较。设备页通过子标签进入键位和同步记录。
-• DeepSeek 分开计算有效输出、思考内容与传输额度，修正过小的累计读取限制。
-  MiniMax 接受完整 stop 后关闭流，并调整 M3 思考参数，仍拒绝不完整回复。
-  新 MiniMax 连接默认 M3.1 Flash Preview，已保存其他模型不会被强制改回。
-• v2 工作区保留本机会话、归一化图片、不可变版本、作品库和独立草稿。
-  成功保存后才报告；退出/重载先等待保存，失败提供留在 App 导出/重试入口。
-  首次写入新版前将旧工作区保存在 workspace-before-1.0.json。
-• 延续十预设、回收站、JSON、单槽同步、当前键位保留和完整备份/同步计划。
-  升级与打开预览不会自动探测或写入 USB。
+Windows Private Beta 1 本次更新
+• 通用 Codex 任务：工作目录、文字或语音输入、持久记录、继续追问、执行中
+  补充指令、逐次授权和结果文件。实际能力取决于本机 Codex 的工具和连接。
+• “连接本机 Codex”提供安装、浏览器登录、检测和手动选择原生 codex.exe。
+  默认原生 Windows 路线，无需先配置 Node.js 或 WSL，不读取或复制认证文件。
+• 桌面喵娘支持常驻/仅唤醒、直接拖动、记住位置、浅深主题气泡、三套服装、
+  长发选项、32个姿势和15处互动；四种离线声线共60条，默认静音。
+• AI换装需单独配置MiniMax image-01，主动生成后先预览再穿上，可取消或删除。
+  AI新衣装目前是静态立绘，不自动生成整套姿势。
+• 按住物理“·”录音，松开识别，默认先确认文字再提交。快捷键默认关闭，
+  退出时释放；常驻桌面不自动录音。AI创作输入框也支持独立语音转文字。
+• 延续AI对话版本、两种主题、独立外观选择、可读Fn层与键位编辑、十预设、
+  三槽草稿、回收站、JSON与同步审核。正常退出/重载先等待工作区保存。
+• Windows不提供Mac专用Spotify播放验证工具；没有把通用任务限制为播放音乐。
+  WorkBuddy、千问办公、豆包工作仍为规划入口。
+
+快速连接 Codex
+1. 进入“喵唤 · Beta”→“语音任务”，找到“连接本机 Codex”。已有官方CLI
+   可先点击“检测连接”。文字任务不需要语音Key、麦克风或全局按键。
+2. 未安装时点“安装 Codex”，核对官方来源并确认，按PowerShell窗口完成。
+   这是当前用户安装；所用执行策略参数只对本次进程生效，不修改长期策略。
+3. 点击“登录”，在官方浏览器页面完成ChatGPT登录。密码只在官方页面填写。
+4. 回到App点“检测连接”。不在默认目录时用“手动选择”找到原生codex.exe，
+   保留其旁边的运行时文件；不要选.cmd/.ps1，也不要复制auth.json。
+5. 选择测试目录，默认只读。输入一个任务，点击“交给 Codex”。确实需要写
+   文件时再勾选允许修改；收到额外权限请求时在任务详情核对并逐次答复。
+6. 首次执行如果要求Windows隔离环境初始化，按官方Codex提示完成；旧系统
+   可能需要管理员确认UAC。软件不关闭隔离、不静默改为完全访问权限。
+
+“复制官方安装命令”复制OpenAI发布的独立CLI安装命令：
+powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
+默认目录为 %LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe。
+已经登录Windows桌面版时，由官方接口判断能否复用同一用户的登录。
+检测连接成功不等于所有任务工具、网络或隔离环境都已初始化。
+官方安装：https://learn.chatgpt.com/docs/cli
+官方Windows部署：https://learn.chatgpt.com/docs/enterprise/windows-deployment
+Windows隔离环境：https://learn.chatgpt.com/docs/windows/windows-sandbox
+
+语音与桌面喵娘
+先在“模型配置”保存MiniMax、千问或OpenAI的语音识别服务，再开启按键唤起。
+按住Esc下方的物理“·”，看到正在聆听再说话，松开识别；确认文字再交给Codex。
+无声时检查Windows“隐私和安全性→麦克风”的桌面应用访问和默认输入设备。
+语音服务和Codex登录分别配置：文字任务可用但转写失败时，先检查语音连接。
+录音最长60秒，音频只用于本次转写；结束/取消后清理，不进入作品或任务记录。
+转写超时不会自动重发；停止任务不撤销已经发生的修改。
+
+常驻与快捷键独立。角色可直接拖到桌面位置；设置页图片只作预览。
+互动声音默认关闭，可选甜萌、御姐、温柔、元气；鼠标停留后才响应，拖动、
+录音及任务时暂停闲聊。桌面气泡跟随设置中的经典深色/暖岛浅色主题。
 
 五分钟体验
 1. 无需 Key 或键盘：到“灯效工作台”，右侧选择预设播放、暂停、拖动时间轴。
@@ -132,7 +167,7 @@ USB可读身份、固件和键码，不能完整读回灯效像素。正常单�
    显式设置过CYBERBOARD_DATA_DIR时用该记录目录。
 2. Windows关闭App，运行“迁移原配置.cmd”，输入设备目录或current.json路径。
 3. 工具核结构和编码CRC，拒绝覆盖现存当前库，不访问USB或复制旧锁/计划。
-4. 打开候选版检查正确设备。计划保留记录灯效并读取全部当前键码，不用旧码
+4. 打开App检查正确设备。计划保留记录灯效并读取全部当前键码，不用旧码
    覆盖按键。不是同一实体键盘时不能使用另一把键盘的记录。
 
 USB、键位与时间
@@ -140,13 +175,18 @@ USB、键位与时间
 核对产品身份；一个端口超时继续检查其他端口，已知多设备不误选。
 键位不完整时不能显示连接成功。设备管理器可查看“端口（COM和LPT）”。
 本包不安装第三方USB驱动，以硬件厂商说明为准。
-设备页“键位查看”读取81实体键/7层，不能编辑；“同步记录”查看本机历史。
+独立“键位编辑”页显示81实体键/7层可读功能，先改本机草稿，再通过专用计划
+核对全部1400键码、设备/固件和可信灯效基线后写入；未知原始码保留。
+“同步记录”查看本机历史。键位写入与灯效同步是不同计划，不自动混用。
 时间同步使用电脑当前时刻和 Asia/Shanghai（UTC+8），没有时区选择。
 当前CLI不能升级固件。写入期间正常刷新/退出受保护，等待提交验证完成。
 
 本机数据与升级
 %LOCALAPPDATA%\Cyberboard Studio：workspace.json、会话/图片/版本、作品/
 草稿/回收站、backups、plans、ai-settings.json、ai-keys和按需logs\host.log。
+还包含agent-tasks、agent-task-settings.json、语音连接/Key、companion-outfits、
+companion-image.key、companion-desktop.json与companion-position.json。
+这些个人文件不进入源码或发布包；Codex官方会话由Codex自身保存。
 %LOCALAPPDATA%\cyberboard-cli\devices：CLI完整配置及历史。
 显式CYBERBOARD_DATA_DIR会改变CLI记录目录。安装目录与数据目录分开。
 
@@ -166,11 +206,12 @@ app-host-trace.log、app-stdout.txt、app-stderr.txt与probe-*，可区分运行
 “检查运行环境.cmd”只验Python/CLI/时区/存储，不能证明主窗口或USB可用。
 
 验收范围
-候选采用Mac交叉构建Windows，并有共享UI、协议、会话、局部补丁、工作区、
-退出门控、COM/时区、迁移和包检查。完整结果以发布验收说明为准。
-此前K3/Flash模型的真实API和R6同步记录不代表本候选Windows或R4已验收。
-Windows原生窗口/Key/USB、R4写入，以及所有型号的首次配置与模式恢复仍需实机。
-没有固件升级、键位编辑、通用AI生图、视频导出或自动更新功能。
+Windows宿主交叉编译和39组离线宿主检查已在Mac运行通过。协议、录音数据、
+取消和任务授权使用合成子进程；这不代表Windows原生权限、真实录音或真实
+Codex浏览器登录已验收。Windows专用进程回收还须在Windows执行对应检查。
+最终包和附件校验以发布说明为准，不把编译成功当成完整实机验证。
+Windows原生窗口、拖动/透明点击区域、麦克风、全局按键、官方登录与任务、
+Key保存/USB、R4写入及更多固件仍需实机。没有固件升级、视频导出或自动更新。
 
 运行组件与许可证
 Microsoft .NET 10 / WinForms、WebView2 SDK、Python 3.12.10、Cyberboard CLI

@@ -627,16 +627,19 @@ internal static class Program
                 Directory.CreateDirectory(Path.Combine(HostPaths.Web, "assets"));
                 File.WriteAllText(Path.Combine(HostPaths.Web, "index.html"), "index");
                 File.WriteAllText(Path.Combine(HostPaths.Web, "assets", "猫爪 logo.png"), "image");
+                File.WriteAllText(Path.Combine(HostPaths.Web, "assets", "voice.mp3"), "synthetic audio asset");
                 File.WriteAllText(Path.Combine(HostPaths.Web, "other.html"), "other");
                 File.WriteAllText(Path.Combine(HostPaths.Web, "secret.exe"), "executable");
                 File.WriteAllText(Path.Combine(HostPaths.Resources, "outside.png"), "outside");
                 Check(ResourcePolicy.IsAsset(ResourcePolicy.Index), "Index asset rejected.");
+                Check(ResourcePolicy.IsAsset("https://studio.cyberboard.invalid/assets/voice.mp3"), "Public companion audio rejected.");
                 Check(ResourcePolicy.IsAsset("https://studio.cyberboard.invalid/assets/%E7%8C%AB%E7%88%AA%20logo.png?version=1"), "Unicode/space asset URL rejected.");
                 foreach (var path in new[] { "/missing.png", "/other.html", "/secret.exe", "/assets/%2e%2e/%2e%2e/outside.png", "/assets%2f..%2f..%2foutside.png", "/assets%5c..%5coutside.png", "/index.html%3aevil.png", "/%00.png", "/C%3a/secret.png" })
                     Check(!ResourcePolicy.IsAsset("https://studio.cyberboard.invalid" + path), "Unexpected asset accepted: " + path);
                 Check(!ResourcePolicy.IsAsset("https://example.org/index.html"), "External asset origin accepted.");
                 return Task.CompletedTask;
             });
+            await Run("MiaoCall task/session lifecycle and platform-specific process ownership", MiaoCallChecks.RunAsync);
             Console.WriteLine($"\n{passed} host bridge/resource checks passed. Native source linked unchanged; fake Python only, no USB.");
         }
         finally { Directory.Delete(temp, recursive: true); }

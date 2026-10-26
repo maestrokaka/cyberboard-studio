@@ -1,4 +1,4 @@
-> 本文保留早期 Spotify 专用 Beta 的安装与权限背景。最新私有 Tasks Beta 3 的工作目录、通用任务、持久记录与授权流程以 [通用任务说明](MIAOCALL_TASKS.md) 为准。
+> 本文保留早期 macOS Spotify 专用公开 Beta 的安装与权限背景，不表示当前私有版的平台范围。私有版的通用任务、持久记录与授权流程见 [任务说明](MIAOCALL_TASKS.md)；Windows Private Beta 1 的安装、Codex 连接与待验收项见 [Windows 指南](MIAOCALL_WINDOWS.md)。
 
 # 喵唤 MiaoCall · Beta 14 公开测试版
 

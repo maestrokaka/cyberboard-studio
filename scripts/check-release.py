@@ -3,8 +3,8 @@
 import argparse, json, os, subprocess, sys, time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PYTHON_TESTS=['backend-check.py','ai-conversation-check.py','workspace-conversation-check.py','speech-input-check.py','companion-check.py','miaocall-codex-check.py','agent-tasks-check.py']
-JS_TESTS=['model-check.cjs','chat-ui-check.cjs','workspace-save-ui-check.cjs','miaocall-ui-check.cjs','agent-tasks-ui-check.cjs','theme-ui-check.cjs','appearance-performance-check.cjs','preview-aspect-check.cjs']
+PYTHON_TESTS=['backend-check.py','ai-conversation-check.py','workspace-conversation-check.py','speech-input-check.py','companion-check.py','miaocall-codex-check.py','agent-tasks-check.py','codex-connection-check.py']
+JS_TESTS=['model-check.cjs','chat-ui-check.cjs','workspace-save-ui-check.cjs','miaocall-ui-check.cjs','agent-tasks-ui-check.cjs','codex-setup-ui-check.cjs','theme-ui-check.cjs','appearance-performance-check.cjs','preview-aspect-check.cjs']
 MAC_TESTS=['companion-native-check.py','miaocall-native-check.py','native-workspace-exit-check.py']
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mac-native',action='store_true');p.add_argument('--output',type=Path,default=ROOT/'build/release-check');args=p.parse_args()

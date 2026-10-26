@@ -1,0 +1,82 @@
+name: Private Windows native checks
+on:
+  push:
+    branches: [feature/miaocall-companion]
+    paths:
+      - 'windows/**'
+      - 'backend/**'
+      - 'tests/windows-task-liveness-check.py'
+      - 'tests/windows-codex-setup-check.py'
+      - '.github/workflows/windows-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-native:
+    # This feature is private. Never run its release checks against the public fork.
+    if: github.repository == 'maestrokaka/cyberboard-studio-miaocall'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build the actual Windows host
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/windows-native-check | Out-Null
+          dotnet build windows/src/CyberboardStudio.Windows.csproj -c Release --nologo 2>&1 |
+            Tee-Object -FilePath build/windows-native-check/host-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise production host code with synthetic worker processes
+        shell: pwsh
+        run: |
+          $pythonExe = (Get-Command python).Source
+          dotnet restore windows/tests/host-bridge/HostBridge.Check.csproj --configfile windows/tests/host-bridge/NuGet.Config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --no-restore --project windows/tests/host-bridge/HostBridge.Check.csproj -- $pythonExe 2>&1 |
+            Tee-Object -FilePath build/windows-native-check/host-bridge.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Require proof that Windows kernel Job Objects ran, not the Mac skip path.
+          if (-not (Select-String -Quiet -Path build/windows-native-check/host-bridge.log -SimpleMatch 'PASS Windows native Job Object')) {
+            throw 'The Windows process ownership check did not execute.'
+          }
+      - name: Verify Windows worker liveness cannot terminate a task
+        shell: pwsh
+        run: |
+          python tests/windows-task-liveness-check.py 2>&1 |
+            Tee-Object -FilePath build/windows-native-check/task-liveness.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install the official standalone Codex CLI in the disposable runner account
+        shell: pwsh
+        run: |
+          # Fixed official installer; no Node, WSL, API key or login is involved.
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://chatgpt.com/codex/install.ps1 | iex" 2>&1 |
+            Tee-Object -FilePath build/windows-native-check/codex-install.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installedCodex = Join-Path $env:LOCALAPPDATA 'Programs/OpenAI/Codex/bin/codex.exe'
+          if (-not (Test-Path -LiteralPath $installedCodex)) { throw 'Official Codex installation was not found.' }
+      - name: Check the real Codex protocol with a fresh unsigned-in profile
+        shell: pwsh
+        run: |
+          python tests/windows-codex-setup-check.py 2>&1 |
+            Tee-Object -FilePath build/windows-native-check/codex-setup.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-windows-native-check-results
+          path: build/windows-native-check/*.log
+          retention-days: 7

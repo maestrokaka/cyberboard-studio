@@ -1968,7 +1968,7 @@ class Bridge:
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "agentTaskList", "agentTaskRead", "agentTaskArchive", "agentTaskDelete", "agentTaskDiagnostics", "agentTaskContext", "agentTaskConfigure", "agentTaskReveal", "agentTaskExport", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "codexConnectionWorker", "agentTaskList", "agentTaskRead", "agentTaskArchive", "agentTaskDelete", "agentTaskDiagnostics", "agentTaskContext", "agentTaskConfigure", "agentTaskReveal", "agentTaskExport", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()
@@ -1988,10 +1988,13 @@ def main():
             emit({"result": {"tlsReady": True, "hostnameVerification": True,
                              "certificateVerification": True, "caCertificates": certificates}})
             return 0
-        if args.action == "miaoCallWorker":
+        if args.action in ("miaoCallWorker", "codexConnectionWorker"):
             # The task transport is interactive JSONL; unlike one-shot actions its
             # input stays open for bounded tool replies and cancellation.
-            from codex_tasks import run as run_miao_call
+            if args.action == "codexConnectionWorker":
+                from codex_connection import run as run_miao_call
+            else:
+                from codex_tasks import run as run_miao_call
             line = sys.stdin.readline(32769)
             require(len(line.encode("utf-8")) <= 32768, "input_too_large", "语音指令过长。")
             payload = json.loads(line or "{}")

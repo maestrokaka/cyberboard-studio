@@ -28,6 +28,10 @@
     const enabled = document.createElement('label'); enabled.className = 'companion-check';
     enabled.innerHTML = '<input id="miaoUseSpotify" type="checkbox">启用已配置歌曲的播放验证工具';
     music.prepend(enabled);
+    if (global.StudioNative?.platform === 'windows') {
+      details.hidden = true; details.dataset.platformUnavailable = 'true'; enabled.querySelector('input').disabled = true;
+      $('agentTaskRevealFolder').textContent = '在文件管理器查看';
+    }
     let tasks = [], selected = '', record = null, context = null, attachments = [], revision = 0, liveText = '', liveSteps = [], current = status(), requestId = '', sending = false, pendingMessages = [];
     function button(text, fn) { const b = document.createElement('button'); b.className = 'button'; b.textContent = text; b.onclick = fn; return b; }
     function note(text) { $('agentTaskNotice').textContent = text; }
@@ -45,7 +49,7 @@
       $('agentTaskStepsText').textContent = steps.map(s => s.title + ' · ' + s.status + (s.exitCode !== undefined ? ' · 返回 ' + s.exitCode : '') + '\n' + (s.detail || '')).join('\n\n');
       $('agentTaskFiles').replaceChildren();
       for (const path of record?.artifacts || current.taskResult?.artifacts || []) {
-        const b = button('查看文件：' + path.split('/').pop(), () => api('miaoCallTaskReveal', { taskId: selected, path }).catch(e => toast(e.message)));
+        const b = button('查看文件：' + path.split(/[\\/]/).pop(), () => api('miaoCallTaskReveal', { taskId: selected, path }).catch(e => toast(e.message)));
         b.title = path; $('agentTaskFiles').appendChild(b);
       }
     }
@@ -100,7 +104,7 @@
     function renderAttachments() {
       $('agentTaskAttachments').replaceChildren();
       for (const path of attachments) {
-        const b = button(path.split('/').pop() + ' ×', () => { attachments = attachments.filter(p => p !== path); renderAttachments(); });
+        const b = button(path.split(/[\\/]/).pop() + ' ×', () => { attachments = attachments.filter(p => p !== path); renderAttachments(); });
         b.title = path; $('agentTaskAttachments').appendChild(b);
       }
     }
@@ -108,7 +112,7 @@
       if (sending) return;
       const text = $('agentTaskInput').value.trim();
       if (!text || text.length > 2000) { toast('请填写 1–2000 字的任务。'); return; }
-      if (!native) { toast('任务执行需使用 macOS App。'); return; }
+      if (!native) { toast('任务执行需使用桌面 App。'); return; }
       sending = true; refreshControls();
       try {
         if (['thinking','acting','connecting'].includes(current.state)) await api('miaoCallTaskSteer', { text });

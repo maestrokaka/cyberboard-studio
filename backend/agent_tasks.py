@@ -40,9 +40,20 @@ class TaskStore:
         require(isinstance(identity, str) and ID.fullmatch(identity), "任务编号无效。")
         return self.folder / (identity + ".json")
 
-    def context(self, payload=None):
+    def settings(self):
         value = self._read(self.settings_file, {})
         require(isinstance(value, dict), "任务设置无法读取，请重新选择工作目录。")
+        return value
+
+    def configured_cli(self):
+        # Connection setup is independent of a previously selected work folder.
+        # A moved/deleted project must not prevent repairing the Codex connection.
+        value = self.settings().get("cliPath")
+        require(value is None or isinstance(value, str) and len(value) <= 4096 and Path(value).is_absolute(), "Codex 路径无效。")
+        return value
+
+    def context(self, payload=None):
+        value = self.settings()
         cwd = value.get("cwd") or str(self.root / "MiaoCallWorkspace")
         path = Path(cwd)
         if not value.get("cwd"):
@@ -50,19 +61,38 @@ class TaskStore:
         require(path.is_absolute() and path.is_dir(), "工作目录已不存在，请重新选择。")
         mode = value.get("mode", "read-only")
         require(mode in {"read-only", "workspace-write"}, "请选择有效的任务权限。")
-        return {"cwd": str(path.resolve()), "mode": mode, "model": value.get("model") or None}
+        return {"cwd": str(path.resolve()), "mode": mode, "model": value.get("model") or None, "cliPath": value.get("cliPath") or None}
 
     def configure(self, payload):
-        old = self.context()
-        cwd = payload.get("cwd", old["cwd"])
+        require(isinstance(payload, dict), "任务设置无效。")
+        old = self.settings()
+        cwd = payload.get("cwd", old.get("cwd") or str(self.root / "MiaoCallWorkspace"))
         require(isinstance(cwd, str) and len(cwd) <= 4096, "请选择有效的工作目录。")
         path = Path(cwd)
+        if not payload.get("cwd") and not old.get("cwd"):
+            path.mkdir(parents=True, exist_ok=True)
+        if set(payload) == {"cliPath"}:
+            # Selecting an executable does not alter or validate the work folder.
+            from codex_runtime import locate
+            selected = payload["cliPath"]
+            require(selected is None or isinstance(selected, str) and len(selected) <= 4096 and Path(selected).is_absolute(), "Codex 路径无效。")
+            try: cli_path = locate(selected) if selected else None
+            except (OSError, ValueError): raise TaskStoreError("请选择已安装的 Codex 原生可执行文件。") from None
+            value = {**old, "cliPath": cli_path}
+            atomic(self.settings_file, json.dumps(value, ensure_ascii=False).encode())
+            return value
         require(path.is_absolute() and path.is_dir(), "请选择存在的工作目录。")
-        mode = payload.get("mode", old["mode"])
+        mode = payload.get("mode", old.get("mode", "read-only"))
         require(mode in {"read-only", "workspace-write"}, "请选择有效的任务权限。")
-        model = payload.get("model", old["model"])
+        model = payload.get("model", old.get("model"))
         require(model is None or isinstance(model, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,100}", model), "模型名称无效。")
-        value = {"cwd": str(path.resolve()), "mode": mode, "model": model}
+        cli_path = payload.get("cliPath", old.get("cliPath"))
+        require(cli_path is None or isinstance(cli_path,str) and len(cli_path)<=4096 and Path(cli_path).is_absolute(), "Codex 路径无效。")
+        if cli_path and "cliPath" in payload:
+            from codex_runtime import locate
+            try: cli_path = locate(cli_path)
+            except (OSError,ValueError): raise TaskStoreError("请选择已安装的 Codex 原生可执行文件。") from None
+        value = {"cwd": str(path.resolve()), "mode": mode, "model": model, "cliPath": cli_path}
         atomic(self.settings_file, json.dumps(value, ensure_ascii=False).encode())
         return value
 
@@ -122,6 +152,25 @@ class TaskStore:
         pid = record.get("workerPid")
         if not isinstance(pid, int) or pid <= 0:
             return False
+        if os.name == "nt":
+            # Windows os.kill(pid, 0) is not a POSIX liveness probe: it may
+            # terminate the target. Open only a wait handle and poll it instead.
+            import ctypes
+            from ctypes import wintypes
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+            kernel.OpenProcess.restype = wintypes.HANDLE
+            kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+            kernel.WaitForSingleObject.restype = wintypes.DWORD
+            kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+            kernel.CloseHandle.restype = wintypes.BOOL
+            handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE only
+            if not handle:
+                return ctypes.get_last_error() == 5  # Access denied is not proof of exit.
+            try:
+                return kernel.WaitForSingleObject(handle, 0) != 0
+            finally:
+                kernel.CloseHandle(handle)
         try:
             os.kill(pid, 0)
             return True
@@ -135,10 +184,10 @@ class TaskStore:
         report = {"feature": "MiaoCall Tasks Beta 3", "platform": platform.system(),
                   "taskStore": "ready", "scope": "no keys, paths, task text or account information"}
         try:
-            cli = find_cli()
+            cli = find_cli(self.configured_cli())
             version = subprocess.run([cli, "--version"], capture_output=True, text=True, timeout=8, check=True).stdout.strip()
             report["codexVersion"] = version[:100]
-        except (MiaoCallError, OSError, subprocess.SubprocessError):
+        except (MiaoCallError, TaskStoreError, OSError, subprocess.SubprocessError):
             report["codexVersion"] = "unavailable"
         try:
             records = self.list()["tasks"]

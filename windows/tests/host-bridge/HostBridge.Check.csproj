@@ -12,6 +12,8 @@
     <Compile Include="../../src/StartupDiagnostics.cs" Link="StartupDiagnostics.cs" />
     <Compile Include="../../src/WorkspaceExitGate.cs" Link="WorkspaceExitGate.cs" />
     <Compile Include="../../src/VoiceRecorder.cs" Link="VoiceRecorder.cs" />
+    <Compile Include="../../src/BackendSession.cs" Link="BackendSession.cs" />
+    <Compile Include="../../src/MiaoCallContracts.cs" Link="MiaoCallContracts.cs" />
     <Content Include="fake-bridge.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

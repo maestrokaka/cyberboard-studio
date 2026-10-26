@@ -15,6 +15,7 @@ internal sealed class StudioForm : Form
     private readonly BackendClient voiceBackend = new();
     private readonly AISettings aiSettings = new(HostPaths.State);
     private readonly VoiceRecorder voiceRecorder = new();
+    private MiaoCallController? miaoCall;
     private CancellationTokenSource? aiCancellation;
     private string? activeAIRequestId;
     private CancellationTokenSource? voiceCancellation;
@@ -30,7 +31,7 @@ internal sealed class StudioForm : Form
     private bool workspaceFailureShowing;
     private bool documentReady;
     private bool exitApproved;
-    private const string ReleaseVersion = "1.0.0-rc.2";
+    private const string ReleaseVersion = "1.0.0-miaocall.windows.beta.1";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
     { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
@@ -45,6 +46,7 @@ internal sealed class StudioForm : Form
           if (window.top !== window || location.origin !== 'https://studio.cyberboard.invalid') return;
           Object.defineProperty(window, 'StudioNative', {value: Object.freeze({
             platform: 'windows',
+            capabilities: Object.freeze({miaoCall:true, codexSetup:true, spotifyVerification:false}),
             postMessage(message) { window.chrome.webview.postMessage(message); }
           }), writable: false, configurable: false});
           window.chrome.webview.addEventListener('message', event => {
@@ -54,15 +56,16 @@ internal sealed class StudioForm : Form
           });
           document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.dataset.platform = 'windows';
+            const version=document.querySelector('.sidebar .version span');if(version)version.textContent='Windows Beta 1';
           }, {once: true});
         })();
         """;
 
     public StudioForm()
     {
-        Text = "Cyberboard Studio";
+        Text = "Cyberboard Studio · MiaoCall";
         BackColor = Color.FromArgb(14, 16, 21);
-        MinimumSize = new Size(1100, 740);
+        MinimumSize = new Size(1120, 760);
         ClientSize = new Size(1440, 940);
         StartPosition = FormStartPosition.CenterScreen;
         KeyPreview = true;
@@ -75,10 +78,13 @@ internal sealed class StudioForm : Form
         Controls.Add(web);
         Controls.Add(loading);
         Controls.Add(menu);
-        Shown += async (_, _) => await InitializeAsync();
+        Shown += async (_, _) => {
+            miaoCall = new MiaoCallController(this,PostToUi,SendMiaoEvent,()=>activeAIRequestId==null&&activeVoiceRequestId==null&&voiceRecorder.RequestId==null&&!deviceWritePending&&!workspaceExit.IsPending,()=>{Show();WindowState=FormWindowState.Normal;Activate();SendEvent(new{@event="miaoCall",type="openTask"});});
+            await InitializeAsync();
+        };
         FormClosing += OnClosing;
         voiceRecorder.StateChanged += state => PostToUi(() => SendEvent(state));
-        FormClosed += (_, _) => { voiceRecorder.Dispose(); voiceCancellation?.Cancel(); voiceBackend.Dispose(); workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
+        FormClosed += (_, _) => { miaoCall?.Dispose(); voiceRecorder.Dispose(); voiceCancellation?.Cancel(); voiceBackend.Dispose(); workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -98,6 +104,7 @@ internal sealed class StudioForm : Form
 
     private void ApplyAppearance(string theme)
     {
+        miaoCall?.ApplyTheme(theme);
         var light = theme == "island";
         var color = light ? Color.FromArgb(248, 248, 240) : Color.FromArgb(14, 16, 21);
         BackColor = web.DefaultBackgroundColor = loading.BackColor = color;
@@ -161,6 +168,7 @@ internal sealed class StudioForm : Form
             core.ProcessFailed += (_, args) =>
             {
                 voiceRecorder.CancelAll();
+                miaoCall?.DisableShortcutAndCancel();
                 voiceCancellation?.Cancel();
                 HostLog.Write("webview", args.ProcessFailedKind.ToString());
                 loading.Text = deviceWritePending
@@ -244,7 +252,7 @@ internal sealed class StudioForm : Form
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
         if (deviceWritePending || workspaceExit.IsPending) { args.Cancel = true; return; }
-        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; voiceRecorder.CancelAll(); voiceCancellation?.Cancel(); aiCancellation?.Cancel(); navigationGeneration++; return; }
+        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; miaoCall?.DisableShortcutAndCancel(); voiceRecorder.CancelAll(); voiceCancellation?.Cancel(); aiCancellation?.Cancel(); navigationGeneration++; return; }
         args.Cancel = true;
         if (args.IsUserInitiated) OpenExternalLink(args.Uri);
     }
@@ -292,6 +300,13 @@ internal sealed class StudioForm : Form
         var writesDevice = DeviceWriteActions.Contains(action);
         try
         {
+            if(action.StartsWith("miaoCall",StringComparison.Ordinal))
+            {
+                if(miaoCall==null)throw new IOException("喵唤正在加载，请稍后重试。");
+                if((workspaceExit.IsPending||exitApproved||deviceWritePending)&&action is not("miaoCallStatus" or "miaoCallCancel" or "miaoCallDisable"))throw new IOException("正在保存工作区或操作设备，请稍后再试。");
+                var reply=await miaoCall.HandleAsync(action,payload);Reply(id,reply,generation);return;
+            }
+            if(miaoCall?.IsBusy==true && (action is "generateAI" or "testAIConnection" or "startVoiceRecording" or "transcribeVoice" or "saveVoiceSettings" or "deleteVoiceKey" || writesDevice))throw new IOException("喵唤正在进行，请先完成或停止当前任务。");
             switch (action)
             {
                 case "setAppearance":
@@ -359,7 +374,7 @@ internal sealed class StudioForm : Form
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (VoiceBackendActions.Contains(action) || action is "startVoiceRecording" or "stopVoiceRecording" or "cancelVoiceRecording" or "cancelVoiceTranscription" or "getAISettings" or "saveAISettings" or "revealAIKey" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
+            if (action.StartsWith("miaoCall",StringComparison.Ordinal) || VoiceBackendActions.Contains(action) || action is "startVoiceRecording" or "stopVoiceRecording" or "cancelVoiceRecording" or "cancelVoiceTranscription" or "getAISettings" or "saveAISettings" or "revealAIKey" or "testAIConnection" or "generateAI" or "cancelAI" or "importAIImages")
                 HostLog.Write("AI request", exception.GetType().Name);
             else HostLog.Write("request " + action, exception.ToString());
             ReplyError(id, exception is BackendReplyException backendError ? backendError.Error : exception.Message, generation);
@@ -509,6 +524,8 @@ internal sealed class StudioForm : Form
         Reply(id, new { fileName = Path.GetFileName(path), path }, generation);
     }
 
+    private void SendMiaoEvent(object value)=>SendEvent(value);
+
     private void Reply(JsonElement id, object result, int generation) => Send("receive", new { id, result }, generation);
     private void ReplyError(JsonElement id, object error, int generation) => Send("receive", new { id, error }, generation);
     private void SendEvent(object value, int? generation = null) => Send("event", value, generation ?? navigationGeneration);
@@ -540,6 +557,7 @@ internal sealed class StudioForm : Form
         if (token is null) return;
         voiceRecorder.CancelAll();
         voiceCancellation?.Cancel();
+        if(miaoCall!=null){try{await miaoCall.StopForExitAsync();}catch(IOException e){FailWorkspaceExit(token,e.Message);return;}}
         if (!documentReady || web.CoreWebView2 is null) { CompleteWorkspaceExit(token); return; }
         SendEvent(new { @event = "workspaceExit", phase = "saving" });
         workspaceExitTimeout = new CancellationTokenSource();

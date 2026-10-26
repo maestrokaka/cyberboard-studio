@@ -47,3 +47,7 @@
 # Local managed agent task records
 /agent-tasks/
 agent-task-settings.json
+
+# Windows desktop companion preferences
+**/companion-desktop.json
+**/companion-position.json

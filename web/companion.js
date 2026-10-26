@@ -51,7 +51,7 @@
     function picture(pose = 'idle') { const o = outfit(); art.src = o.imageDataUrl || o.frames[pose] || o.frames.idle; art.alt = o.name + (o.hair === 'long' ? ' · 长发' : ' · 短发'); }
     function switchTab(next) {
       tab = next; layout.dataset.companionTab = tab; tabs.querySelectorAll('button').forEach(b => { const active = b.dataset.tab === tab; b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1; });
-      controls.hidden = tab !== 'companion'; wardrobe.hidden = tab !== 'wardrobe'; original.forEach(el => el.hidden = tab !== 'tasks');
+      controls.hidden = tab !== 'companion'; wardrobe.hidden = tab !== 'wardrobe'; original.forEach(el => el.hidden = tab !== 'tasks' || el.dataset.platformUnavailable === 'true');
       zones.hidden = tab === 'tasks'; bubble.textContent = ''; picture();
       stage.dataset.companion = tab === 'tasks' ? 'false' : 'true';
       caption.textContent = tab === 'wardrobe' ? '衣橱预览 · 选好后再穿上' : '拖动桌面喵娘，放在喜欢的位置。'; caption.hidden = tab === 'tasks';
@@ -92,14 +92,14 @@
     }
     function candidate(wear = false) { return settingsPayload(preferences, { mode: $('companionMode').value, sound: $('companionSound').checked, hover: $('companionHover').checked, voice: $('companionVoice').value, volume: Number($('companionVolume').value), size: Number($('companionSize').value) }, selected, wear); }
     async function save(wear = false) {
-      if (!native) { toast('桌面常驻与声音设置请在 macOS App 中使用。'); return; }
+      if (!native) { toast('桌面常驻与声音设置请在桌面 App 中使用。'); return; }
       try { const result = await api('miaoCallCompanionSave', candidate(wear)); settingsDirty = false; update(result); $('companionSavedNote').textContent = '已保存；桌面显示与声音设置已生效。'; return true; }
       catch (e) { toast(e.message); return false; }
     }
     $('companionSize').oninput = () => $('companionSizeLabel').value = $('companionSize').value;
     $('companionSave').onclick = () => save(false); $('companionWear').onclick = () => save(true);
     $('companionAudition').onclick = async () => {
-      if (!native) { toast('声线试听请在 macOS App 中使用。'); return; }
+      if (!native) { toast('声线试听请在桌面 App 中使用。'); return; }
       try { await api('miaoCallCompanionTest', { zone: 'cheek', sound: true, voice: $('companionVoice').value, volume: Number($('companionVolume').value) }); } catch (e) { toast(e.message); }
     };
     $('companionDelete').onclick = async () => {

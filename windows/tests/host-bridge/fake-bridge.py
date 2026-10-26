@@ -9,6 +9,40 @@ parser.add_argument("--action", required=True)
 parser.add_argument("--state-dir", required=True)
 parser.add_argument("--resource-dir", required=True)
 args = parser.parse_args()
+if args.action == "miaoCallWorker":
+    payload=json.loads(sys.stdin.readline())
+    def stream(value):print(json.dumps(value),flush=True)
+    if payload.get("mode") == "malformed":
+        print("{broken JSON", flush=True)
+        stream({"result": {"ok": True}})
+    elif payload.get("mode") == "nonzero":
+        stream({"result": {"ok": True}})
+        raise SystemExit(7)
+    elif payload.get("mode") == "partial":
+        print(json.dumps({"result": {"ok": True}}), end="", flush=True)
+    elif payload.get("mode") == "duplicate":
+        stream({"result": {"ok": True}})
+        stream({"result": {"ok": True}})
+    elif payload.get("mode") == "after-final":
+        stream({"result": {"ok": True}})
+        stream({"event": "miaoCall", "type": "state", "state": "thinking"})
+    elif payload.get("mode") == "unknown":
+        stream({"unrecognized": "fixture"})
+        stream({"result": {"ok": True}})
+    elif payload.get("mode")=="child":
+        import subprocess
+        child=subprocess.Popen([sys.executable,"-c","import time;time.sleep(60)"],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        stream({"result":{"ok":True,"status":"completed","childPid":child.pid}})
+    else:
+        stream({"event":"miaoCall","type":"request","request":{"id":"request-1","kind":"approval"}})
+        message=json.loads(sys.stdin.readline())
+        if payload.get("mode")=="cancel":
+            assert message["type"]=="cancel"
+            stream({"result":{"ok":False,"status":"cancelled"}})
+        else:
+            assert message["type"]=="approval" and message["decision"]=="accept"
+            stream({"result":{"ok":True,"status":"completed","text":"fixture"}})
+    raise SystemExit(0)
 payload = json.load(sys.stdin)
 
 

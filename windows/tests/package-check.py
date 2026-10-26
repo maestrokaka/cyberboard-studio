@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import argparse
 import json
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 from pathlib import Path
 import struct
 import sys
@@ -11,9 +13,13 @@ import unittest
 import zipfile
 
 APP = Path(__file__).resolve().parents[2]
+VERSION = "1.0.0-miaocall.windows.beta.1"
+BACKEND_MODULES = ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py",
+                   "speech_input.py", "keymap_codec.py", "companion.py", "miao_call.py",
+                   "agent_tasks.py", "codex_tasks.py", "codex_runtime.py", "codex_connection.py")
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
-parser.add_argument("--archive", type=Path, default=APP / "build/Cyberboard-Studio-1.0.0-rc.2-Windows-x64.zip")
+parser.add_argument("--archive", type=Path, default=APP / f"build/Cyberboard-Studio-{VERSION}-Windows-x64.zip")
 parser.add_argument("--expected-cet", choices=["enabled", "disabled"], default="enabled")
 options, unittest_args = parser.parse_known_args()
 PACKAGE = options.package
@@ -54,7 +60,7 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(config["runtimeOptions"]["tfm"], "net10.0")
         release = json.loads((PACKAGE / "release-manifest.json").read_text())
         self.assertTrue(release["diagnosticStartup"])
-        self.assertEqual(release["version"], "1.0.0-rc.2")
+        self.assertEqual(release["version"], VERSION)
         self.assertEqual(release["executableSha256"], digest(PACKAGE / "Cyberboard Studio.exe"))
         self.assertEqual(release["managedHostSha256"], digest(PACKAGE / "Cyberboard Studio.dll"))
         self.assertEqual(release["hostSourceSha256"],
@@ -64,19 +70,19 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(release["credentialStore"], "provider-local-plain-files")
         self.assertIs(release["systemCredentialAccess"], False)
         host_source = (APP / "windows/src/StudioForm.cs").read_text(encoding="utf-8")
-        self.assertIn('ReleaseVersion = "1.0.0-rc.2"', host_source)
+        self.assertIn(f'ReleaseVersion = "{VERSION}"', host_source)
         self.assertIn('version = ReleaseVersion', host_source)
-        self.assertIn('1.0.0-rc.2'.encode("utf-16-le"),
+        self.assertIn(VERSION.encode("utf-16-le"),
                       (PACKAGE / "Cyberboard Studio.dll").read_bytes())
         self.assertEqual(release["webview2BootstrapperSha256"], digest(PACKAGE / "Dependencies/MicrosoftEdgeWebview2Setup.exe"))
         self.assertIs(release["includesDeviceBaseline"], False)
         self.assertIs(release["startupAccessesUSB"], False)
-        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio 1.0.0-rc.2"))
+        self.assertTrue((PACKAGE / "使用说明.txt").read_text(encoding="utf-8").startswith("Cyberboard Studio " + VERSION))
         self.assertIn("includedFrameworks", config["runtimeOptions"], "Runtime must be self-contained")
         for name in ("index.html", "data.js", "app.js", "studio-model.js", "ai-client.js", "chat-client.js", "creation.css", "library-client.js", "keymap-client.js", "keymap.css", "voice-input.js", "voice-input.css", "preview-selector.js", "preview-engine.js", "polish.css", "dialogs.js", "assets/builtin-default-pages.json", "assets/support/wechat-pay.jpg", "assets/photos/r4-fluo-front.jpg", "assets/photos/r4-bebop-front.jpg"):
             self.assertEqual(digest(PACKAGE / "resources/web" / name), digest(APP / "web" / name), name)
         self.assertTrue(any((PACKAGE / "resources/python").rglob("_imagingcms*.pyd")), "Color conversion native module is missing")
-        for name in ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py", "speech_input.py", "keymap_codec.py"):
+        for name in BACKEND_MODULES:
             self.assertEqual(digest(PACKAGE / "resources/backend" / name), digest(APP / "backend" / name), name)
 
     def test_executable_and_native_dependencies_are_windows_x64(self):
@@ -117,6 +123,8 @@ class PackageChecks(unittest.TestCase):
             for relative in sorted(set(expected) - rewritten):
                 self.assertEqual(digest(actual[relative]), digest(expected[relative]), relative)
         self.assertEqual(digest(PACKAGE / "resources/backend/migrate-config.py"), digest(APP / "windows/migrate-config.py"))
+        self.assertEqual(set(files(PACKAGE / "resources/backend")), set(BACKEND_MODULES) | {"migrate-config.py"},
+                         "Only the explicit production backend modules may be shipped")
 
     def test_apphost_cet_bit_matches_the_selected_package(self):
         sys.path.insert(0, str(APP / "windows"))
@@ -163,13 +171,56 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(layout["keys"], data["keyLayout"])
         for path in PACKAGE.rglob("*"):
             if path.is_file():
-                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json", "voice-settings.json"})
+                self.assertNotIn(path.name, {"current.json", "meta.json", ".lock", "workspace.json", "ai-settings.json", "voice-settings.json",
+                                             "companion-desktop.json", "companion-position.json", "companion-image-settings.json",
+                                             "companion-image.key", "agent-task-settings.json", "auth.json"})
+                self.assertFalse(path.name.startswith("task-") and path.suffix == ".json", "Private task record shipped")
+                self.assertFalse(path.name.startswith("custom-") and path.suffix in {".json", ".png"}, "Private generated outfit shipped")
+                for private_part in (".codex", "agent-tasks", "companion-outfits", "recordings"):
+                    self.assertNotIn(private_part, path.relative_to(PACKAGE).parts)
                 self.assertNotIn("/credentials/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/ai-keys/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/voice-keys/", path.relative_to(PACKAGE).as_posix())
                 self.assertNotIn("/history/", path.relative_to(PACKAGE).as_posix())
         self.assertNotIn("/Users/sheva", source)
         self.assertFalse((PACKAGE / "resources/python/pyvenv.cfg").exists())
+
+    def test_miaocall_tasks_setup_and_public_companion_assets_are_complete(self):
+        web = PACKAGE / "resources/web"
+        for name in ("miaocall.js", "agent-tasks.js", "agent-tasks.css", "codex-setup.js", "companion.js", "companion.css"):
+            self.assertEqual(digest(web / name), digest(APP / "web" / name), name)
+        index = (web / "index.html").read_text(encoding="utf-8")
+        class ScriptSources(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.paths = []
+            def handle_starttag(self, tag, attributes):
+                if tag == "script":
+                    url = urlsplit(dict(attributes).get("src", ""))
+                    if not url.scheme and not url.netloc:
+                        self.paths.append(url.path)
+        scripts = ScriptSources()
+        scripts.feed(index)
+        self.assertIn("codex-setup.js", scripts.paths)
+        self.assertIn("agent-tasks.js", scripts.paths)
+        catalog = json.loads((web / "assets/companion/catalog.json").read_text())
+        self.assertGreaterEqual(len(catalog["outfits"]), 4)
+        self.assertGreaterEqual(len(catalog["voices"]), 4)
+        self.assertGreaterEqual(len(catalog["zones"]), 10)
+        for outfit in catalog["outfits"]:
+            for pose in catalog["poses"]:
+                relative = Path(outfit["frames"][pose])
+                self.assertFalse(relative.is_absolute())
+                self.assertNotIn("..", relative.parts)
+                self.assertEqual(relative.parts[:2], ("assets", "companion"))
+                self.assertTrue((web / relative).is_file(), str(relative))
+                self.assertEqual(digest(web / relative), digest(APP / "web" / relative))
+        for voice in catalog["voices"]:
+            for zone in catalog["zones"]:
+                relative = Path("assets/companion/audio") / voice["id"] / (zone["id"] + ".mp3")
+                self.assertTrue((web / relative).is_file(), str(relative))
+                self.assertEqual(digest(web / relative), digest(APP / "web" / relative))
+        self.assertIn('".mp3"', (APP / "windows/src/ResourcePolicy.cs").read_text())
 
     def test_photo_and_approved_logo_resources_are_preserved(self):
         web = PACKAGE / "resources/web"
