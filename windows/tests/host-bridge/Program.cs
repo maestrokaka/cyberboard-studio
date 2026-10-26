@@ -61,6 +61,12 @@ internal static class Program
 
     private static async Task Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--fixture-cleanup-check")
+        {
+            await FixtureCleanup.CheckAsync();
+            Console.WriteLine("PASS deterministic fixture cleanup lock/failure cases");
+            return;
+        }
         if (args.Length != 1 || !File.Exists(args[0])) throw new Exception("Pass a real Python interpreter path.");
         temp = Path.Combine(Path.GetTempPath(), "Cyberboard 模拟 空格 " + Guid.NewGuid().ToString("N"));
         HostPaths.Resources = Path.Combine(temp, "资源 files");
@@ -71,6 +77,7 @@ internal static class Program
         File.Copy(Path.Combine(AppContext.BaseDirectory, "fake-bridge.py"), HostPaths.Backend);
         try
         {
+            await Run("fixture cleanup retries only temporary Windows locks within a fixed bound", FixtureCleanup.CheckAsync);
             await Run("voice recording request ownership, PCM/WAV duration, exact limits and stop/cancel/exit release", () =>
             { VoiceChecks.Lifecycle(); return Task.CompletedTask; });
             await Run("voice capture start/read failures and raw byte upper bound", () =>
@@ -705,6 +712,6 @@ internal static class Program
             await Run("MiaoCall task/session lifecycle and platform-specific process ownership", MiaoCallChecks.RunAsync);
             Console.WriteLine($"\n{passed} host bridge/resource checks passed. Native source linked unchanged; fake Python only, no USB.");
         }
-        finally { Directory.Delete(temp, recursive: true); }
+        finally { await FixtureCleanup.DeleteAsync(temp); }
     }
 }
