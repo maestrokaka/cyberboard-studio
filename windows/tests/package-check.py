@@ -13,10 +13,10 @@ import unittest
 import zipfile
 
 APP = Path(__file__).resolve().parents[2]
-VERSION = "1.0.0-miaocall.windows.beta.1"
+VERSION = "1.0.0-beta.15"
 BACKEND_MODULES = ("bridge.py", "kimi_ai.py", "lighting_recipe.py", "ai_images.py", "ai_quality.py",
                    "speech_input.py", "keymap_codec.py", "companion.py", "miao_call.py",
-                   "agent_tasks.py", "codex_tasks.py", "codex_runtime.py", "codex_connection.py")
+                   "agent_tasks.py", "codex_tasks.py", "codex_runtime.py", "codex_connection.py", "r6_audio.py", "r6_keymap.py", "r6_firmware.py")
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--package", type=Path, default=APP / "build/windows/Cyberboard Studio")
 parser.add_argument("--archive", type=Path, default=APP / f"build/Cyberboard-Studio-{VERSION}-Windows-x64.zip")

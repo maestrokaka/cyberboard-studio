@@ -14,9 +14,13 @@ enum StudioAudioDevices {
         return value
     }
     private static func name(_ device: AudioDeviceID) -> String {
-        var property = address(kAudioObjectPropertyName), value: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
-        guard AudioObjectGetPropertyData(device, &property, 0, nil, &size, &value) == noErr else { return "音频设备" }
+        var property = address(kAudioObjectPropertyName)
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let storage = UnsafeMutablePointer<Unmanaged<CFString>?>.allocate(capacity: 1)
+        storage.initialize(to: nil)
+        defer { storage.deinitialize(count: 1); storage.deallocate() }
+        guard AudioObjectGetPropertyData(device, &property, 0, nil, &size, storage) == noErr,
+              let value = storage.pointee?.takeRetainedValue() else { return "音频设备" }
         return value as String
     }
     private static func hasChannels(_ device: AudioDeviceID, scope: AudioObjectPropertyScope) -> Bool {
