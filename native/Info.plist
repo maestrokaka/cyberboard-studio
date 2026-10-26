@@ -10,12 +10,12 @@
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundleVersion</key><string>1.0.0</string>
-  <key>CyberboardDisplayVersion</key><string>1.0.0-miaocall.tasks.beta.3</string>
+  <key>CyberboardDisplayVersion</key><string>1.0.0-beta.15</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
-  <key>NSMicrophoneUsageDescription</key><string>点击语音输入后录制你的指令，并发送到你配置的语音转写服务。录音最长 60 秒，取消后立即删除。</string>
+  <key>NSMicrophoneUsageDescription</key><string>点击语音输入时将录音发送到你配置的转写服务；点击麦克风测试时仅在本机录音回放。取消后清理临时音频。</string>
   <key>NSAppleEventsUsageDescription</key><string>当你将语音指令交给喵唤执行 Spotify 播放任务时，通过 Spotify 官方脚本接口播放指定歌曲并核对实际播放状态。</string>
   <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
 </dict></plist>

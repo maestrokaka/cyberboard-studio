@@ -98,7 +98,7 @@ if [[ -f "$backend_dir/CyberboardBackend" && -x "$backend_dir/CyberboardBackend"
   /usr/bin/ditto "$backend_dir" "$contents_dir/Resources/backend/CyberboardBackend"
 fi
 if [[ -n "$dev_python" ]]; then
-  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py ai_quality.py speech_input.py keymap_codec.py miao_call.py companion.py agent_tasks.py codex_tasks.py codex_runtime.py codex_connection.py; do
+  for module_name in bridge.py kimi_ai.py lighting_recipe.py ai_images.py ai_quality.py speech_input.py keymap_codec.py miao_call.py companion.py agent_tasks.py codex_tasks.py codex_runtime.py codex_connection.py r6_audio.py r6_keymap.py r6_firmware.py; do
     /bin/cp "$project_dir/backend/$module_name" "$contents_dir/Resources/backend/$module_name"
   done
 fi

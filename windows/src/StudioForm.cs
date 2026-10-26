@@ -15,6 +15,7 @@ internal sealed class StudioForm : Form
     private readonly BackendClient voiceBackend = new();
     private readonly AISettings aiSettings = new(HostPaths.State);
     private readonly VoiceRecorder voiceRecorder = new();
+    private readonly VoiceRecorder audioTestRecorder = new(maximumSeconds:30);
     private MiaoCallController? miaoCall;
     private CancellationTokenSource? aiCancellation;
     private string? activeAIRequestId;
@@ -31,14 +32,14 @@ internal sealed class StudioForm : Form
     private bool workspaceFailureShowing;
     private bool documentReady;
     private bool exitApproved;
-    private const string ReleaseVersion = "1.0.0-miaocall.windows.beta.1";
+    private const string ReleaseVersion = "1.0.0-beta.15";
     private int navigationGeneration;
     private static readonly HashSet<string> BackendActions = new(StringComparer.Ordinal)
     { "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
-      "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice" };
+      "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice", "r6AudioStatus", "r6AudioSet", "r6AudioCalibrate", "r6KeymapRead", "r6KeymapPlan", "r6KeymapExecute", "r6FirmwareStatus" };
     private static readonly HashSet<string> VoiceBackendActions = new(StringComparer.Ordinal)
     { "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice" };
-    private static readonly HashSet<string> DeviceWriteActions = new(StringComparer.Ordinal) { "execute", "setTime" };
+    private static readonly HashSet<string> DeviceWriteActions = new(StringComparer.Ordinal) { "execute", "setTime", "r6AudioSet", "r6AudioCalibrate", "r6KeymapExecute" };
     private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true, MaxDepth = 256 };
 
     private const string Adapter = """
@@ -79,12 +80,13 @@ internal sealed class StudioForm : Form
         Controls.Add(loading);
         Controls.Add(menu);
         Shown += async (_, _) => {
-            miaoCall = new MiaoCallController(this,PostToUi,SendMiaoEvent,()=>activeAIRequestId==null&&activeVoiceRequestId==null&&voiceRecorder.RequestId==null&&!deviceWritePending&&!workspaceExit.IsPending,()=>{Show();WindowState=FormWindowState.Normal;Activate();SendEvent(new{@event="miaoCall",type="openTask"});});
+            miaoCall = new MiaoCallController(this,PostToUi,SendMiaoEvent,()=>activeAIRequestId==null&&activeVoiceRequestId==null&&voiceRecorder.RequestId==null&&audioTestRecorder.RequestId==null&&!deviceWritePending&&!workspaceExit.IsPending,()=>{Show();WindowState=FormWindowState.Normal;Activate();SendEvent(new{@event="miaoCall",type="openTask"});});
             await InitializeAsync();
         };
         FormClosing += OnClosing;
         voiceRecorder.StateChanged += state => PostToUi(() => SendEvent(state));
-        FormClosed += (_, _) => { miaoCall?.Dispose(); voiceRecorder.Dispose(); voiceCancellation?.Cancel(); voiceBackend.Dispose(); workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
+        audioTestRecorder.StateChanged += state => PostToUi(() => {var value=JsonSerializer.SerializeToElement(state).EnumerateObject().ToDictionary(p=>p.Name,p=>(object?)p.Value.Clone());value["event"]="audioTestRecording";SendEvent(value);});
+        FormClosed += (_, _) => { miaoCall?.Dispose(); voiceRecorder.Dispose(); audioTestRecorder.Dispose(); voiceCancellation?.Cancel(); voiceBackend.Dispose(); workspaceExitTimeout?.Cancel(); aiCancellation?.Cancel(); aiBackend.Dispose(); backend.Dispose(); };
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -167,7 +169,7 @@ internal sealed class StudioForm : Form
             };
             core.ProcessFailed += (_, args) =>
             {
-                voiceRecorder.CancelAll();
+                voiceRecorder.CancelAll(); audioTestRecorder.CancelAll();
                 miaoCall?.DisableShortcutAndCancel();
                 voiceCancellation?.Cancel();
                 HostLog.Write("webview", args.ProcessFailedKind.ToString());
@@ -252,7 +254,7 @@ internal sealed class StudioForm : Form
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
     {
         if (deviceWritePending || workspaceExit.IsPending) { args.Cancel = true; return; }
-        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; miaoCall?.DisableShortcutAndCancel(); voiceRecorder.CancelAll(); voiceCancellation?.Cancel(); aiCancellation?.Cancel(); navigationGeneration++; return; }
+        if (ResourcePolicy.IsDocument(args.Uri)) { documentReady = false; miaoCall?.DisableShortcutAndCancel(); voiceRecorder.CancelAll(); audioTestRecorder.CancelAll(); voiceCancellation?.Cancel(); aiCancellation?.Cancel(); navigationGeneration++; return; }
         args.Cancel = true;
         if (args.IsUserInitiated) OpenExternalLink(args.Uri);
     }
@@ -293,7 +295,7 @@ internal sealed class StudioForm : Form
             return;
         }
         var generation = navigationGeneration;
-        if ((workspaceExit.IsPending || exitApproved) && action is "generateAI" or "testAIConnection" or "execute" or "setTime" or "importJSON" or "exportJSON" or "importAIImages" or "saveAISettings" or "startVoiceRecording" or "transcribeVoice" or "saveVoiceSettings" or "deleteVoiceKey")
+        if ((workspaceExit.IsPending || exitApproved) && action is "generateAI" or "testAIConnection" or "execute" or "setTime" or "importJSON" or "exportJSON" or "importAIImages" or "saveAISettings" or "startVoiceRecording" or "transcribeVoice" or "saveVoiceSettings" or "deleteVoiceKey" or "audioTestStart" or "r6AudioSet" or "r6AudioCalibrate" or "r6KeymapExecute")
         {
             ReplyError(id, "正在保存工作区，请等待完成后再操作。", generation); return;
         }
@@ -322,7 +324,18 @@ internal sealed class StudioForm : Form
                     var voiceCancelled = activeVoiceRequestId == voiceId;
                     if (voiceCancelled) voiceCancellation?.Cancel();
                     Reply(id, new { cancelled = voiceCancelled, requestId = voiceId }, generation); return;
+                case "audioTestDevices":
+                    Reply(id, AudioDevices.Snapshot(), generation); return;
+                case "audioTestStart":
+                    if(deviceWritePending||miaoCall?.IsBusy==true||voiceRecorder.RequestId!=null||activeVoiceRequestId!=null)throw new IOException("语音或设备通道正在使用。");
+                    AudioDevices.ValidateInput(payload.TryGetProperty("inputId",out var selectedInput)?selectedInput.GetString():null);
+                    Reply(id,audioTestRecorder.Start(VoiceRecorder.ReadRequestId(payload)),generation); return;
+                case "audioTestStop":
+                    Reply(id,audioTestRecorder.Stop(VoiceRecorder.ReadRequestId(payload)),generation); return;
+                case "audioTestCancel":
+                    Reply(id,audioTestRecorder.Cancel(VoiceRecorder.ReadRequestId(payload)),generation); return;
                 case "startVoiceRecording":
+                    if(audioTestRecorder.RequestId!=null||deviceWritePending)throw new IOException("语音或设备通道正在使用。");
                     Reply(id, voiceRecorder.Start(VoiceRecorder.ReadRequestId(payload)), generation); return;
                 case "stopVoiceRecording":
                     Reply(id, voiceRecorder.Stop(VoiceRecorder.ReadRequestId(payload)), generation); return;
@@ -349,7 +362,7 @@ internal sealed class StudioForm : Form
             if (!BackendActions.Contains(action)) { ReplyError(id, "不支持的操作：" + action, generation); return; }
             if (activeVoiceRequestId is not null && action is "saveVoiceSettings" or "deleteVoiceKey")
                 throw new IOException("语音正在转写，请先结束输入或等待完成后再修改配置。");
-            if (writesDevice && (deviceWritePending || activeAIRequestId is not null))
+            if (writesDevice && (deviceWritePending || activeAIRequestId is not null || audioTestRecorder.RequestId is not null || voiceRecorder.RequestId is not null))
             {
                 ReplyError(id, "设备操作或 AI 请求正在进行，请等待完成后再试。", generation);
                 return;
@@ -358,7 +371,17 @@ internal sealed class StudioForm : Form
             try
             {
                 // Keep subprocess I/O and JSON parsing off the UI thread; marshal only events and replies.
-                var result = await Task.Run(() => backend.RunAsync(action, payload, record =>
+                using var calibrationRoute = action == "r6AudioCalibrate" ? new AudioDevices.RouteGuard() : null;
+                using var calibrationStream = action == "r6AudioCalibrate" ? AudioDevices.Silence() : null;
+                using var calibrationPlayer = calibrationStream != null ? new System.Media.SoundPlayer(calibrationStream) : null;
+                var effectivePayload=payload;
+                if(calibrationPlayer!=null){
+                    if(!payload.TryGetProperty("confirmCalibration",out var confirmed)||confirmed.ValueKind!=JsonValueKind.True)throw new IOException("请先确认校准操作。");
+                    AudioDevices.ValidateCalibrationOutput();calibrationPlayer.Load();calibrationPlayer.PlayLooping();
+                    var prepared=payload.EnumerateObject().ToDictionary(x=>x.Name,x=>(object?)x.Value.Clone());prepared["nativeAudioActive"]=true;effectivePayload=JsonSerializer.SerializeToElement(prepared);
+                }
+                JsonElement result;
+                try { result = await Task.Run(() => backend.RunAsync(action, effectivePayload, record =>
                 {
                     var values = record.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone());
                     if (VoiceBackendActions.Contains(action))
@@ -367,6 +390,8 @@ internal sealed class StudioForm : Form
                     values.TryAdd("id", id);
                     PostToUi(() => SendEvent(values, generation));
                 }, suppressDiagnostics: VoiceBackendActions.Contains(action)));
+                    if(calibrationPlayer!=null){AudioDevices.ValidateCalibrationOutput();if(calibrationRoute?.Changed==true)throw new IOException("校准期间音频输出发生改变，结果需要重新确认。");}
+                } finally {calibrationPlayer?.Stop();}
                 Reply(id, result, generation);
             }
             finally { if (writesDevice) deviceWritePending = false; }
@@ -555,7 +580,7 @@ internal sealed class StudioForm : Form
         if (workspaceFailureShowing) return;
         var token = workspaceExit.Begin(intent);
         if (token is null) return;
-        voiceRecorder.CancelAll();
+        voiceRecorder.CancelAll(); audioTestRecorder.CancelAll();
         voiceCancellation?.Cancel();
         if(miaoCall!=null){try{await miaoCall.StopForExitAsync();}catch(IOException e){FailWorkspaceExit(token,e.Message);return;}}
         if (!documentReady || web.CoreWebView2 is null) { CompleteWorkspaceExit(token); return; }

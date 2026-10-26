@@ -3,9 +3,9 @@
 import argparse, json, os, subprocess, sys, time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PYTHON_TESTS=['backend-check.py','ai-conversation-check.py','workspace-conversation-check.py','speech-input-check.py','companion-check.py','miaocall-codex-check.py','agent-tasks-check.py','codex-connection-check.py']
-JS_TESTS=['model-check.cjs','chat-ui-check.cjs','workspace-save-ui-check.cjs','miaocall-ui-check.cjs','agent-tasks-ui-check.cjs','codex-setup-ui-check.cjs','theme-ui-check.cjs','appearance-performance-check.cjs','preview-aspect-check.cjs']
-MAC_TESTS=['companion-native-check.py','miaocall-native-check.py','native-workspace-exit-check.py']
+PYTHON_TESTS=['device-sync-state-check.py','r6-audio-check.py','r6-keymap-check.py','r6-partial-lighting-check.py','r6-firmware-check.py','backend-check.py','ai-conversation-check.py','workspace-conversation-check.py','speech-input-check.py','companion-check.py','miaocall-codex-check.py','agent-tasks-check.py','codex-connection-check.py']
+JS_TESTS=['r6-audio-ui-check.cjs','r6-keymap-ui-check.cjs','model-check.cjs','chat-ui-check.cjs','workspace-save-ui-check.cjs','miaocall-ui-check.cjs','agent-tasks-ui-check.cjs','codex-setup-ui-check.cjs','theme-ui-check.cjs','appearance-performance-check.cjs','preview-aspect-check.cjs']
+MAC_TESTS=['r6-native-audio-check.py','companion-native-check.py','miaocall-native-check.py','native-workspace-exit-check.py']
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mac-native',action='store_true');p.add_argument('--output',type=Path,default=ROOT/'build/release-check');args=p.parse_args()
  args.output.mkdir(parents=True,exist_ok=True);results=[]

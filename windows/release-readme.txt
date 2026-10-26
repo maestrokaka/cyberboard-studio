@@ -1,9 +1,9 @@
-Cyberboard Studio 1.0.0-miaocall.windows.beta.1 · Windows x64 私有测试版
+Cyberboard Studio 1.0.0-beta.15 · Windows x64 测试版
 
 第三方怒喵（Angry Miao）键盘工具，面向 CYBERBOARD R4 / CYBERBOARD R6。
 本版将喵唤通用 Codex 任务与桌面喵娘接入 Windows。仍为私有 Beta，Windows
 原生窗口、麦克风、全局快捷键、Codex 登录与真实任务、USB 和 R4 写入待实机验收。
-本次不替换 macOS Tasks Beta 3，也不修改公开仓库和公开 Beta 14。
+Beta 15 同时更新 macOS 与 Windows，公开和私有仓库均提供。
 完整指南与验收范围：
 https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/MIAOCALL_WINDOWS.md
 https://github.com/maestrokaka/cyberboard-studio-miaocall/blob/feature/miaocall-companion/docs/RELEASE_NOTES_WINDOWS_BETA1.md
@@ -26,7 +26,7 @@ Codex 由下面的官方安装入口另外安装，不随包复制账户资料�
 兼容包只取消本 App 的 CET 标记，不修改系统安全设置，不扩大 .NET 官方系统
 支持范围。优先更新系统后继续使用普通包，不要混用普通和兼容包的文件。
 
-Windows Private Beta 1 本次更新
+Windows Beta 15 本次更新
 • 通用 Codex 任务：工作目录、文字或语音输入、持久记录、继续追问、执行中
   补充指令、逐次授权和结果文件。实际能力取决于本机 Codex 的工具和连接。
 • “连接本机 Codex”提供安装、浏览器登录、检测和手动选择原生 codex.exe。

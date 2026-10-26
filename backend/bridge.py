@@ -76,6 +76,32 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def sync_state(transfer="not-started", keymap="not-checked"):
+    """Keep transport receipt separate from readback and unreadable LED pixels."""
+    changed = transfer != "not-started"
+    acknowledged = transfer == "acknowledged"
+    return {"syncStateVersion": 1, "transferState": transfer,
+            "keymapVerification": keymap,
+            "ledVerification": "protocol-ack-only" if acknowledged else "unknown" if changed else "not-written",
+            "deviceState": "last-written" if acknowledged and keymap == "verified" else "unknown" if changed else "unchanged",
+            "deviceMayHaveChanged": changed}
+
+
+def recorded_sync_state(record):
+    """Old failed/executing records cannot prove that JSON_START was never sent."""
+    if record.get("syncStateVersion") == 1 and record.get("transferState") in (
+            "not-started", "started", "sent", "acknowledged", "unknown"):
+        keymap = record.get("keymapVerification", "unknown")
+        return sync_state(record["transferState"], keymap if keymap in (
+            "not-checked", "verified", "mismatch", "unknown") else "unknown")
+    if record.get("status") == "prepared":
+        return sync_state()
+    if (record.get("status") == "complete" or record.get("success") is True) and \
+            record.get("deviceAck") is True and record.get("keymapMatch") is True:
+        return sync_state("acknowledged", "verified")
+    return sync_state("unknown", "unknown")
+
+
 def configure_stdio():
     """The native hosts exchange UTF-8 JSON, regardless of Windows code page."""
     if sys.platform == "win32":
@@ -525,7 +551,7 @@ class Bridge:
         return config
 
     def require_current_led_baseline(self, pid, current):
-        """Do not reuse an old unreadable LED baseline after a consumed write.
+        """Do not reuse an old unreadable LED baseline after a possible write.
 
         Plan metadata and its result are independent local completion records.
         Either can establish verified success; an executing record alone cannot.
@@ -540,7 +566,13 @@ class Bridge:
                 metadata = load_json(folder / "plan.json")
                 if not isinstance(metadata, dict) or metadata.get("productId") != pid or \
                         metadata.get("planVersion") != 2 or metadata.get("token") != folder.name or \
-                        metadata.get("status") not in ("executing", "complete"):
+                        metadata.get("status") not in ("executing", "complete", "failed"):
+                    continue
+                # Versioned not-started records are durable evidence that the
+                # serial open/preflight failed before JSON_START. Older failed
+                # records had no boundary marker and must stay conservative.
+                if metadata.get("status") != "complete" and metadata.get("syncStateVersion") == 1 and \
+                        metadata.get("transferState") == "not-started" and metadata.get("deviceMayHaveChanged") is False:
                     continue
                 if not all(isinstance(metadata.get(field), str) and
                            re.fullmatch(r"[0-9a-f]{64}", metadata[field])
@@ -564,6 +596,7 @@ class Bridge:
                     any(isinstance(attempt, dict) and attempt.get("keymapMatch") is True and
                         attempt.get("completeKeycodes") == 1400 for attempt in readback_attempts)
                 stamps = [metadata.get("createdTimestamp"), metadata.get("startedTimestamp"),
+                          metadata.get("writeStartedTimestamp"), metadata.get("failedTimestamp"),
                           metadata.get("completedTimestamp")]
                 if verified_report:
                     stamps.append(report.get("completedTimestamp"))
@@ -575,7 +608,7 @@ class Bridge:
             return
         _, _, latest, verified = max(candidates, key=lambda value: value[:2])
         current_hash = digest(current)
-        if current_hash != latest["storedBaselineHash"] or current_hash == latest["targetHash"]:
+        if current_hash != latest["storedBaselineHash"] or verified and current_hash == latest["targetHash"]:
             return
         previous_mtime = latest.get("currentRecordMtimeNs")
         current_mtime = self.current_record_mtime_ns(pid)
@@ -589,10 +622,12 @@ class Bridge:
         if verified:
             raise BridgeError("baseline_store_incomplete",
                               "上次灯效已同步，但本机完整配置记录仍是同步前的旧版本。继续同步可能覆盖刚成功的灯效。"
-                              "请先通过可信 CLI 修复或更新完整配置记录，再重新准备同步。")
+                              "请先通过可信 CLI 修复或更新完整配置记录，再重新准备同步。",
+                              **sync_state("acknowledged", "verified"))
         raise BridgeError("baseline_result_unknown",
                           "上次设备写入的结果未能完整留存，当前灯效基线无法确认。"
-                          "请先通过可信 CLI 更新完整配置记录，再重新准备同步。")
+                          "请先通过可信 CLI 更新完整配置记录，再重新准备同步。",
+                          **recorded_sync_state(latest))
 
     def current_record_mtime_ns(self, pid):
         try:
@@ -1025,7 +1060,20 @@ class Bridge:
         return keys
 
     def keymapCatalog(self, payload):
-        return keymap_codec.catalog()
+        return {**keymap_codec.catalog(), "r6DirectKeymapSupported": True}
+
+    def require_r6_fullwrite_safe(self, identity):
+        from r6_keymap import is_r6, inspect_advanced_protection, R6KeymapError
+        if not is_r6(identity):
+            return
+        try:
+            protection = inspect_advanced_protection(self, identity, refresh=True)
+        except R6KeymapError as error:
+            raise BridgeError(error.code, error.message, **error.details) from None
+        require(protection.get("known") is True and protection.get("active") is False,
+                "r6_advanced_preservation_required",
+                "这把 R6 的宏或长短按表仍在使用，或未能完整读取。当前完整灯效同步无法保证保留这些表，已停止写入；请先在键位页核对。",
+                advancedProtection=protection)
 
     def decode_binding(self, code, known=None):
         return keymap_codec.decode(code)
@@ -1238,8 +1286,19 @@ class Bridge:
                                   "topFrames": page["frames"]["frame_num"],
                                   "keyFrames": page["keyframes"]["frame_num"],
                                   "speedMs": page["speed_ms"], "brightness": page["lightness"]})
-                results.append({"id": f"{source}:{path.name}", "snapshotId": f"{source}:{path.name}",
-                                "createdAt": stamp, "filename": path.name, "slots": slots, "source": "last-written"})
+                item = {"id": f"{source}:{path.name}", "snapshotId": f"{source}:{path.name}",
+                        "createdAt": stamp, "filename": path.name, "slots": slots, "source": "last-written"}
+                if source == "app":
+                    token = path.stem.rsplit("--", 1)[-1]
+                    if TOKEN_RE.fullmatch(token):
+                        try:
+                            metadata = load_json(self.state_dir / "plans" / token / "plan.json")
+                            if isinstance(metadata, dict) and metadata.get("token") == token and metadata.get("productId") == pid:
+                                item.update(recorded_sync_state(metadata), attemptStatus=metadata.get("status", "unknown"),
+                                            snapshotScope="before-write")
+                        except (OSError, ValueError, TypeError):
+                            item.update(sync_state("unknown", "unknown"), attemptStatus="unknown", snapshotScope="before-write")
+                results.append(item)
             except (OSError, ValueError, TypeError, KeyError, BridgeError):
                 continue
         return sorted(results, key=lambda value: value["createdAt"], reverse=True)[:100]
@@ -1250,6 +1309,7 @@ class Bridge:
     def fresh_baseline(self, payload, *, preserve_current_keymap=False):
         identity = self.discover(payload)
         require(identity is not None, "device_missing", "请通过 USB 连接键盘后重新检测。")
+        self.require_r6_fullwrite_safe(identity)
         config = self.stored_config(identity.product_id, required=True)
         validate_config(config, self.cli)
         self.require_current_led_baseline(identity.product_id, config)
@@ -1374,7 +1434,7 @@ class Bridge:
         atomic_json(folder / "before.json", before)
         atomic_json(folder / "target.json", target)
         (folder / "before.raw").write_bytes(raw)
-        metadata = {"planVersion": 2, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
+        metadata = {**sync_state(), "planVersion": 2, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
                     "status": "prepared", "productId": identity.product_id, "firmware": identity.version,
                     "port": identity.port, "storedBaselineHash": digest(stored),
                     "beforeHash": digest(before), "targetHash": digest(target),
@@ -1408,7 +1468,7 @@ class Bridge:
                         "brightness": page["lightness"], "speedMs": page["speed_ms"],
                         "enabled": bool(page["valid"]), "wordEnabled": bool(page.get("word_page", {}).get("valid"))}
                        for slot, page in sorted(restore_pages.items())]
-        return {**extra, "token": token, "changedSlots": sorted(slots), "totalFrames": fp.total,
+        return {**extra, **sync_state(), "token": token, "changedSlots": sorted(slots), "totalFrames": fp.total,
                 "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
                 "backupPath": str(backup), "summary": summary, "keyChangeCount": len(changes),
                 "config": self.provenance(target, "prepared"), "device": self.device_dict(identity),
@@ -1493,6 +1553,7 @@ class Bridge:
                 "device_changed", "所选 USB 键盘已变化，请重新检测。")
         self.require_no_current_record(identity.product_id)
         self.require_unstarted_initialization(identity.product_id)
+        self.require_r6_fullwrite_safe(identity)
         live, raw = self.read_live(identity.port)
         defaults = self.built_in_defaults()
         target = initial_configuration(identity.product_id, live, defaults["pages"])
@@ -1536,7 +1597,7 @@ class Bridge:
                    "ledSource": "unknown-before-initialization", "limitations": list(INITIALIZATION_LIMITATIONS),
                    "keymapPreservation": preservation, "summary": summary,
                    "builtinSummary": self.builtin_summary(target), "builtinSource": copy.deepcopy(defaults["source"])}
-        metadata = {**details, "planVersion": 3, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
+        metadata = {**details, **sync_state(), "planVersion": 3, "token": token, "createdAt": now_iso(), "createdTimestamp": time.time(),
                     "status": "prepared", "productId": identity.product_id, "firmware": identity.version,
                     "port": identity.port, "targetHash": digest(target), "liveSnapshotHash": digest(snapshot),
                     "builtinDefaultsHash": digest(defaults),
@@ -1545,7 +1606,7 @@ class Bridge:
         atomic_json(folder / "plan.json", metadata)
         config = copy.deepcopy(target)
         config["_provenance"] = {"led": "unknown-before-initialization", "keymap": "live"}
-        return {**details, "token": token, "totalFrames": fp.total, "status": "prepared",
+        return {**details, **sync_state(), "token": token, "totalFrames": fp.total, "status": "prepared",
                 "estimatedSeconds": math.ceil(fp.total * self.cli["cb_write"].WRITE_DELAY + 20),
                 "config": config, "device": self.device_dict(identity), "keymap": self.keymap_view(live)}
 
@@ -1579,7 +1640,7 @@ class Bridge:
         # current baseline, and final target validation precedes any write.
         return self.prepare({"preserveCurrentKeymap": True}, context, restore_source=snapshot_id, restore_pages=pages)
 
-    def send_config(self, port, fp, pre_start=None):
+    def send_config(self, port, fp, pre_start=None, on_transfer=None):
         """CLI-equivalent serial write, with CRC/header checks and real frame progress."""
         writer, protocol = self.cli["cb_write"], self.cli["cb_protocol"]
         ser = writer.serial.Serial(port, baudrate=self.cli["cb_device"].BAUD, timeout=10,
@@ -1590,7 +1651,13 @@ class Bridge:
             self.event("starting", 0, fp.total)
             if pre_start is not None:
                 pre_start()
-            ser.write(protocol.build_frame(*writer.CMD_JSON_START))
+            start_frame = protocol.build_frame(*writer.CMD_JSON_START)
+            if on_transfer is not None:
+                # This callback durably invalidates the old LED baseline before
+                # a write can partially reach the device or the process exits.
+                on_transfer("started")
+            require(ser.write(start_frame) == 64, "short_usb_write", "USB 开始命令发送中断，请检查连接。",
+                    deviceMayHaveChanged=True)
             ser.flush()
             reply = ser.read(64)
             require(len(reply) == 64 and reply[:3] == b"\x01\x05\x01" and protocol.crc_ok(reply),
@@ -1608,12 +1675,17 @@ class Bridge:
                     end += sections[section][1]
             ser.flush()
             time.sleep(writer.WRITE_DELAY)
-            ser.write(protocol.build_frame(*writer.CMD_JSON_END, fp.total.to_bytes(4, "big", signed=True)))
+            require(ser.write(protocol.build_frame(*writer.CMD_JSON_END, fp.total.to_bytes(4, "big", signed=True))) == 64,
+                    "short_usb_write", "USB 完成命令发送中断，请检查连接。", deviceMayHaveChanged=True)
             ser.flush()
+            if on_transfer is not None:
+                on_transfer("sent")
             self.event("committing", fp.total, fp.total)
             reply = ser.read(64)
             for _ in range(15):
                 if len(reply) == 64 and reply[:3] == b"\x01\x06\x01" and protocol.crc_ok(reply):
+                    if on_transfer is not None:
+                        on_transfer("acknowledged")
                     return reply
                 if not (len(reply) == 64 and reply[:3] == b"\x01\x06\x02" and protocol.crc_ok(reply)):
                     break
@@ -1689,6 +1761,7 @@ class Bridge:
         identity = self.discover({"port": metadata["port"]})
         require(identity is not None and identity.product_id == metadata["productId"] and identity.version == metadata["firmware"],
                 "device_changed", "连接的键盘或固件发生变化，请重新检测。")
+        self.require_r6_fullwrite_safe(identity)
         fp = validate_config(target, self.cli)
         require(fp.total == metadata["totalFrames"], "plan_tampered", "同步数据量发生变化，请重新准备。")
         # Read exactly once after encoding, close to JSON_START. Never silently
@@ -1699,7 +1772,7 @@ class Bridge:
         # Final store comparison immediately before the destructive JSON_START.
         require(digest(self.stored_config(identity.product_id, required=True)) == metadata["storedBaselineHash"],
                 "baseline_changed", "本机配置已更新，请重新准备同步。")
-        metadata.update(status="executing", startedAt=now_iso(), startedTimestamp=time.time(),
+        metadata.update(sync_state(), status="executing", startedAt=now_iso(), startedTimestamp=time.time(),
                         currentRecordMtimeNs=self.current_record_mtime_ns(identity.product_id))
         atomic_json(folder / "plan.json", metadata)
         return self._execute_configuration(folder, metadata, identity, target, fp)
@@ -1737,6 +1810,7 @@ class Bridge:
         require(identity is not None and identity.product_id == metadata["productId"] and
                 identity.version == metadata["firmware"] and identity.port == metadata["port"],
                 "device_changed", "连接的键盘、USB 端口或固件发生变化，请重新检测。")
+        self.require_r6_fullwrite_safe(identity)
         fp = validate_initial_configuration(target, live_before, metadata.get("appliedSlots"), self.cli, defaults["pages"])
         require(fp.total == metadata["totalFrames"], "plan_tampered", "首次配置数据量发生变化，请重新准备。")
         live, _ = self.read_live(identity.port)
@@ -1744,26 +1818,56 @@ class Bridge:
                 matrix(live) == matrix(target["key_layer"]),
                 "keymap_changed", "键盘上的键位已变化，请重新准备首次配置。")
         self.require_no_current_record(identity.product_id)
-        # This durable, separate marker precedes JSON_START. Even if completion
-        # and failure reports cannot be saved, another init cannot trust the
-        # potentially reset matrix as the original device state.
-        atomic_json(self.initialization_marker(identity.product_id),
-                    {"initialization": True, "productId": identity.product_id, "token": metadata["token"],
-                     "startedAt": now_iso(), "targetHash": metadata["targetHash"], "scope": "live-keymap-only"})
-        metadata.update(status="executing", startedAt=now_iso(), startedTimestamp=time.time())
+        metadata.update(sync_state(), status="executing", startedAt=now_iso(), startedTimestamp=time.time())
         atomic_json(folder / "plan.json", metadata)
         return self._execute_configuration(folder, metadata, identity, target, fp)
 
     def _execute_configuration(self, folder, metadata, identity, target, fp):
+        attempts, archive_warnings, matched = [], [], False
+
+        def transfer(stage):
+            next_state = sync_state(stage)
+            if stage == "started":
+                next_metadata = {**metadata, **next_state, "writeStartedAt": now_iso(),
+                                 "writeStartedTimestamp": time.time()}
+                marker = self.initialization_marker(identity.product_id) if metadata.get("initialization") is True else None
+                try:
+                    if marker is not None:
+                        # This separate marker survives a lost plan/report. It
+                        # is created only after serial open and final preflight.
+                        atomic_json(marker, {"initialization": True, "productId": identity.product_id,
+                                             "token": metadata["token"], "startedAt": next_metadata["writeStartedAt"],
+                                             "targetHash": metadata["targetHash"], "scope": "live-keymap-only"})
+                    atomic_json(folder / "plan.json", next_metadata)
+                except BaseException:
+                    # The callback has not returned, so no serial write can have
+                    # happened. Remove only this attempt's initialization marker.
+                    if marker is not None:
+                        try:
+                            if load_json(marker).get("token") == metadata["token"]:
+                                marker.unlink()
+                        except (OSError, ValueError, TypeError):
+                            pass
+                    raise
+                metadata.update(next_metadata)
+                return
+            metadata.update(next_state)
+            try:
+                atomic_json(folder / "plan.json", metadata)
+            except Exception as error:
+                # After sending, a report failure must not stop the actual
+                # device readback or turn verified success into a USB failure.
+                archive_warnings.append(f"同步阶段记录未保存：{error}")
+
         try:
             if metadata.get("initialization") is True:
                 ack = self.send_config(identity.port, fp,
-                                       pre_start=lambda: self.require_no_current_record(identity.product_id))
+                                       pre_start=lambda: self.require_no_current_record(identity.product_id),
+                                       on_transfer=transfer)
             else:
-                ack = self.send_config(identity.port, fp)
+                ack = self.send_config(identity.port, fp, on_transfer=transfer)
             self.event("verifying", fp.total, fp.total)
             time.sleep(self.cli["cb_write"].SETTLE_SECONDS)
-            attempts, archive_warnings, matched = [], [], False
             for attempt in range(3):
                 try:
                     after = self.cli["cb_device"].probe(identity.port, full=True)
@@ -1786,14 +1890,33 @@ class Bridge:
                     time.sleep(5)
             require(matched, "verification_failed", "键盘已接收数据，但完整键位核对未通过。请保留同步快照并重新检测。",
                     deviceMayHaveChanged=True, deviceAck=True, backupPath=metadata["backupPath"], attempts=attempts)
-        except Exception as error:
-            metadata.update(status="failed", failedAt=now_iso(), error=str(error))
-            atomic_json(folder / "plan.json", metadata)
+        except BaseException as error:
+            stage = metadata.get("transferState", "unknown")
+            keymap = "mismatch" if any(attempt.get("completeKeycodes") == 1400 and
+                                      attempt.get("keymapMatch") is False for attempt in attempts) else \
+                "not-checked" if stage == "not-started" else "unknown"
+            failure_state = sync_state(stage, keymap)
+            metadata.update(failure_state, status="failed", failedAt=now_iso(), failedTimestamp=time.time(),
+                            error=str(error), deviceAck=stage == "acknowledged", keymapMatch=False,
+                            readbackAttempts=attempts)
+            try:
+                atomic_json(folder / "plan.json", metadata)
+            except Exception as save_error:
+                archive_warnings.append(f"同步失败记录未保存：{save_error}")
+            details = {**failure_state, "deviceAck": stage == "acknowledged", "keymapMatch": False,
+                       "backupPath": metadata["backupPath"], "attempts": attempts}
+            if archive_warnings:
+                details["reportWarning"] = "\n".join(archive_warnings)
             if isinstance(error, BridgeError):
+                error.details.update(details)
                 raise
-            raise BridgeError("write_interrupted", "同步中断，键盘可能已经接收部分数据。请保留同步快照并重新检测。",
-                              deviceMayHaveChanged=True, backupPath=metadata["backupPath"], reason=str(error)) from error
-        # Device success is now established by an ACK and a complete readback.
+            if not isinstance(error, Exception):
+                raise
+            message = "同步中断，键盘可能已经接收部分数据。请保留同步快照并重新检测。" if failure_state["deviceMayHaveChanged"] else \
+                "同步尚未开始，未向键盘写入数据。请检查连接后重新准备。"
+            raise BridgeError("write_interrupted", message, **details, reason=str(error)) from error
+        # The device ACK and complete key readback are established. LED pixels
+        # cannot be read back; their state remains last-written, never verified.
         # A later local bookkeeping failure cannot turn it into a USB failure.
         return self._complete_verified_write(folder, metadata, identity, target, fp, ack, attempts, archive_warnings)
 
@@ -1818,7 +1941,7 @@ class Bridge:
             device = {"productId": identity.product_id, "firmware": identity.version,
                       "port": identity.port, "connected": True, "lastSeen": None}
             store_warnings.append(str(error))
-        report = {"success": True, "deviceAck": True, "keymapMatch": True, "stateStored": state_stored,
+        report = {**sync_state("acknowledged", "verified"), "success": True, "deviceAck": True, "keymapMatch": True, "stateStored": state_stored,
                   "reportStored": not report_warnings, "backupPath": metadata["backupPath"], "changedSlots": metadata["changedSlots"],
                   "keyChangeCount": metadata["keyChangeCount"], "device": device,
                   "writtenAt": now_iso(), "totalFrames": fp.total, "readbackAttempts": attempts,
@@ -1845,7 +1968,7 @@ class Bridge:
             if report_warnings:
                 report["reportWarning"] = "\n".join(report_warnings)
 
-        metadata.update(status="complete", completedAt=report["writtenAt"], completedTimestamp=report["completedTimestamp"],
+        metadata.update(sync_state("acknowledged", "verified"), status="complete", completedAt=report["writtenAt"], completedTimestamp=report["completedTimestamp"],
                         deviceAck=True, keymapMatch=True, stateStored=state_stored, verifiedTargetHash=metadata["targetHash"])
         try:
             atomic_json(folder / "plan.json", metadata)
@@ -1964,11 +2087,28 @@ class Bridge:
         return {"success": True, "deviceAck": True, "device": self.device_dict(identity),
                 "timezone": timezone_name, "syncedAt": datetime.now(zone).isoformat(timespec="seconds")}
 
+    def r6_action(self, module, action, payload):
+        implementation = importlib.import_module(module)
+        try:
+            return implementation.dispatch(self, action, payload)
+        except (getattr(implementation, "R6AudioError", BridgeError),
+                getattr(implementation, "R6KeymapError", BridgeError),
+                getattr(implementation, "R6FirmwareError", BridgeError)) as error:
+            raise BridgeError(error.code, error.message, **error.details) from None
+
+    def r6AudioStatus(self, payload): return self.r6_action("r6_audio", "r6AudioStatus", payload)
+    def r6AudioSet(self, payload): return self.r6_action("r6_audio", "r6AudioSet", payload)
+    def r6AudioCalibrate(self, payload): return self.r6_action("r6_audio", "r6AudioCalibrate", payload)
+    def r6KeymapRead(self, payload): return self.r6_action("r6_keymap", "r6KeymapRead", payload)
+    def r6KeymapPlan(self, payload): return self.r6_action("r6_keymap", "r6KeymapPlan", payload)
+    def r6KeymapExecute(self, payload): return self.r6_action("r6_keymap", "r6KeymapExecute", payload)
+    def r6FirmwareStatus(self, payload): return self.r6_action("r6_firmware", "r6FirmwareStatus", payload)
+
 
 def main():
     configure_stdio()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "codexConnectionWorker", "agentTaskList", "agentTaskRead", "agentTaskArchive", "agentTaskDelete", "agentTaskDiagnostics", "agentTaskContext", "agentTaskConfigure", "agentTaskReveal", "agentTaskExport", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth"))
+    parser.add_argument("--action", required=True, choices=("bootstrap", "detect", "keymap", "keymapCatalog", "keymapPlan", "readConfiguration", "history", "plan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "saveWorkspace", "testAIConnection", "generateAI", "prepareAIImages", "voiceSettings", "saveVoiceSettings", "revealVoiceKey", "deleteVoiceKey", "transcribeVoice", "miaoCallWorker", "codexConnectionWorker", "agentTaskList", "agentTaskRead", "agentTaskArchive", "agentTaskDelete", "agentTaskDiagnostics", "agentTaskContext", "agentTaskConfigure", "agentTaskReveal", "agentTaskExport", "companionImageSettings", "companionImageSave", "companionImageReveal", "companionOutfitGenerate", "companionOutfitDelete", "runtimeHealth", "r6AudioStatus", "r6AudioSet", "r6AudioCalibrate", "r6KeymapRead", "r6KeymapPlan", "r6KeymapExecute", "r6FirmwareStatus"))
     parser.add_argument("--state-dir", required=True)
     parser.add_argument("--resource-dir", required=True)
     args = parser.parse_args()
@@ -2010,7 +2150,7 @@ def main():
         bridge = Bridge(args.state_dir, args.resource_dir)
         # Native serializes actions; the lock also prevents a second app process
         # from interleaving a plan or write with this one.
-        if args.action in ("plan", "keymapPlan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "detect", "keymap", "readConfiguration"):
+        if args.action in ("plan", "keymapPlan", "builtInPlan", "initializePlan", "execute", "setTime", "restorePlan", "detect", "keymap", "readConfiguration", "r6AudioStatus", "r6AudioSet", "r6AudioCalibrate", "r6KeymapRead", "r6KeymapPlan", "r6KeymapExecute", "r6FirmwareStatus"):
             with operation_lock(bridge.state_dir / ".operation.lock"):
                 result = getattr(bridge, args.action)(payload)
         else:

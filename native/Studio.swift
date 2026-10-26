@@ -2,6 +2,75 @@ import Cocoa
 import WebKit
 import UniformTypeIdentifiers
 import AVFoundation
+import CoreAudio
+
+enum StudioAudioDevices {
+    private static func address(_ selector: AudioObjectPropertySelector, scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+    }
+    private static func defaultID(_ selector: AudioObjectPropertySelector) -> AudioDeviceID {
+        var property = address(selector), value = AudioDeviceID(0), size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &property, 0, nil, &size, &value) == noErr else { return 0 }
+        return value
+    }
+    private static func name(_ device: AudioDeviceID) -> String {
+        var property = address(kAudioObjectPropertyName), value: CFString = "" as CFString
+        var size = UInt32(MemoryLayout<CFString>.size)
+        guard AudioObjectGetPropertyData(device, &property, 0, nil, &size, &value) == noErr else { return "音频设备" }
+        return value as String
+    }
+    private static func hasChannels(_ device: AudioDeviceID, scope: AudioObjectPropertyScope) -> Bool {
+        var property = address(kAudioDevicePropertyStreamConfiguration, scope: scope), size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &property, 0, nil, &size) == noErr, size > 0 else { return false }
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { buffer.deallocate() }
+        guard AudioObjectGetPropertyData(device, &property, 0, nil, &size, buffer) == noErr else { return false }
+        return UnsafeMutableAudioBufferListPointer(buffer.assumingMemoryBound(to: AudioBufferList.self)).contains { $0.mNumberChannels > 0 }
+    }
+    static func snapshot() -> [String: Any] {
+        let input = defaultID(kAudioHardwarePropertyDefaultInputDevice), output = defaultID(kAudioHardwarePropertyDefaultOutputDevice)
+        var property = address(kAudioHardwarePropertyDevices), size: UInt32 = 0
+        var devices: [AudioDeviceID] = []
+        if AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &property, 0, nil, &size) == noErr, size > 0 {
+            devices = Array(repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+            _ = devices.withUnsafeMutableBytes { AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &property, 0, nil, &size, $0.baseAddress!) }
+        }
+        func rows(_ scope: AudioObjectPropertyScope, _ current: AudioDeviceID) -> [[String: Any]] {
+            devices.filter { hasChannels($0, scope: scope) }.map { ["id": String($0), "name": name($0), "isDefault": $0 == current] }
+        }
+        return ["inputs": rows(kAudioDevicePropertyScopeInput, input), "outputs": rows(kAudioDevicePropertyScopeOutput, output),
+                "defaultInputId": String(input), "defaultOutputId": String(output), "selectionMode": "system-default"]
+    }
+    static func validateInput(_ payload: [String: Any]) throws {
+        let current = defaultID(kAudioHardwarePropertyDefaultInputDevice)
+        guard current != 0, payload["inputId"] as? String == String(current) else {
+            throw VoiceRecordingController.failure("默认输入已改变或不可用，请在系统设置选择麦克风后刷新。")
+        }
+    }
+    static func validateCalibrationOutput() throws {
+        let current = defaultID(kAudioHardwarePropertyDefaultOutputDevice)
+        guard current != 0, name(current).lowercased().contains("airohachat") else {
+            throw VoiceRecordingController.failure("请先在系统声音设置将默认输出切换为 AIROHAChat，再刷新并开始校准。")
+        }
+    }
+    static func watchOutput(_ block: @escaping AudioObjectPropertyListenerBlock) throws {
+        var property = address(kAudioHardwarePropertyDefaultOutputDevice)
+        guard AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &property, .main, block) == noErr else {
+            throw VoiceRecordingController.failure("无法监测校准输出，请稍后重试。")
+        }
+    }
+    static func unwatchOutput(_ block: @escaping AudioObjectPropertyListenerBlock) {
+        var property = address(kAudioHardwarePropertyDefaultOutputDevice)
+        AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &property, .main, block)
+    }
+    static func silence() -> Data {
+        var data = Data("RIFF".utf8)
+        func number(_ value: Int, _ count: Int) { for index in 0..<count { data.append(UInt8((value >> (8 * index)) & 255)) } }
+        number(192036, 4); data.append(Data("WAVEfmt ".utf8)); number(16, 4); number(1, 2); number(2, 2)
+        number(48000, 4); number(192000, 4); number(4, 2); number(16, 2); data.append(Data("data".utf8)); number(192000, 4)
+        data.append(Data(repeating: 0, count: 192000)); return data
+    }
+}
 
 protocol VoiceCaptureHandle: AnyObject {
     var currentTime: TimeInterval { get }
@@ -21,6 +90,8 @@ final class VoiceRecordingController {
     private let requestPermission: (@escaping (Bool) -> Void) -> Void
     private let createRecorder: (URL) throws -> VoiceCaptureHandle
     private let temporaryDirectory: URL
+    var maximumDuration: TimeInterval = VoiceRecordingController.maximumSeconds
+    var beforeRecording: (() throws -> Void)?
     var onState: (([String: Any]) -> Void)?
     private(set) var requestID: String?
     private var recorder: VoiceCaptureHandle?
@@ -77,12 +148,13 @@ final class VoiceRecordingController {
             let url = self.temporaryDirectory.appendingPathComponent("cyberboard-voice-" + UUID().uuidString + ".wav")
             self.temporaryURL = url
             do {
+                try self.beforeRecording?()
                 guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
                     throw Self.failure("无法准备临时录音，请检查可用存储空间。")
                 }
                 let recorder = try self.createRecorder(url)
                 self.recorder = recorder
-                guard recorder.prepareToRecord(), recorder.record(forDuration: Self.maximumSeconds) else {
+                guard recorder.prepareToRecord(), recorder.record(forDuration: self.maximumDuration) else {
                     throw Self.failure("无法开始录音，请检查麦克风是否可用。")
                 }
                 let timer = DispatchWorkItem { [weak self] in
@@ -90,7 +162,7 @@ final class VoiceRecordingController {
                     self.finishAtLimit(id)
                 }
                 self.limit = timer
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.maximumSeconds, execute: timer)
+                DispatchQueue.main.asyncAfter(deadline: .now() + self.maximumDuration, execute: timer)
                 let reply = self.startCompletion
                 self.startCompletion = nil
                 reply?(.success(["recording": true, "requestId": id]))
@@ -596,6 +668,10 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var voiceCancelled = false
     private var activeVoiceRequestID: String?
     private let voiceRecorder = VoiceRecordingController()
+    private let audioTestRecorder = VoiceRecordingController()
+    private var calibrationPlayer: AVAudioPlayer?
+    private var calibrationRouteListener: AudioObjectPropertyListenerBlock?
+    private var calibrationRouteChanged = false
     private var miaoCall: MiaoCallController?
     private let aiSettings = AISettingsStore(stateDirectory: FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/Cyberboard Studio", isDirectory: true))
@@ -605,17 +681,20 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var workspaceFailureShowing = false
     private var documentReady = false
     private var exitApproved = false
-    private let releaseVersion = "1.0.0-miaocall.tasks.beta.3"
+    private let releaseVersion = "1.0.0-beta.15"
     private var navigationGeneration = 0
     private let backendActions: Set<String> = [
         "bootstrap", "detect", "readConfiguration", "plan", "builtInPlan", "initializePlan", "execute", "history", "keymap", "keymapCatalog", "keymapPlan", "setTime", "restorePlan", "saveWorkspace",
-        "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice"
+        "voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice",
+        "r6AudioStatus", "r6AudioSet", "r6AudioCalibrate", "r6KeymapRead", "r6KeymapPlan", "r6KeymapExecute", "r6FirmwareStatus"
     ]
-    private let deviceWriteActions: Set<String> = ["execute", "setTime"]
+    private let deviceWriteActions: Set<String> = ["execute", "setTime", "r6AudioSet", "r6AudioCalibrate", "r6KeymapExecute"]
     private let voiceBackendActions: Set<String> = ["voiceSettings", "saveVoiceSettings", "deleteVoiceKey", "revealVoiceKey", "transcribeVoice"]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         voiceRecorder.onState = { [weak self] state in self?.sendEvent(state) }
+        audioTestRecorder.maximumDuration = 30
+        audioTestRecorder.onState = { [weak self] state in var value = state; value["event"] = "audioTestRecording"; self?.sendEvent(value) }
         if let resources = Bundle.main.resourceURL {
             let controller = MiaoCallController(resources: resources)
             controller.onEvent = { [weak self] state in self?.sendEvent(state) }
@@ -625,7 +704,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             }
             controller.canBegin = { [weak self] in
                 guard let self else { return false }
-                return self.voiceRecorder.requestID == nil && self.activeVoiceRequestID == nil &&
+                return self.voiceRecorder.requestID == nil && self.audioTestRecorder.requestID == nil && self.activeVoiceRequestID == nil &&
                     self.activeAIRequestID == nil && !self.deviceWritePending && !self.workspaceExit.isPending && !self.exitApproved
             }
             miaoCall = controller
@@ -671,7 +750,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
-    func applicationWillTerminate(_ notification: Notification) { miaoCall?.shutdown(); voiceRecorder.cancelAll(); cancelActiveVoice() }
+    func applicationWillTerminate(_ notification: Notification) { miaoCall?.shutdown(); voiceRecorder.cancelAll(); audioTestRecorder.cancelAll(); calibrationPlayer?.stop(); calibrationPlayer = nil; cancelActiveVoice() }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if deviceWritePending { showWriteInProgress(); return .terminateCancel }
@@ -693,7 +772,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         guard !workspaceFailureShowing else { return }
         guard let token = workspaceExit.begin(intent) else { return }
         miaoCall?.disable()
-        voiceRecorder.cancelAll()
+        voiceRecorder.cancelAll(); audioTestRecorder.cancelAll()
         cancelActiveVoice()
         if !documentReady { completeWorkspaceExit(token); return }
         sendEvent(["event": "workspaceExit", "phase": "saving"])
@@ -844,7 +923,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             return
         }
         if workspaceExit.isPending || exitApproved,
-           ["generateAI", "testAIConnection", "execute", "setTime", "importJSON", "exportJSON", "importAIImages", "saveAISettings", "startVoiceRecording", "transcribeVoice", "saveVoiceSettings", "deleteVoiceKey"].contains(action) {
+           ["generateAI", "testAIConnection", "execute", "setTime", "importJSON", "exportJSON", "importAIImages", "saveAISettings", "startVoiceRecording", "transcribeVoice", "saveVoiceSettings", "deleteVoiceKey", "audioTestStart", "r6AudioSet", "r6AudioCalibrate", "r6KeymapExecute"].contains(action) {
             reply(id: id, error: "正在保存工作区，请等待完成后再操作。"); return
         }
         if action.hasPrefix("miaoCall") {
@@ -862,6 +941,29 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             return
         }
         switch action {
+        case "audioTestDevices":
+            reply(id: id, result: StudioAudioDevices.snapshot())
+        case "audioTestStart":
+            guard !deviceWritePending, miaoCall?.isBusy != true, voiceRecorder.requestID == nil, activeVoiceRequestID == nil else {
+                reply(id: id, error: "语音或设备通道正在使用，请先完成当前操作。"); return
+            }
+            do {
+                try StudioAudioDevices.validateInput(payload)
+                let requestID = try VoiceRecordingController.requestID(payload)
+                audioTestRecorder.beforeRecording = { try StudioAudioDevices.validateInput(payload) }
+                audioTestRecorder.start(requestID) { [weak self] result in
+                    switch result {
+                    case .success(let value): self?.reply(id: id, result: value)
+                    case .failure(let error): self?.reply(id: id, error: error.localizedDescription)
+                    }
+                }
+            } catch { reply(id: id, error: error.localizedDescription) }
+        case "audioTestStop":
+            do { reply(id: id, result: try audioTestRecorder.stop(VoiceRecordingController.requestID(payload))) }
+            catch { reply(id: id, error: error.localizedDescription) }
+        case "audioTestCancel":
+            do { reply(id: id, result: audioTestRecorder.cancel(try VoiceRecordingController.requestID(payload))) }
+            catch { reply(id: id, error: error.localizedDescription) }
         case "setAppearance":
             guard let theme = payload["theme"] as? String, ["dark", "island"].contains(theme) else {
                 reply(id: id, error: "界面风格无效。"); return
@@ -885,7 +987,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 reply(id: id, result: ["cancelled": cancelled, "requestId": requestID])
             } catch { reply(id: id, error: error.localizedDescription) }
         case "startVoiceRecording":
-            guard miaoCall?.isBusy != true, activeVoiceRequestID == nil else { reply(id: id, error: "语音通道正在使用，请先完成或取消。"); return }
+            guard miaoCall?.isBusy != true, activeVoiceRequestID == nil, audioTestRecorder.requestID == nil, !deviceWritePending else { reply(id: id, error: "语音通道正在使用，请先完成或取消。"); return }
             do {
                 let requestID = try VoiceRecordingController.requestID(payload)
                 let generation = navigationGeneration
@@ -1063,7 +1165,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let isAI = aiRequestID != nil
         let isVoice = voiceRequestID != nil
         let writesDevice = deviceWriteActions.contains(action)
-        if writesDevice && (deviceWritePending || activeAIRequestID != nil || miaoCall?.isBusy == true) {
+        if writesDevice && (deviceWritePending || activeAIRequestID != nil || miaoCall?.isBusy == true || audioTestRecorder.requestID != nil || voiceRecorder.requestID != nil) {
             reply(id: id, error: "设备操作或 AI 请求正在进行，请等待完成后再试。")
             return
         }
@@ -1097,6 +1199,29 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             executable = URL(fileURLWithPath: path)
             leadingArguments = ["-X", "utf8", "-u", script.path]
         }
+        var preparedPayload = payload
+        if action == "r6AudioCalibrate" {
+            do {
+                guard payload["confirmCalibration"] as? Bool == true else { throw VoiceRecordingController.failure("请先确认校准操作。") }
+                try StudioAudioDevices.validateCalibrationOutput()
+                calibrationRouteChanged = false
+                let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                    self?.calibrationRouteChanged = true; self?.calibrationPlayer?.stop()
+                }
+                try StudioAudioDevices.watchOutput(listener)
+                calibrationRouteListener = listener
+                let player = try AVAudioPlayer(data: StudioAudioDevices.silence())
+                player.numberOfLoops = -1
+                guard player.prepareToPlay(), player.play() else { throw VoiceRecordingController.failure("无法开启校准音频流。") }
+                calibrationPlayer = player
+                preparedPayload["nativeAudioActive"] = true
+            } catch {
+                if let listener = calibrationRouteListener { StudioAudioDevices.unwatchOutput(listener) }
+                calibrationRouteListener = nil; calibrationPlayer?.stop(); calibrationPlayer = nil
+                reply(id: id, error: error.localizedDescription); return
+            }
+        }
+        let effectivePayload = preparedPayload
         if writesDevice { deviceWritePending = true }
         let stateDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Cyberboard Studio", isDirectory: true)
@@ -1141,7 +1266,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             var launchError: String?
             var watchdog: DispatchWorkItem?
             do {
-                var requestPayload = payload
+                var requestPayload = effectivePayload
                 if isAI {
                     let injected = try self.aiSettings.inject(payload, allowInactive: action == "testAIConnection")
                     requestPayload = injected.payload
@@ -1209,6 +1334,16 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let final = lines.finalReply.map { isAI ? AISettingsStore.redact($0, secret: secret) as! [String: Any] : $0 }
             let errorMessage = launchError ?? lines.parseError
             DispatchQueue.main.async {
+                var calibrationError: String?
+                if action == "r6AudioCalibrate" {
+                    do {
+                        try StudioAudioDevices.validateCalibrationOutput()
+                        guard !self.calibrationRouteChanged, self.calibrationPlayer?.isPlaying == true else { throw VoiceRecordingController.failure("校准输出已改变或音频流停止，结果需要重新确认。") }
+                    } catch { calibrationError = error.localizedDescription }
+                    self.calibrationPlayer?.stop(); self.calibrationPlayer = nil
+                    if let listener = self.calibrationRouteListener { StudioAudioDevices.unwatchOutput(listener) }
+                    self.calibrationRouteListener = nil
+                }
                 self.voiceProcessLock.lock()
                 let voiceCancelledAtReply = isVoice && self.voiceCancelled
                 self.voiceProcessLock.unlock()
@@ -1218,7 +1353,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 guard generation == self.navigationGeneration else { return }
                 if cancelled || voiceCancelledAtReply {
                     self.reply(id: id, result: ["cancelled": true, "requestId": (voiceRequestID ?? aiRequestID)!])
-                } else if let error = errorMessage {
+                } else if let error = calibrationError ?? errorMessage {
                     self.reply(id: id, error: error)
                 } else if let final {
                     if let error = final["error"] { self.reply(id: id, error: error) }
@@ -1252,7 +1387,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         documentReady = false
         miaoCall?.disable()
-        voiceRecorder.cancelAll()
+        voiceRecorder.cancelAll(); audioTestRecorder.cancelAll()
         cancelActiveVoice()
         cancelActiveAI()
         navigationGeneration += 1
@@ -1261,7 +1396,7 @@ final class StudioApp: NSObject, NSApplicationDelegate, NSWindowDelegate,
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         documentReady = false
         miaoCall?.disable()
-        voiceRecorder.cancelAll()
+        voiceRecorder.cancelAll(); audioTestRecorder.cancelAll()
         cancelActiveVoice()
     }
 

@@ -27,6 +27,8 @@ internal sealed class VoiceRecorder : IDisposable
     private readonly Func<IVoiceCapture> createCapture;
     private readonly Func<TimeSpan> elapsed;
     private readonly bool schedulePolling;
+    private readonly int maximumSeconds;
+    private int MaximumCapturePcmBytes => SampleRate * 2 * maximumSeconds;
     private readonly Stopwatch watch = new();
     private IVoiceCapture? capture;
     private MemoryStream? pcm;
@@ -35,11 +37,13 @@ internal sealed class VoiceRecorder : IDisposable
     internal string? RequestId { get; private set; }
     internal event Action<object>? StateChanged;
 
-    internal VoiceRecorder(Func<IVoiceCapture>? createCapture = null, Func<TimeSpan>? elapsed = null, bool schedulePolling = true)
+    internal VoiceRecorder(Func<IVoiceCapture>? createCapture = null, Func<TimeSpan>? elapsed = null, bool schedulePolling = true, int maximumSeconds = MaximumSeconds)
     {
         this.createCapture = createCapture ?? (() => new WinMMVoiceCapture());
         this.elapsed = elapsed ?? (() => watch.Elapsed);
         this.schedulePolling = schedulePolling;
+        if(maximumSeconds<1||maximumSeconds>MaximumSeconds)throw new ArgumentOutOfRangeException(nameof(maximumSeconds));
+        this.maximumSeconds=maximumSeconds;
     }
     internal static string ReadRequestId(JsonElement payload)
     {
@@ -77,7 +81,7 @@ internal sealed class VoiceRecorder : IDisposable
     private void Add(byte[] bytes)
     {
         if (bytes.Length % 2 != 0) throw new IOException("录音数据无效，请重新录制。");
-        var count = Math.Min(bytes.Length, MaximumPcmBytes - (int)pcm!.Length);
+        var count = Math.Min(bytes.Length, MaximumCapturePcmBytes - (int)pcm!.Length);
         if (count > 0) pcm.Write(bytes, 0, count);
     }
     private void FinishCapture()
@@ -102,7 +106,7 @@ internal sealed class VoiceRecorder : IDisposable
             try
             {
                 Add(capture.ReadAvailable());
-                if (elapsed().TotalSeconds >= MaximumSeconds || pcm!.Length >= MaximumPcmBytes)
+                if (elapsed().TotalSeconds >= maximumSeconds || pcm!.Length >= MaximumCapturePcmBytes)
                 {
                     FinishCapture();
                     state = new { @event = "voiceRecording", requestId, recording = false, reason = "limit" };

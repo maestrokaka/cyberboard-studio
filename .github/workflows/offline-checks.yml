@@ -1,7 +1,7 @@
 name: Offline release checks
 on:
   push:
-    branches: [feature/miaocall-companion]
+    branches: [main, feature/miaocall-companion]
   pull_request:
   workflow_dispatch:
 permissions:

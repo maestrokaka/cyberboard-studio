@@ -1,7 +1,7 @@
-name: Private Windows native checks
+name: Windows native checks
 on:
   push:
-    branches: [feature/miaocall-companion]
+    branches: [main, feature/miaocall-companion]
     paths:
       - 'windows/**'
       - 'backend/**'
@@ -16,8 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   windows-native:
-    # This feature is private. Never run its release checks against the public fork.
-    if: github.repository == 'maestrokaka/cyberboard-studio-miaocall'
+    if: github.repository == 'maestrokaka/cyberboard-studio-miaocall' || github.repository == 'maestrokaka/cyberboard-studio'
     runs-on: windows-2022
     timeout-minutes: 20
     env:
@@ -53,6 +52,9 @@ jobs:
           if (-not (Select-String -Quiet -Path build/windows-native-check/host-bridge.log -SimpleMatch 'PASS Windows native Job Object')) {
             throw 'The Windows process ownership check did not execute.'
           }
+      - name: Verify local audio test capture and calibration WAV without hardware
+        shell: pwsh
+        run: python tests/r6-native-audio-check.py --dotnet (Get-Command dotnet).Source
       - name: Verify Windows worker liveness cannot terminate a task
         shell: pwsh
         run: |

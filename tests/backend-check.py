@@ -66,6 +66,12 @@ class BackendChecks(unittest.TestCase):
                                                      serial=types.SimpleNamespace(Serial=self.serial), _record_write=self.record)
         self.cli["cb_settime"] = types.SimpleNamespace(serial=types.SimpleNamespace(Serial=self.serial))
         self.backend = bridge.Bridge(self.directory / "app-state", resources, self.cli, version, self.events.append)
+        # Full-config fault tests isolate the independently tested R6 table
+        # readback. The fixture explicitly has no macros or tap/hold entries.
+        import r6_keymap
+        self.advanced_fixture = patch.object(r6_keymap, "inspect_advanced_protection", return_value={"known": True, "active": False, "source": "fixture-readback"})
+        self.advanced_fixture.start()
+        self.addCleanup(self.advanced_fixture.stop)
         self.sleep = patch.object(bridge.time, "sleep", return_value=None)
         self.sleep.start()
 
@@ -73,6 +79,21 @@ class BackendChecks(unittest.TestCase):
         self.sleep.stop()
         self.env.stop()
         self.temp.cleanup()
+
+    def test_r6_full_write_refuses_active_unbound_advanced_tables(self):
+        import r6_keymap
+        with patch.object(r6_keymap, "inspect_advanced_protection", return_value={"known": True, "active": True}):
+            with self.assertRaises(bridge.BridgeError) as error:
+                self.backend.plan(self.payload())
+        self.assertEqual(error.exception.code, "r6_advanced_preservation_required")
+        self.assertEqual(self.sent, [])
+
+    def test_r6_full_write_refuses_unknown_advanced_tables(self):
+        import r6_keymap
+        with patch.object(r6_keymap, "inspect_advanced_protection", return_value={"known": False, "active": None}):
+            with self.assertRaises(bridge.BridgeError):
+                self.backend.plan(self.payload())
+        self.assertEqual(self.sent, [])
 
     def fixture(self):
         frame = lambda n: {"valid": 1, "frame_num": 1,
@@ -381,8 +402,9 @@ class BackendChecks(unittest.TestCase):
         self.bad_start_crc = True
         self.expect_error("start_ack_failed", lambda: self.backend.execute({"token": result["token"]}))
         self.assertEqual(self.recorded, [])
-        self.bad_start_crc = False
-        self.sent.clear()
+        self.expect_error("baseline_result_unknown", lambda: self.prepared_keymap())
+
+    def test_keymap_failed_readback_never_records_success(self):
         result = self.prepared_keymap()
         self.retry_mismatches = 99
         self.expect_error("verification_failed", lambda: self.backend.execute({"token": result["token"]}))
@@ -1131,8 +1153,11 @@ class BackendChecks(unittest.TestCase):
                 raise OSError("isolated failure report failure")
             return original(path, value, **kwargs)
 
-        with patch.object(bridge, "atomic_json", failed_status), self.assertRaises(OSError):
+        with patch.object(bridge, "atomic_json", failed_status), self.assertRaises(bridge.BridgeError) as caught:
             self.initialize_execute(result)
+        self.assertEqual(caught.exception.code, "end_ack_failed")
+        self.assertTrue(caught.exception.details["deviceMayHaveChanged"])
+        self.assertIn("isolated failure report failure", caught.exception.details["reportWarning"])
         self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
         self.expect_error("initialization_unresolved", lambda: self.backend.initializePlan(self.initialization_payload()))
 
@@ -1145,12 +1170,18 @@ class BackendChecks(unittest.TestCase):
                 raise OSError("isolated durable marker failure")
             return original(path, value, **kwargs)
 
-        with patch.object(bridge, "atomic_json", failed_marker), self.assertRaises(OSError):
+        with patch.object(bridge, "atomic_json", failed_marker), self.assertRaises(bridge.BridgeError) as caught:
             self.initialize_execute(result)
+        self.assertEqual(caught.exception.code, "write_interrupted")
+        self.assertFalse(caught.exception.details["deviceMayHaveChanged"])
+        self.assertEqual(caught.exception.details["deviceState"], "unchanged")
         self.assertEqual(self.sent, [])
         self.assertIsNone(self.real_cli["cb_store"].load_current("AM01R6"))
         metadata = bridge.load_json(self.backend.state_dir / "plans" / result["token"] / "plan.json")
-        self.assertEqual(metadata["status"], "prepared")
+        self.assertEqual(metadata["status"], "failed")
+        self.assertEqual(metadata["transferState"], "not-started")
+        self.assertFalse(self.backend.initialization_marker("AM01R6").exists())
+        self.backend.initializePlan(self.initialization_payload())
 
     def builtin_prepared(self, indices=None):
         source = self.backend.readConfiguration({})

@@ -128,7 +128,7 @@ function harness(options = {}) {
   }
   const themeCache=new Map(options.themeCache?[['cyberboard-ui-theme',options.themeCache]]:[]);
   const context = { window, document, console, localStorage:{getItem:key=>themeCache.get(key)||null,setItem:(key,value)=>themeCache.set(key,value)}, setTimeout(fn, ms) { const id = ++timerID; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); }, Blob, URL };
-  vm.createContext(context); ['theme.js','data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', 'keymap-client.js', ...(options.chat?['chat-client.js']:[]), 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
+  vm.createContext(context); ['theme.js','data.js', 'studio-model.js', 'preview-selector.js', 'ai-client.js', 'library-client.js', 'keymap-client.js', ...(options.chat?['chat-client.js']:[]), 'r6-audio.js', 'app.js'].forEach(name => vm.runInContext(name === 'data.js' && options.dataPath ? fs.readFileSync(options.dataPath, 'utf8') : read(name), context, { filename: name }));
   return { window, document, calls, control, get app() { return window.StudioApp; }, el: id => document.getElementById(id),
     async flushSave() { for (const [id, item] of [...timers]) if (item.ms <= 250) { timers.delete(id); await item.fn(); } await settle(); },
     replyExecute(value) { assert.ok(executeReply, 'execute must have an explicit click'); executeReply(value); executeReply = null; } };
