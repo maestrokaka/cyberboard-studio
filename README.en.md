@@ -119,7 +119,7 @@ Windows builds require .NET 10 SDK and the prepared Python runtime; see the [run
 
 Source lives in `web/`, `backend/`, `native/` and `windows/src/`. Public artwork, photographs and generic layouts are in `data/`; third-party code and licenses are in `vendor/`. R6 additions are independently implemented from the official website's observed communication behavior rather than copied website business code.
 
-Beta 15 is synchronized to the public and private repositories. Historical Beta 14, RC2 and private tags/assets remain intact. Releases contain packages and checksums, without videos, personal audio, voice-cloning sources, keys, workspaces or device records. For feedback, include the app version, operating system, keyboard model, firmware version and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio/issues).
+This public update includes preview source, documentation and screenshots only; App packages remain private for testing. The briefly published Beta 15 release has been withdrawn. Historical Beta 14, RC2 and 0.4.x tags and assets remain unchanged. Releases contain no videos, personal audio, voice-cloning sources, keys, workspaces or device records. For feedback, include the app version, operating system, keyboard model, firmware version and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio/issues).
 
 ## Support the author
 
