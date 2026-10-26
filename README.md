@@ -4,9 +4,9 @@
 
 面向 **CYBERBOARD R4 / R6** 的第三方键盘工作室：用 AI 对话创作灯效，在真实键盘照片上比较版本，再调整并同步到键盘。也可以开启实验性的「喵唤」，按住一颗键，把语音指令交给本机 Codex。
 
-**[下载 Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[Windows Private Beta 1 · 发布准备与配置指南](docs/MIAOCALL_WINDOWS.md)** · [Windows 更新说明](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [桌面陪伴与衣橱](docs/MIAOCALL_COMPANION.md)
+**[下载 Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[下载 Windows Private Beta 1](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1)** · [Windows 更新说明](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [桌面陪伴与衣橱](docs/MIAOCALL_COMPANION.md)
 
-这是 **私有测试版**，在灯效工作室和桌面陪伴基础上，将喵唤扩展为 Codex 通用任务入口。支持工作目录、持久任务、继续追问、授权与结果文件；Spotify 仅作可选示例。Windows Private Beta 1 正在准备，将同一套任务与桌面陪伴接入 Windows；当前 macOS 下载保持 Tasks Private Beta 3。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
+这是 **私有测试版**，在灯效工作室和桌面陪伴基础上，将喵唤扩展为 Codex 通用任务入口。支持工作目录、持久任务、继续追问、授权与结果文件；Spotify 仅作可选示例。Windows Private Beta 1 已提供下载，将同一套任务与桌面陪伴接入 Windows；当前 macOS 下载保持 Tasks Private Beta 3。只更新此私有仓库，公开仓库与公开 Beta 14 不变。
 
 ## 这一版的喵娘
 
@@ -27,7 +27,7 @@
 - **两种界面风格**：「经典深色」与「暖岛浅色」在设置中即时切换，重开后保留；不改变作品 RGB 或槽位。
 - **键位编辑**：独立页面显示 81 个实体键、7 层可读功能；先编辑本机草稿，审核专用计划后才写入。未知原始码保留，Fn 功能不再只是一串数字。
 - **AI 语音输入**：单独配置 MiniMax、千问或 OpenAI 的语音转文字模型，识别后检查文字，再手动发送制作灯效。
-- **喵唤 MiaoCall · Beta**：按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。Mac 已有私有测试包，Windows 新版正在准备实机验收。
+- **喵唤 MiaoCall · Beta**：按住物理「·」说话，喵娘浮层显示识别与任务进度，可拖到桌面合适位置。默认关闭，开启后才注册快捷键。Mac 与 Windows 均提供私有测试包；Windows 的真实麦克风、快捷键与用户登录仍待实机验收。
 
 ## 界面预览
 
@@ -50,7 +50,7 @@
 | 平台 / 版本 | 下载 | 说明 |
 | --- | --- | --- |
 | **macOS · MiaoCall Tasks Private Beta 3** | [私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3) | Apple Silicon，macOS 13 及以上；含 CLI 与运行环境 |
-| **Windows · MiaoCall Private Beta 1** | [发布准备与配置指南](docs/MIAOCALL_WINDOWS.md) | x64 私有版正在打包验证；原生 GUI、语音、快捷键、Codex 登录与 USB 待实机验收 |
+| **Windows · MiaoCall Private Beta 1** | [普通 x64 / 兼容包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) | 已通过 Windows CI 与包检查；原生 GUI、语音、快捷键、用户登录与 USB 待实机验收 |
 | Windows · 历史 RC2 | [旧版普通 x64 / 兼容包](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | 历史灯效版，不含本次喵唤功能；附件保持原样 |
 
 Mac 下载 `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`，解压后将 App 放入「应用程序」。不要只下载 GitHub 的 Source code；旁边的 `.zip.sha256` 用于校验。无需另装 Python。当前没有 Intel Mac、Windows 32 位或 ARM64 原生新包。
@@ -110,6 +110,8 @@ Windows 新版在页面内提供「安装 Codex → 登录 → 检测连接」�
 ## 数据与验证范围
 
 个人作品、会话、参考图、槽位草稿、Key 和设备记录与 App 安装目录分开保存，不进入源码或发布包。录音最长 60 秒，仅在明确操作后采集；临时录音结束或取消后清理，不进入作品库或工作区。同步灯效和修改键位分别需要专用计划与确认，不会因打开 App、切换外观或更新软件自动写入键盘。
+
+Windows Private Beta 1 已通过 17 组本机离线套件、两个实际 ZIP 各 14 项包检查、包内 64 组预览比例检查，以及 Windows CI 的 40 组宿主检查和 2 项进程探活。官方 CLI 安装、自动发现与真实 app-server 初始化 / 未登录状态查询也已通过；这些检查未登录用户账户。原生 GUI、真实麦克风、快捷键、用户登录与 USB 仍待个人 Windows 电脑实测。[Windows CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)
 
 Beta 14 已验证 14 组前端 / 预览回归、照片像素与 83 颗轴灯遮罩一致性、首次及再次进入外观页、macOS 签名包搬移启动和工作区保存恢复。语音请求的 TLS 漏包问题已修复，证书和主机名验证保持开启。Windows 原生界面 / USB、更多固件及 R4 对应写入仍需实机验收；不将本版标为正式稳定版。
 

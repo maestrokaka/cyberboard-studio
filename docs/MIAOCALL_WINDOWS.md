@@ -1,12 +1,12 @@
 # 喵唤 Windows · Private Beta 1
 
-版本：`1.0.0-miaocall.windows.beta.1`。本页对应正在准备的 Windows 私有测试包；macOS 继续使用 Tasks Private Beta 3。Windows 真机的窗口、麦克风、全局按键、Codex 登录和 USB 尚待验收。
+版本：`1.0.0-miaocall.windows.beta.1`。[Windows 私有测试包与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) 已提供下载；macOS 继续使用 Tasks Private Beta 3。Windows 真机的窗口、麦克风、全局按键、Codex 登录和 USB 尚待验收。
 
 喵唤把你确认后的文字或语音交给本机 Codex，适合整理文件、总结资料、修改项目等任务。每个任务有自己的工作目录、记录与后续追问。实际可执行的操作取决于 Codex 已配置的工具和连接；本版没有接管其他 Codex 桌面聊天。
 
 ## 安装软件
 
-1. 从本私有仓库 Releases 下载 Windows x64 ZIP 和对应 `.zip.sha256`，核对校验值。不要下载 Source code 代替安装包。
+1. 从 [Windows Private Beta 1 发布页](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) 下载 Windows x64 ZIP 和对应 `.zip.sha256`，核对校验值。不要下载 Source code 代替安装包。
 2. 将整个 ZIP 解压到普通目录，例如 `D:\Apps\Cyberboard Studio`，运行 `Cyberboard Studio.exe`。保留旁边所有 DLL、`resources`、`Dependencies`。
 3. 若提示缺少 WebView2，运行随包的 `Dependencies\MicrosoftEdgeWebview2Setup.exe`，按 Microsoft 安装向导完成后重开。
 
@@ -83,3 +83,12 @@ App 数据在 `%LOCALAPPDATA%\Cyberboard Studio`，CLI 设备记录在 `%LOCALAP
 | 任务报错或中断 | 在任务详情查看错误，可复制不含正文与 Key 的诊断；核对已发生的操作后再继续，不盲目重做。 |
 
 反馈时附版本、Windows 版本、复现步骤和脱敏截图；不要发送 Key、录音、认证文件或整个个人数据目录。Windows 原生窗口、真实麦克风、按键监听、官方登录及 USB 写入仍是本 Beta 的实机验收项目；离线协议通过不能替代这些检查。
+
+## 本版验证记录
+
+- 17 组本机离线套件通过；两个实际 ZIP 各通过 14 项包检查，包内预览通过 64 组比例检查。
+- Windows CI 通过 40 组宿主检查与 2 项进程探活，包括 Job Object 回收所属子进程，以及不误杀无关进程的检查。
+- Windows CI 实际安装官方 `codex-cli 0.164.0`，不刷新 PATH 即发现默认安装路径；真实 app-server 的 `initialize` / `account/read` 返回 `installed=true`、`protocolReady=true`、`authenticated=false`。这次没有登录用户、启动模型轮次或执行 Codex 工具，用户官方浏览器登录仍待实机。
+- Linux / Mac 通用 CI 通过。真实 GUI 操作、麦克风、全局快捷键、用户登录和 USB 仍待个人 Windows 电脑实测。
+
+[Windows CI 记录](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI 记录](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)

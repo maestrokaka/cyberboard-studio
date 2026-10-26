@@ -4,9 +4,9 @@
 
 A third-party **CYBERBOARD R4 / R6** studio: create lighting through AI conversations, compare versions on real keyboard photographs, and review a plan before syncing. The optional MiaoCall beta turns a held key and a voice instruction into a persistent local Codex task.
 
-**[Download Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[Windows Private Beta 1 · preparation and setup guide — Chinese](docs/MIAOCALL_WINDOWS.md)** · [Windows release notes — Chinese](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [Companion guide — Chinese](docs/MIAOCALL_COMPANION.md)
+**[Download Tasks Private Beta 3 · macOS](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3)** · **[Download Windows Private Beta 1](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1)** · [Windows release notes — Chinese](docs/RELEASE_NOTES_WINDOWS_BETA1.md) · [Companion guide — Chinese](docs/MIAOCALL_COMPANION.md)
 
-This **private beta** adds persistent Codex tasks, follow-ups, working folders, approvals, results and artifacts. It includes a persistent or wake-only desktop companion, 15 hover interactions, 32 poses across four outfit/hair variants, four offline voice styles and opt-in AI wardrobe generation. It preserves the Beta 14 lighting studio. Windows Private Beta 1 is being prepared with the same task and companion features; the current Mac download remains Tasks Private Beta 3. The public repository and public Beta 14 release are unchanged.
+This **private beta** adds persistent Codex tasks, follow-ups, working folders, approvals, results and artifacts. It includes a persistent or wake-only desktop companion, 15 hover interactions, 32 poses across four outfit/hair variants, four offline voice styles and opt-in AI wardrobe generation. It preserves the Beta 14 lighting studio. Windows Private Beta 1 is available with the same task and companion features; the current Mac download remains Tasks Private Beta 3. The public repository and public Beta 14 release are unchanged.
 
 ## Desktop companion and wardrobe
 
@@ -27,7 +27,7 @@ The default character height remains 300. Beta 3 fixes all 20 custom outfits bei
 - **Two styles:** Classic Dark and Warm Island Light, switchable in Settings and retained after restart without changing artwork RGB or slot drafts.
 - **Keymap editor:** readable functions for 81 physical keys across seven layers, local drafts and a separate reviewed write plan. Unknown raw codes are preserved.
 - **AI dictation:** separately configure a supported MiniMax, Qwen or OpenAI ASR model, review the transcript, then explicitly send it to create lighting.
-- **MiaoCall beta:** hold the physical `·` key to speak. A draggable catgirl overlay shows listening and task progress. The shortcut starts off and is registered only when enabled. The Mac private package is available; the new Windows port is awaiting native acceptance.
+- **MiaoCall beta:** hold the physical `·` key to speak. A draggable catgirl overlay shows listening and task progress. The shortcut starts off and is registered only when enabled. Private packages are available for Mac and Windows; real Windows microphone, shortcut and user sign-in acceptance remains pending.
 
 ## Screenshots
 
@@ -50,7 +50,7 @@ Screenshots use a separate interface demonstration environment with no personal 
 | Platform / version | Download | Scope |
 | --- | --- | --- |
 | **macOS · MiaoCall Tasks Private Beta 3** | [Private package and SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.tasks.beta.3) | Apple Silicon, macOS 13+; CLI and runtime included |
-| **Windows · MiaoCall Private Beta 1** | [Preparation and setup guide — Chinese](docs/MIAOCALL_WINDOWS.md) | Private x64 package being built and checked; native GUI, microphone, shortcut, Codex login and USB still need real-machine acceptance |
+| **Windows · MiaoCall Private Beta 1** | [Standard x64 / compatibility packages and SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) | Windows CI and package checks passed; native GUI, microphone, shortcut, user sign-in and USB still need real-machine acceptance |
 | Windows · older RC2 | [Historical x64 / compatibility packages](https://github.com/maestrokaka/cyberboard-studio/releases/tag/v1.0.0-rc.2) | Earlier lighting build without MiaoCall; historical assets remain unchanged |
 
 On Mac, download `Cyberboard-Studio-1.0.0-miaocall.tasks.beta.3-macOS-Apple-Silicon.zip`, extract it and move the app to Applications. Verify the matching `.zip.sha256` file first. This private beta is ad-hoc signed and not notarized: on first launch, Control-click the app, choose **Open**, then choose **Open** again in the system dialog. Do not disable Gatekeeper or use copied quarantine-removal commands as a normal install step. No separate Python installation is required. See the [private macOS installation guide](docs/PRIVATE_MACOS_INSTALL.md). There is no new Intel Mac, 32-bit Windows or native Windows ARM64 package.
@@ -108,6 +108,8 @@ Each animation uses a background-removed, front-view CYBERBOARD R6 Vision photog
 
 Works, conversations, reference images, drafts, keys and device records stay outside the installation directory and release assets. Recordings are limited to 60 seconds and start only after an explicit action; temporary audio is cleaned up and is not stored in works or the workspace. Lighting sync and keymap writes use separate reviewed plans. Starting the app, selecting a photograph or upgrading does not write to the keyboard.
 
+Windows Private Beta 1 passed 17 local offline suites, 14 package checks for each of the two actual ZIPs, 64 packaged preview-aspect cases, 40 Windows host checks and two Windows process-liveness checks. Official CLI installation, automatic discovery and real app-server initialization / signed-out account queries also passed without signing in a user. Native GUI, microphone, shortcut, user sign-in and USB acceptance on a personal Windows PC is still pending. [Windows CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)
+
 Beta 14 passed fourteen UI / preview groups, byte-identical photo and 83-mask checks, cold and warm appearance-entry tests, relocated signed macOS startup and workspace restoration. The packaged speech-runtime TLS-file omission is fixed while certificate and hostname verification remain enabled. Windows GUI / USB, additional firmware and corresponding R4 writes still need hardware acceptance. This is not a stable 1.0 release.
 
 ## Building and contributing
@@ -121,7 +123,7 @@ python3 scripts/prepare-data.py
 native/build.sh --backend-dir build/macos-backend/CyberboardBackend
 ```
 
-The app is generated at `build/Cyberboard Studio.app`. Windows development notes are in [the runtime guide](windows/runtime-readme.txt); the new Windows Private Beta 1 package is being prepared for private testing. Offline checks use synthetic devices and HTTP substitutes, without USB or model credits. See the [offline checks](README.md#离线验证).
+The app is generated at `build/Cyberboard Studio.app`. Windows development notes are in [the runtime guide](windows/runtime-readme.txt); Windows Private Beta 1 is available for private testing. Offline checks use synthetic devices and HTTP substitutes, without USB or model credits. See the [offline checks](README.md#离线验证).
 
 This private `feature/miaocall-companion` contains Tasks Beta 3 and Windows Private Beta 1 integration source and assets. It is not pushed to public main; personal audio, voice-cloning sources and desktop recordings are excluded. Public Beta 14 and existing RC2 tags and downloads remain unchanged. For feedback, include your app version, operating system, keyboard model and reproduction steps in an [issue](https://github.com/maestrokaka/cyberboard-studio-miaocall/issues).
 

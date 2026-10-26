@@ -1,6 +1,6 @@
 # MiaoCall · Windows Private Beta 1
 
-版本：`1.0.0-miaocall.windows.beta.1`。发布准备中的 Windows x64 私有测试版；仅同步私有仓库，macOS Tasks Private Beta 3 与公开 Beta 14 保持原样。
+版本：`1.0.0-miaocall.windows.beta.1`。[Windows x64 私有测试版与 SHA-256](https://github.com/maestrokaka/cyberboard-studio-miaocall/releases/tag/v1.0.0-miaocall.windows.beta.1) 已提供下载；仅同步私有仓库，macOS Tasks Private Beta 3 与公开 Beta 14 保持原样。
 
 ## 本次变化
 
@@ -17,8 +17,14 @@
 
 ## 验证范围
 
-Windows 宿主交叉编译已通过；宿主通信、录音资源释放、取消、工作区保存等待等 39 组离线检查已在 macOS 运行通过。新增的授权与登录检查使用合成子进程，不登录真实账户、不消耗模型额度。Windows 专用进程回收分支仍须在 Windows 执行，不能把 Mac 上通过的测试当成已完成该分支验证。
+- 17 组本机离线套件通过。
+- 两个实际 ZIP 各通过 14 项包检查；包内预览通过 64 组比例检查。
+- Windows CI 通过 40 组宿主检查和 2 项进程探活，包含 Job Object 所属子进程回收及不误杀无关进程的检查。
+- Windows CI 实际安装官方 `codex-cli 0.164.0`，未刷新 PATH 即自动发现默认路径。真实 app-server 初始化与 `account/read` 返回已安装、协议就绪、未登录；没有登录用户账户、启动模型轮次或执行 Codex 工具。
+- Linux / Mac 通用 CI 通过。
 
-本版还需 Windows 真机验收原生窗口、桌面拖动与透明点击区域、麦克风、全局快捷键、官方浏览器登录、实际 Codex 任务和 USB；不是稳定 1.0 正式版。最终包检查与附件校验以正式上传时记录为准。
+[Windows CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014974) · [Linux / Mac CI](https://github.com/maestrokaka/cyberboard-studio-miaocall/actions/runs/40306014874)
+
+本版仍需个人 Windows 电脑验收原生窗口与桌面拖动、透明点击区域、真实麦克风、全局快捷键、用户浏览器登录、实际 Codex 任务和 USB。进程探活和未登录接口检查不能替代这些验收；本版不是稳定 1.0 正式版。
 
 不附桌面演示视频、私人音频、声纹源素材、Key 或用户工作区。历史 Mac 包与公开发布附件不变。
